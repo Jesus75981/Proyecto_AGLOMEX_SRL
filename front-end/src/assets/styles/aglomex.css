@@ -1,0 +1,56 @@
+/*
+  Archivo de estilos personalizados para la marca Aglomex.
+  Utiliza la paleta de colores oficial (naranja, negro, blanco).
+*/
+
+/* Definición de la paleta de colores personalizados */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-primary: #FF5722; /* El naranja distintivo de Aglomex */
+    --color-secondary: #000000; /* El color negro para el texto y elementos oscuros */
+    --color-background: #F8F8F8; /* Un blanco roto o gris claro para el fondo */
+    --color-text: #333333; /* Color de texto principal */
+    --color-light-text: #FFFFFF; /* Color de texto para fondos oscuros */
+  }
+}
+
+@layer components {
+  /* Estilos para el contenedor principal de la aplicación */
+  .app-container {
+    @apply min-h-screen bg-aglomex-background text-aglomex-text;
+    font-family: 'Inter', sans-serif;
+  }
+
+  /*
+    Estilos para el botón principal (naranja de Aglomex).
+    Tiene efectos de hover y focus para una mejor experiencia de usuario.
+  */
+  .btn-primary {
+    @apply px-6 py-3 rounded-full font-bold text-aglomex-light-text bg-aglomex-primary
+           hover:bg-opacity-90 transition-colors duration-300 shadow-lg
+           focus:outline-none focus:ring-4 focus:ring-aglomex-primary focus:ring-opacity-50;
+  }
+
+  /* Estilos para los títulos y encabezados de la aplicación */
+  .title-main {
+    @apply text-4xl font-extrabold text-aglomex-secondary mb-4;
+  }
+
+  .subtitle-section {
+    @apply text-2xl font-semibold text-aglomex-text mb-6;
+  }
+
+  /* Estilos para las tarjetas o contenedores de contenido */
+  .card-default {
+    @apply bg-white rounded-xl shadow-xl p-8 transition-transform transform hover:scale-105;
+  }
+
+  /* Estilos para el logotipo de Aglomex */
+  .logo-aglomex {
+    @apply h-16 w-auto;
+  }
+}

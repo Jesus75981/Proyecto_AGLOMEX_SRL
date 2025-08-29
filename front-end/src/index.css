@@ -1,3 +1,6 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Importación de estilos personalizados de Aglomex */
+@import './assets/styles/aglomex.css';
