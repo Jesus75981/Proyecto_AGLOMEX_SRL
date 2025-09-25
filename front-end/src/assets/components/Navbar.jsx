@@ -1,46 +1,30 @@
-import React from "react";
-import { Link } from "react-router-dom";
+import React from 'react';
+import { Link } from 'react-router-dom';
 
-function Navbar() {
+const Navbar = () => {
   return (
-    <nav className="bg-blue-600 text-white shadow-md">
-      <div className="container mx-auto px-4 py-3 flex justify-between items-center">
-        
-        {/* Logo */}
-        <h1 className="text-2xl font-bold tracking-wide hover:text-gray-200">
-          Proyecto Muebles
-        </h1>
-
-        {/* Links */}
-        <ul className="flex space-x-6 text-lg font-medium">
-          <li>
-            <Link 
-              to="/" 
-              className="hover:text-yellow-300 transition-colors"
-            >
-              Inicio
-            </Link>
-          </li>
-          <li>
-            <Link 
-              to="/ventas" 
-              className="hover:text-yellow-300 transition-colors"
-            >
-              Ventas
-            </Link>
-          </li>
-          <li>
-            <Link 
-              to="/login" 
-              className="hover:text-yellow-300 transition-colors"
-            >
-              Login
-            </Link>
-          </li>
-        </ul>
+    <nav className="bg-gray-800 p-4 rounded-lg shadow-lg mb-8">
+      <div className="container mx-auto flex justify-between items-center">
+        <div className="text-white font-bold text-2xl">
+          <Link to="/">Muebles 2025</Link>
+        </div>
+        <div className="flex space-x-4">
+          <Link to="/catalogo" className="text-gray-300 hover:text-white transition-colors duration-300">
+            Catálogo
+          </Link>
+          <Link to="/inventario" className="text-gray-300 hover:text-white transition-colors duration-300">
+            Inventario
+          </Link>
+          <Link to="/finanzas" className="text-gray-300 hover:text-white transition-colors duration-300">
+            Finanzas
+          </Link>
+          <Link to="/compras" className="text-gray-300 hover:text-white transition-colors duration-300">
+            Compras
+          </Link>
+        </div>
       </div>
     </nav>
   );
-}
+};
 
 export default Navbar;

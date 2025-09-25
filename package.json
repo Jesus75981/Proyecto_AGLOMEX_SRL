@@ -9,14 +9,15 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "cors": "^2.8.5",
     "express": "^5.1.0",
-    "mongoose": "^8.14.2",
-    "morgan": "^1.10.0"
+    "mongoose": "^8.18.0",
+    "morgan": "^1.10.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.1",
     "vite": "^5.1.0"
   }
-} 
+}
