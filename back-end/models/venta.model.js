@@ -27,6 +27,12 @@ const ventaSchema = new mongoose.Schema({
       precioTotal: Number
     }
   ],
+  serviciosAdicionales: [
+    {
+      nombre: { type: String, required: true },
+      costo: { type: Number, required: true },
+    },
+  ],
   metodoPago: {
     type: String,
     enum: ["Efectivo", "Transferencia", "Cheque", "Credito"],

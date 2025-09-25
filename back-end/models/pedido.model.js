@@ -21,6 +21,12 @@ const pedidoSchema = new mongoose.Schema({
     enum: ["pendiente", "en_produccion", "despachado", "entregado"], 
     default: "pendiente" 
   },
+  serviciosAdicionales: [
+    {
+      nombre: { type: String, required: true },
+      costo: { type: Number, required: true },
+    },
+  ],
   fechaPedido: { type: Date, default: Date.now },
   fechaEntrega: Date,
   direccionEntrega: { type: String },

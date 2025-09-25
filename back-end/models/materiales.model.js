@@ -27,6 +27,10 @@ const materialSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "Proveedor"
   },
+  activo: {
+    type: Boolean,
+    default: true
+  },
   imagen: {
     type: String,
     default: ""

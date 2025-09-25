@@ -1,14 +1,33 @@
 import ProductoTienda from "../models/productoTienda.models.js";
 
+// Función para generar un ID único
+const generarCodigoInterno = (nombre) => {
+  const prefijo = nombre.substring(0, 3).toUpperCase();
+  const timestamp = Date.now().toString().slice(-5);
+  const random = Math.floor(Math.random() * 1000);
+  return `${prefijo}-${timestamp}-${random}`;
+};
+
 export const crearProducto = async (req, res) => {
-  const producto = new ProductoTienda(req.body);
-  await producto.save();
-  res.status(201).json(producto);
+  try {
+    const idProductoTienda = generarCodigoInterno(req.body.nombre);
+    const productoData = { ...req.body, idProductoTienda };
+    const producto = new ProductoTienda(productoData);
+    await producto.save();
+    res.status(201).json(producto);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 };
 
 export const listarProductos = async (req, res) => {
-  const productos = await ProductoTienda.find().populate("proveedor objeto3D");
-  res.json(productos);
+  try {
+    // Solo muestra los productos que tienen el estado activo: true
+    const productos = await ProductoTienda.find({ activo: true }).populate("proveedor objeto3D");
+    res.json(productos);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 };
 
 export const actualizarProducto = async (req, res) => {
@@ -17,6 +36,18 @@ export const actualizarProducto = async (req, res) => {
 };
 
 export const eliminarProducto = async (req, res) => {
-  await ProductoTienda.findByIdAndDelete(req.params.id);
-  res.json({ message: "Producto eliminado" });
+  try {
+    // En lugar de borrar, actualiza el estado 'activo' a false
+    const producto = await ProductoTienda.findByIdAndUpdate(
+      req.params.id,
+      { activo: false },
+      { new: true } // Para devolver el documento actualizado
+    );
+    if (!producto) {
+      return res.status(404).json({ message: "Producto no encontrado" });
+    }
+    res.json({ message: "Producto eliminado lógicamente (inactivado)" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 };

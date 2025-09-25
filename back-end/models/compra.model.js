@@ -15,17 +15,23 @@ const compraSchema = new mongoose.Schema({
     ref: "Proveedor", // relación con proveedores.model.js
     required: true
   },
+  tipoCompra: {
+    type: String,
+    enum: ["Materia Prima", "Producto Terminado"],
+    required: true,
+  },
   productos: [
     {
       producto: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "ProductoTienda", // relación con productoTienda.models.js
-        required: true
+        ref: "ProductoTienda", // Asume un solo modelo para simplicidad
+        required: true,
       },
       cantidad: Number,
       precioUnitario: Number,
-      precioTotal: Number
-    }
+      precioTotal: Number,
+      codigoProveedor: String, // Se mantiene para rastrear el código de proveedor
+    },
   ],
   metodoPago: {
     type: String,
@@ -38,4 +44,6 @@ const compraSchema = new mongoose.Schema({
   observaciones: String
 }, { timestamps: true });
 
+
 export default mongoose.model("Compra", compraSchema);
+                                       

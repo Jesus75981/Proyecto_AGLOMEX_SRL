@@ -1,9 +1,9 @@
 import Venta from "../models/venta.js";
 
 export const registrarVenta = async (req, res) => {
-  const venta = new Venta(req.body);
-  await venta.save();
-  res.status(201).json(venta);
+  const venta = new Venta(req.body);
+  await venta.save();
+  res.status(201).json(venta);
 };
 
 export const listarVentas = async (req, res) => {

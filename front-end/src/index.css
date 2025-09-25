@@ -3,8 +3,10 @@
 @import 'tailwindcss/components';
 @import 'tailwindcss/utilities';
 
+
 /* Importación de estilos personalizados de Aglomex */
 @import './assets/styles/aglomex.css';
+<<<<<<< HEAD
 
 /* Definiciones de fuentes y variables */
 @font-face {
@@ -19,3 +21,7 @@
 body {
   font-family: 'Inter', sans-serif;
 }
+=======
+@import url("slick-carousel/slick/slick.css");
+@import url("slick-carousel/slick/slick-theme.css");
+>>>>>>> 9a2f255f3ac6f4964a29357a6eb1d14d6969aa6f
