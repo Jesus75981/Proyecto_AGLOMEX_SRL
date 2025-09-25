@@ -7,4 +7,4 @@ router.post("/", registrarVenta);
 router.get("/", listarVentas);
 
 export default router;
-4
+

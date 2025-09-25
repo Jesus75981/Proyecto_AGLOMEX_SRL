@@ -25,6 +25,10 @@ const clienteSchema = new mongoose.Schema({
     type: String,
     default: ""
   },
+  activo: {
+    type: Boolean,
+    default: true
+  },
   ci: {
     type: String,
     default: ""

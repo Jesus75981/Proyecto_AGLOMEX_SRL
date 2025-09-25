@@ -16,6 +16,10 @@ const proveedorSchema = new mongoose.Schema({
   nit: {
     type: String
   },
+  activo: {
+    type: Boolean,
+    default: true
+  },
   banco: {
     nombre: String,
     numeroCuenta: String

@@ -38,8 +38,17 @@ const logisticaSchema = new mongoose.Schema({
   },
   metodoEntrega: {
     type: String,
-    enum: ["Recojo en Tienda", "Envio Domicilio"],
+    enum: ["Recojo en Tienda", "Envio Domicilio","Evio Departamental"],
     default: "Envio Domicilio"
+  },
+  tipoMovimiento: {
+    type: String,
+    enum: ["Envío a Cliente", "Traslado Interno"],
+    default: "Envío a Cliente",
+  },
+  costoAdicional: {
+    type: Number,
+    default: 0,
   },
   observaciones: {
     type: String,

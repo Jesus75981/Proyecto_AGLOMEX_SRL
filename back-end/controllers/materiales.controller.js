@@ -7,8 +7,12 @@ export const crearMaterial = async (req, res) => {
 };
 
 export const listarMateriales = async (req, res) => {
-  const materiales = await Material.find().populate("proveedor");
-  res.json(materiales);
+  try {
+    const materiales = await Material.find({ activo: true });
+    res.json(materiales);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 };
 
 export const actualizarMaterial = async (req, res) => {
@@ -17,6 +21,17 @@ export const actualizarMaterial = async (req, res) => {
 };
 
 export const eliminarMaterial = async (req, res) => {
-  await Material.findByIdAndDelete(req.params.id);
-  res.json({ message: "Material eliminado" });
+  try {
+    const material = await Material.findByIdAndUpdate(
+      req.params.id,
+      { activo: false },
+      { new: true }
+    );
+    if (!material) {
+      return res.status(404).json({ message: "Material no encontrado" });
+    }
+    res.json({ message: "Material desactivado exitosamente" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 };

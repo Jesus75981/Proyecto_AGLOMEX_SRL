@@ -11,8 +11,12 @@ export const crearCliente = async (req, res) => {
 };
 
 export const listarClientes = async (req, res) => {
-  const clientes = await Cliente.find();
-  res.json(clientes);
+  try {
+    const clientes = await Cliente.find({ activo: true });
+    res.json(clientes);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 };
 
 export const actualizarCliente = async (req, res) => {
@@ -21,6 +25,17 @@ export const actualizarCliente = async (req, res) => {
 };
 
 export const eliminarCliente = async (req, res) => {
-  await Cliente.findByIdAndDelete(req.params.id);
-  res.json({ message: "Cliente eliminado" });
+  try {
+    const cliente = await Cliente.findByIdAndUpdate(
+      req.params.id,
+      { activo: false },
+      { new: true }
+    );
+    if (!cliente) {
+      return res.status(404).json({ message: "Cliente no encontrado" });
+    }
+    res.json({ message: "Cliente desactivado exitosamente" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 };

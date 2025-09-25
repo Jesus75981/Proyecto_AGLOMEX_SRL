@@ -43,7 +43,13 @@ const productoTiendaSchema = new mongoose.Schema({
   objeto3D: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Objeto3D" // para vincular con el modelo 3D en RA
-  }
+  },
+  
+  // ... (tus campos existentes)
+  activo: {
+    type: Boolean,
+    default: true,
+  },
 }, { timestamps: true });
 
 export default mongoose.model("ProductoTienda", productoTiendaSchema);
