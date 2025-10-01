@@ -33,6 +33,12 @@ const ventaSchema = new mongoose.Schema({
       costo: { type: Number, required: true },
     },
   ],
+  ventasAcumuladas: {
+    type: Number,
+    required: true,
+    default: 0,
+    min: 0
+  },
   metodoPago: {
     type: String,
     enum: ["Efectivo", "Transferencia", "Cheque", "Credito"],

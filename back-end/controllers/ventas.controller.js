@@ -1,9 +1,53 @@
 import Venta from "../models/venta.js";
 
 export const registrarVenta = async (req, res) => {
-  const venta = new Venta(req.body);
-  await venta.save();
-  res.status(201).json(venta);
+    try {
+        const ventaData = req.body;
+        
+        // 1. Crear el documento de Venta
+        const nuevaVenta = new Venta(ventaData);
+        await nuevaVenta.save();
+        
+        // 2. Iterar sobre los productos de la venta y actualizar el inventario y ventasAcumuladas
+        const productosVendidos = ventaData.productos;
+        const operacionesActualizacion = [];
+
+        for (const item of productosVendidos) {
+            const { producto: productoId, cantidad } = item; // productoId es el ObjectId del ProductoTienda
+
+            // Prepara una operación de actualización atómica para el producto
+            operacionesActualizacion.push(
+                ProductoTienda.findByIdAndUpdate(
+                    productoId,
+                    { 
+                        // $inc: Operación atómica para incrementar/decrementar campos
+                        $inc: { 
+                            cantidad: -cantidad, // Decrementa el stock (cantidad)
+                            ventasAcumuladas: cantidad // Incrementa las ventas acumuladas
+                        }
+                    },
+                    { new: true } // Opcional: devuelve el documento actualizado
+                )
+            );
+        }
+
+        // 3. Ejecutar todas las actualizaciones de productos simultáneamente
+        await Promise.all(operacionesActualizacion);
+
+        // 4. Respuesta exitosa
+        return res.status(201).json({ 
+            msg: "Venta registrada exitosamente y productos actualizados.",
+            venta: nuevaVenta 
+        });
+
+    } catch (error) {
+        console.error("Error al registrar la venta:", error);
+        // Manejar posibles errores (ej. producto no encontrado, validación fallida)
+        return res.status(500).json({ 
+            msg: "Error interno del servidor al procesar la venta.", 
+            error: error.message 
+        });
+    }
 };
 
 export const listarVentas = async (req, res) => {
