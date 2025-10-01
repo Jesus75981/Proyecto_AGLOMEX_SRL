@@ -1,3 +1,4 @@
+// models/logistica.model.js
 import mongoose from "mongoose";
 
 const logisticaSchema = new mongoose.Schema({
@@ -18,27 +19,32 @@ const logisticaSchema = new mongoose.Schema({
         ref: "ProductoTienda",
         required: true
       },
-      cantidad: { type: Number, required: true },
-      precioUnitario: { type: Number, required: true },
-      precioTotal: { type: Number, required: true }
+      cantidad: { type: Number, required: true }
+      // ❌ ELIMINAR: precioUnitario y precioTotal (no necesarios en logística)
     }
   ],
   fechaPedido: {
     type: Date,
     default: Date.now
   },
+  fechaEntrega: {  // ✅ AGREGAR: Campo que espera el frontend
+    type: Date,
+    required: true
+  },
   estado: {
     type: String,
-    enum: ["Pendiente", "En Proceso", "Despachado", "Entregado", "Cancelado"],
-    default: "Pendiente"
+    enum: ["pendiente", "en_proceso", "despachado", "entregado", "cancelado"], // ✅ MINÚSCULAS
+    default: "pendiente"
   },
-  direccionEntrega: {
-    type: String,
-    required: true
+  direccionEnvio: {  // ✅ CAMBIAR: de direccionEntrega a direccionEnvio (OBJETO)
+    calle: { type: String, required: true },
+    ciudad: { type: String, required: true },
+    departamento: { type: String, required: true }, // ✅ AGREGAR: departamento
+    codigoPostal: { type: String }
   },
   metodoEntrega: {
     type: String,
-    enum: ["Recojo en Tienda", "Envio Domicilio","Evio Departamental"],
+    enum: ["Recojo en Tienda", "Envio Domicilio", "Envio Departamental"], // ✅ CORREGIR: "Evio" → "Envio"
     default: "Envio Domicilio"
   },
   tipoMovimiento: {

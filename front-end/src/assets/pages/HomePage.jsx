@@ -1,6 +1,6 @@
+// front-end/src/assets/pages/HomePage.jsx
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-
 
 const HomePage = ({ userRole, onLogout }) => {
   const navigate = useNavigate();
@@ -44,7 +44,7 @@ const HomePage = ({ userRole, onLogout }) => {
         {/* Navigation cards container */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 w-full max-w-6xl">
 
-          {/* Sales Card - Visible for both */}
+          {/* Sales Card */}
           <Link to="/ventas" className="group transform transition-all duration-300 hover:scale-105">
             <div className="flex flex-col items-center p-8 bg-white rounded-2xl shadow-xl border-t-4 border-orange-500">
               <span className="text-4xl text-orange-500 mb-4 transition-transform duration-300 group-hover:rotate-6">
@@ -57,7 +57,7 @@ const HomePage = ({ userRole, onLogout }) => {
             </div>
           </Link>
 
-          {/* Purchases Card - Visible for both */}
+          {/* Purchases Card */}
           <Link to="/compras" className="group transform transition-all duration-300 hover:scale-105">
             <div className="flex flex-col items-center p-8 bg-white rounded-2xl shadow-xl border-t-4 border-black">
               <span className="text-4xl text-black mb-4 transition-transform duration-300 group-hover:rotate-6">
@@ -70,7 +70,7 @@ const HomePage = ({ userRole, onLogout }) => {
             </div>
           </Link>
 
-          {/* Manufacturing Card - Visible for both */}
+          {/* Manufacturing Card */}
           <Link to="/fabricacion" className="group transform transition-all duration-300 hover:scale-105">
             <div className="flex flex-col items-center p-8 bg-white rounded-2xl shadow-xl border-t-4 border-orange-500">
               <span className="text-4xl text-orange-500 mb-4 transition-transform duration-300 group-hover:rotate-6">
@@ -83,7 +83,20 @@ const HomePage = ({ userRole, onLogout }) => {
             </div>
           </Link>
 
-          {/* Daily Reports Card - Visible for both */}
+          {/* ✅ LOGÍSTICA CARD - AGREGADA */}
+          <Link to="/logistica" className="group transform transition-all duration-300 hover:scale-105">
+            <div className="flex flex-col items-center p-8 bg-white rounded-2xl shadow-xl border-t-4 border-blue-500">
+              <span className="text-4xl text-blue-500 mb-4 transition-transform duration-300 group-hover:rotate-6">
+                🚚
+              </span>
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">Logística</h2>
+              <p className="text-sm text-gray-500 text-center">
+                Gestiona pedidos, envíos y distribución de productos.
+              </p>
+            </div>
+          </Link>
+
+          {/* Daily Reports Card */}
           <Link to="/reporte-ventas-diario" className="group transform transition-all duration-300 hover:scale-105">
             <div className="flex flex-col items-center p-8 bg-white rounded-2xl shadow-xl border-t-4 border-orange-500">
               <span className="text-4xl text-orange-500 mb-4 transition-transform duration-300 group-hover:rotate-6">
@@ -96,7 +109,7 @@ const HomePage = ({ userRole, onLogout }) => {
             </div>
           </Link>
 
-          {/* Inventory Card - Visible for both */}
+          {/* Inventory Card */}
           <Link to="/inventario" className="group transform transition-all duration-300 hover:scale-105">
             <div className="flex flex-col items-center p-8 bg-white rounded-2xl shadow-xl border-t-4 border-black">
               <span className="text-4xl text-black mb-4 transition-transform duration-300 group-hover:rotate-6">

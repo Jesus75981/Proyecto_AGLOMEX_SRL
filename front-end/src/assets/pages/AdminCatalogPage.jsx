@@ -1,14 +1,15 @@
-// src/assets/pages/AdminCatalogPage.jsx
+// front-end/src/assets/pages/AdminCatalogPage.jsx
 import React from 'react';
 
-const AdminCatalogPage = () => {
+const AdminCatalogPage = ({ userRole }) => {
   return (
-    <div className="p-8 bg-gray-100 min-h-screen">
-      <h1 className="text-3xl font-bold mb-6">Catálogo de Administrador</h1>
-      <p className="text-gray-700">Aquí el administrador podrá subir, editar y eliminar productos.</p>
-      {/* Aquí iría la lógica para gestionar el catálogo */}
+    <div className="min-h-screen bg-gray-100 p-8">
+      <h1 className="text-3xl font-bold mb-6">Administrar Catálogo</h1>
+      <p>Módulo de administración de productos (Rol: {userRole})</p>
+      {/* Tu contenido aquí */}
     </div>
   );
 };
 
+// ✅ IMPORTANTE: Export default
 export default AdminCatalogPage;

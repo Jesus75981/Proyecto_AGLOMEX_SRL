@@ -1,6 +1,11 @@
+// models/pedido.model.js
 import mongoose from "mongoose";
 
 const pedidoSchema = new mongoose.Schema({
+  pedidoNumero: {  // ✅ AGREGAR ESTE CAMPO NUEVO
+    type: Number,
+    unique: true
+  },
   cliente: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: "Cliente", 

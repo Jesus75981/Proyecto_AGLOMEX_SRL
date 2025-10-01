@@ -1,21 +1,22 @@
-const mongoose = require('mongoose');
+// models/Finanzas.js
+import mongoose from 'mongoose';
 
 // Define el esquema para las transacciones financieras
 const finanzasSchema = new mongoose.Schema({
-  tipo: {
+  type: {
     type: String,
     enum: ['ingreso', 'egreso'], // El tipo de transacción debe ser 'ingreso' o 'egreso'
     required: true
   },
-  descripcion: {
+  description: {
     type: String,
     required: true
   },
-  monto: {
+  amount: {
     type: Number,
     required: true
   },
-  fecha: {
+  date: {
     type: Date,
     default: Date.now // La fecha se establece automáticamente al momento de la creación
   }
@@ -24,4 +25,4 @@ const finanzasSchema = new mongoose.Schema({
 // Crea el modelo a partir del esquema
 const Finanzas = mongoose.model('Finanzas', finanzasSchema);
 
-module.exports = Finanzas;
+export default Finanzas;

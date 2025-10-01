@@ -1,21 +1,38 @@
-    const express = require('express');
-    const router = express.Router();
+// routes/finanzas.routes.js
+import express from 'express';
+const router = express.Router();
 
-    // Asumiendo que tienes un controlador para manejar la lógica
-    // const finanzasController = require('../controllers/finanzasController');
-
-    // Define la ruta GET para obtener las transacciones
-    // Asegúrate de que esta ruta coincida con lo que tu frontend espera.
-    router.get('/transactions', async (req, res) => {
-    // Aquí va la lógica para obtener las transacciones de tu base de datos
-    // Por ejemplo, usando un modelo de Mongoose
-    try {
-        const transactions = []; // Reemplaza esto con la llamada a tu base de datos, por ejemplo: await Transaction.find();
-        res.json(transactions);
-    } catch (error) {
-        console.error('Error al obtener las transacciones:', error);
-        res.status(500).json({ message: 'Error en el servidor' });
+// Middleware opcional para control de roles
+const adminOnly = (req, res, next) => {
+    if (req.user.rol !== 'admin') {
+        return res.status(403).json({ message: 'Acceso denegado. Solo admins.' });
     }
-    });
+    next();
+};
 
-    module.exports = router;
+// Ejemplo de endpoint solo para admins
+router.get('/resumen', adminOnly, (req, res) => {
+    res.json({ 
+        mensaje: 'Resumen financiero para admins', 
+        data: { ingresos: 10000, egresos: 5000 } 
+    });
+});
+
+// Ejemplo de endpoint accesible para todos los roles
+router.get('/historial', (req, res) => {
+    res.json({ 
+        mensaje: 'Historial financiero accesible para todos los usuarios', 
+        data: [] 
+    });
+});
+
+// Agrega más rutas aquí...
+router.post('/gasto', (req, res) => {
+    res.json({ mensaje: 'Gasto registrado' });
+});
+
+router.get('/reportes', (req, res) => {
+    res.json({ mensaje: 'Reportes financieros' });
+});
+
+export default router;
