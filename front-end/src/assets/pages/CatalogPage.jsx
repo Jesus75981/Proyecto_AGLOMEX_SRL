@@ -279,6 +279,7 @@ const CatalogPage = () => {
           </div>
         )}
 
+        {/* --- SECCIÓN: PRODUCTOS MÁS VENDIDOS --- */}
         {topSellers.length > 0 && (
             <div className="mb-12">
                 <h2 className="text-4xl font-bold text-yellow-400 mb-6 border-b-2 border-yellow-500/50 pb-2">
