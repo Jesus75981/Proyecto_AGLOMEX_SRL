@@ -34,13 +34,17 @@ const LoginPage = ({ onLogin }) => {
 
       if (response.ok) {
         // ✅ CORRECCIÓN: usar data.user.rol en lugar de data.user.role
-        onLogin(data.user.rol);
+        const userRole = data.user.rol;
         
         // Guardar token en localStorage
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
         
-        navigate('/');
+        // ✅ CORRECCIÓN: Llamar a onLogin con el rol del usuario
+        onLogin(userRole);
+        
+        // Redirigir al dashboard
+        navigate('/home');
       } else {
         setError(data.message || 'Error en el login');
       }
@@ -68,6 +72,11 @@ const LoginPage = ({ onLogin }) => {
     } catch (error) {
       alert('No se pudo conectar al servidor para crear usuarios de prueba');
     }
+  };
+
+  // Función para ir al catálogo público
+  const goToCatalog = () => {
+    navigate('/');
   };
 
   return (
@@ -136,10 +145,21 @@ const LoginPage = ({ onLogin }) => {
               type="submit"
               disabled={isLoading}
             >
-              {isLoading ? 'Conectando...' : 'Entrar'}
+              {isLoading ? 'Conectando...' : 'Entrar al Sistema'}
             </button>
           </div>
         </form>
+
+        {/* Botón para ver catálogo público */}
+        <div className="flex items-center justify-center mb-4">
+          <button
+            onClick={goToCatalog}
+            className="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50 transition-colors duration-200 shadow-md"
+            type="button"
+          >
+            Ver Catálogo Público
+          </button>
+        </div>
 
         {/* Información de usuarios de prueba */}
         <div className="mt-6 p-4 bg-gray-900 rounded-lg border border-gray-700">

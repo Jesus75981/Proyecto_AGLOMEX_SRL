@@ -1,421 +1,877 @@
-// front-end/src/assets/pages/LogisticaPage.jsx
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 const LogisticaPage = ({ userRole }) => {
-    const navigate = useNavigate();
-    
-    // Estados para pedidos
-    const [pedidos, setPedidos] = useState([]);
-    const [pedidosFiltrados, setPedidosFiltrados] = useState([]);
-    const [filtroEstado, setFiltroEstado] = useState('todos');
-    
-    // Estados para nuevo pedido
-    const [mostrarForm, setMostrarForm] = useState(false);
-    const [nuevoPedido, setNuevoPedido] = useState({
-        cliente: '',
-        productos: [],
-        direccionEnvio: {
-            calle: '',
-            ciudad: '',
-            departamento: '',
-            codigoPostal: ''
-        },
-        fechaEntrega: '',
-        observaciones: ''
+  const navigate = useNavigate();
+
+  // ✅ CORREGIDO: Volver al HOME (menú principal)
+  const volverAlHome = () => {
+    navigate('/home');
+  };
+
+  // Estados para el módulo de logística
+  const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState('envios');
+  const [showForm, setShowForm] = useState(false);
+
+  // Datos de ejemplo
+  const [envios, setEnvios] = useState([
+    {
+      id: 1,
+      pedidoId: 'PED-001',
+      cliente: 'Juan Pérez',
+      direccion: 'Av. Principal 123, Ciudad',
+      productos: ['Silla Ejecutiva', 'Mesa de Centro'],
+      estado: 'En tránsito',
+      transportista: 'Transportes XYZ',
+      fechaEnvio: '2024-01-15',
+      fechaEstimada: '2024-01-18',
+      costoEnvio: 45.00,
+      tracking: 'TRK123456789',
+      ubicacionActual: 'Centro de Distribución Norte'
+    },
+    {
+      id: 2,
+      pedidoId: 'PED-002',
+      cliente: 'María García',
+      direccion: 'Calle Secundaria 456, Ciudad',
+      productos: ['Sofá 3 Plazas'],
+      estado: 'En almacén',
+      transportista: 'Logística Rápida',
+      fechaEnvio: '2024-01-16',
+      fechaEstimada: '2024-01-20',
+      costoEnvio: 75.00,
+      tracking: 'TRK987654321',
+      ubicacionActual: 'Almacén Principal'
+    },
+    {
+      id: 3,
+      pedidoId: 'PED-003',
+      cliente: 'Carlos López',
+      direccion: 'Plaza Central 789, Ciudad',
+      productos: ['Estantería Moderna', 'Escritorio Oficina'],
+      estado: 'Entregado',
+      transportista: 'Envios Express',
+      fechaEnvio: '2024-01-10',
+      fechaEstimada: '2024-01-14',
+      costoEnvio: 60.00,
+      tracking: 'TRK456123789',
+      ubicacionActual: 'Entregado al cliente'
+    },
+    {
+      id: 4,
+      pedidoId: 'PED-004',
+      cliente: 'Ana Martínez',
+      direccion: 'Boulevard Industrial 321, Ciudad',
+      productos: ['Cama King Size'],
+      estado: 'En reparto',
+      transportista: 'Transportes Veloz',
+      fechaEnvio: '2024-01-17',
+      fechaEstimada: '2024-01-19',
+      costoEnvio: 85.00,
+      tracking: 'TRK789456123',
+      ubicacionActual: 'En ruta de reparto'
+    }
+  ]);
+
+  const [inventario, setInventario] = useState([
+    {
+      id: 1,
+      producto: 'Silla Ejecutiva',
+      sku: 'SCH-EXEC-001',
+      cantidad: 150,
+      ubicacion: 'Almacén A - Pasillo 1 - Estante 3',
+      nivelMinimo: 20,
+      estado: 'Disponible',
+      categoria: 'Sillas'
+    },
+    {
+      id: 2,
+      producto: 'Mesa de Centro',
+      sku: 'MES-CENT-002',
+      cantidad: 75,
+      ubicacion: 'Almacén A - Pasillo 2 - Estante 1',
+      nivelMinimo: 15,
+      estado: 'Disponible',
+      categoria: 'Mesas'
+    },
+    {
+      id: 3,
+      producto: 'Sofá 3 Plazas',
+      sku: 'SOF-3PL-003',
+      cantidad: 8,
+      ubicacion: 'Almacén B - Pasillo 1 - Estante 2',
+      nivelMinimo: 5,
+      estado: 'Stock Bajo',
+      categoria: 'Sofás'
+    },
+    {
+      id: 4,
+      producto: 'Estantería Moderna',
+      sku: 'EST-MOD-004',
+      cantidad: 0,
+      ubicacion: 'Almacén B - Pasillo 2 - Estante 4',
+      nivelMinimo: 10,
+      estado: 'Agotado',
+      categoria: 'Estanterías'
+    },
+    {
+      id: 5,
+      producto: 'Escritorio Oficina',
+      sku: 'ESC-OFI-005',
+      cantidad: 25,
+      ubicacion: 'Almacén C - Pasillo 1 - Estante 1',
+      nivelMinimo: 8,
+      estado: 'Disponible',
+      categoria: 'Escritorios'
+    }
+  ]);
+
+  const [transportistas, setTransportistas] = useState([
+    {
+      id: 1,
+      nombre: 'Transportes XYZ',
+      contacto: 'Juan Rodríguez - contacto@transportesxyz.com',
+      telefono: '+1 234-567-8901',
+      tipo: 'Terrestre',
+      costoBase: 40.00,
+      rating: 4.5,
+      estado: 'Activo',
+      cobertura: ['Nacional', 'Regional'],
+      tiempoEntrega: '2-5 días'
+    },
+    {
+      id: 2,
+      nombre: 'Logística Rápida',
+      contacto: 'María González - info@logisticarapida.com',
+      telefono: '+1 234-567-8902',
+      tipo: 'Aéreo',
+      costoBase: 80.00,
+      rating: 4.2,
+      estado: 'Activo',
+      cobertura: ['Internacional', 'Urgente'],
+      tiempoEntrega: '1-3 días'
+    },
+    {
+      id: 3,
+      nombre: 'Envios Express',
+      contacto: 'Carlos Martínez - servicio@enviosexpress.com',
+      telefono: '+1 234-567-8903',
+      tipo: 'Terrestre',
+      costoBase: 35.00,
+      rating: 4.7,
+      estado: 'Activo',
+      cobertura: ['Local', 'Regional'],
+      tiempoEntrega: '1-2 días'
+    },
+    {
+      id: 4,
+      nombre: 'Transportes Veloz',
+      contacto: 'Ana López - contacto@transportesveloz.com',
+      telefono: '+1 234-567-8904',
+      tipo: 'Mixto',
+      costoBase: 55.00,
+      rating: 4.4,
+      estado: 'Inactivo',
+      cobertura: ['Nacional'],
+      tiempoEntrega: '3-6 días'
+    }
+  ]);
+
+  const [rutas, setRutas] = useState([
+    {
+      id: 1,
+      nombre: 'Ruta Norte',
+      origen: 'CD Norte',
+      destino: 'Zona Norte',
+      distancia: 350,
+      duracion: '5 horas',
+      estado: 'Activa',
+      transportista: 'Transportes XYZ',
+      frecuencia: 'Diaria'
+    },
+    {
+      id: 2,
+      nombre: 'Ruta Sur',
+      origen: 'CD Central',
+      destino: 'Zona Sur',
+      distancia: 280,
+      duracion: '4 horas',
+      estado: 'Activa',
+      transportista: 'Envios Express',
+      frecuencia: 'Diaria'
+    },
+    {
+      id: 3,
+      nombre: 'Ruta Internacional',
+      origen: 'Aeropuerto',
+      destino: 'Internacional',
+      distancia: 0,
+      duracion: '2-3 días',
+      estado: 'Activa',
+      transportista: 'Logística Rápida',
+      frecuencia: 'Semanal'
+    }
+  ]);
+
+  const [nuevoEnvio, setNuevoEnvio] = useState({
+    pedidoId: '',
+    cliente: '',
+    direccion: '',
+    productos: [],
+    transportista: '',
+    costoEnvio: 0
+  });
+
+  const [nuevaRuta, setNuevaRuta] = useState({
+    nombre: '',
+    origen: '',
+    destino: '',
+    distancia: 0,
+    transportista: '',
+    frecuencia: 'Diaria'
+  });
+
+  // Filtrar datos según búsqueda
+  const enviosFiltrados = envios.filter(envio =>
+    envio.cliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    envio.pedidoId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    envio.estado.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    envio.tracking.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const inventarioFiltrado = inventario.filter(item =>
+    item.producto.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.ubicacion.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.estado.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const transportistasFiltrados = transportistas.filter(trans =>
+    trans.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    trans.tipo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    trans.estado.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const rutasFiltradas = rutas.filter(ruta =>
+    ruta.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    ruta.origen.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    ruta.destino.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    ruta.transportista.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Funciones para envíos
+  const cambiarEstadoEnvio = (id, nuevoEstado) => {
+    setEnvios(envios.map(envio =>
+      envio.id === id ? { 
+        ...envio, 
+        estado: nuevoEstado,
+        ubicacionActual: nuevoEstado === 'Entregado' ? 'Entregado al cliente' :
+                         nuevoEstado === 'En reparto' ? 'En ruta de reparto' :
+                         nuevoEstado === 'En tránsito' ? 'Centro de Distribución Norte' : envio.ubicacionActual
+      } : envio
+    ));
+  };
+
+  const agregarEnvio = () => {
+    if (!nuevoEnvio.pedidoId || !nuevoEnvio.cliente) return;
+
+    const envio = {
+      id: envios.length + 1,
+      ...nuevoEnvio,
+      fechaEnvio: new Date().toISOString().split('T')[0],
+      fechaEstimada: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      estado: 'En almacén',
+      tracking: `TRK${Date.now()}`,
+      ubicacionActual: 'Almacén Principal'
+    };
+
+    setEnvios([...envios, envio]);
+    setNuevoEnvio({
+      pedidoId: '',
+      cliente: '',
+      direccion: '',
+      productos: [],
+      transportista: '',
+      costoEnvio: 0
     });
-    
-    // Estados para datos externos
-    const [clientes, setClientes] = useState([]);
-    const [productos, setProductos] = useState([]);
-    const [productoSeleccionado, setProductoSeleccionado] = useState({
-        producto: '',
-        cantidad: 1
+    setShowForm(false);
+  };
+
+  // Funciones para rutas
+  const agregarRuta = () => {
+    if (!nuevaRuta.nombre || !nuevaRuta.origen || !nuevaRuta.destino) return;
+
+    const ruta = {
+      id: rutas.length + 1,
+      ...nuevaRuta,
+      estado: 'Activa',
+      duracion: nuevaRuta.distancia > 500 ? '8+ horas' : 
+                nuevaRuta.distancia > 300 ? '5-7 horas' :
+                nuevaRuta.distancia > 150 ? '3-4 horas' : '1-2 horas'
+    };
+
+    setRutas([...rutas, ruta]);
+    setNuevaRuta({
+      nombre: '',
+      origen: '',
+      destino: '',
+      distancia: 0,
+      transportista: '',
+      frecuencia: 'Diaria'
     });
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
+  };
 
-    // Verificar autenticación al cargar
-    useEffect(() => {
-        const token = localStorage.getItem('token');
-        if (!token) {
-            navigate('/login');
-            return;
-        }
-        
-        cargarPedidos();
-        cargarClientes();
-        cargarProductos();
-    }, [navigate]);
+  // Cálculos de métricas
+  const totalEnvios = envios.length;
+  const enviosEntregados = envios.filter(e => e.estado === 'Entregado').length;
+  const enviosTransito = envios.filter(e => e.estado === 'En tránsito').length;
+  const costoTotalEnvios = envios.reduce((sum, envio) => sum + envio.costoEnvio, 0);
 
-    // Filtrar pedidos cuando cambia el filtro
-    useEffect(() => {
-        if (filtroEstado === 'todos') {
-            setPedidosFiltrados(pedidos);
-        } else {
-            setPedidosFiltrados(pedidos.filter(pedido => pedido.estado === filtroEstado));
-        }
-    }, [filtroEstado, pedidos]);
+  const productosDisponibles = inventario.filter(p => p.estado === 'Disponible').length;
+  const productosStockBajo = inventario.filter(p => p.estado === 'Stock Bajo').length;
+  const productosAgotados = inventario.filter(p => p.estado === 'Agotado').length;
 
-    // Función para manejar errores de autenticación
-    const manejarErrorAutenticacion = (error) => {
-        console.error('Error de autenticación:', error);
-        if (error.message.includes('403') || error.message.includes('401')) {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            setError('Tu sesión ha expirado. Por favor, inicia sesión nuevamente.');
-            setTimeout(() => navigate('/login'), 2000);
-        }
-    };
+  const transportistasActivos = transportistas.filter(t => t.estado === 'Activo').length;
+  const rutasActivas = rutas.filter(r => r.estado === 'Activa').length;
 
-    const cargarPedidos = async () => {
-        try {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                navigate('/login');
-                return;
-            }
+return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Navbar de Navegación */}
+      <nav className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={volverAlHome}
+                className="flex items-center space-x-2 bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition duration-200"
+              >
+                <span>←</span>
+                <span>Volver al Home</span>
+              </button>
+              <h1 className="text-2xl font-bold text-gray-800">Sistema Aglomex</h1>
+            </div>
+            <div className="flex items-center space-x-4">
+              <span className="text-sm text-gray-600">Módulo de Logística</span>
+              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                {userRole || 'Usuario'}
+              </span>
+            </div>
+          </div>
+        </div>
+      </nav>
 
-            const response = await fetch('http://localhost:5000/api/logistica', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            
-            if (response.status === 403 || response.status === 401) {
-                throw new Error('Token expirado o inválido');
-            }
-            
-            if (!response.ok) {
-                throw new Error(`Error ${response.status}: ${response.statusText}`);
-            }
-            
-            const data = await response.json();
-            setPedidos(Array.isArray(data) ? data : []); // ✅ Asegurar que sea array
-        } catch (error) {
-            console.error('Error cargando pedidos:', error);
-            manejarErrorAutenticacion(error);
-            
-            // Datos de ejemplo para desarrollo (solo si no hay error de auth)
-            if (!error.message.includes('403') && !error.message.includes('401')) {
-                setPedidos([
-                    {
-                        _id: '1',
-                        pedidoNumero: 'PED-001',
-                        cliente: { _id: '1', nombre: 'Cliente Corporativo S.A.' },
-                        productos: [
-                            { producto: { _id: '1', nombre: 'Silla Ejecutiva' }, cantidad: 2 }
-                        ],
-                        estado: 'pendiente',
-                        fechaPedido: '2024-01-25',
-                        fechaEntrega: '2024-02-01',
-                        direccionEnvio: {
-                            calle: 'Av. Principal 123',
-                            ciudad: 'Lima',
-                            departamento: 'Lima',
-                            codigoPostal: '15001'
-                        }
-                    },
-                    {
-                        _id: '2',
-                        pedidoNumero: 'PED-002',
-                        cliente: { _id: '2', nombre: 'Empresa XYZ Ltda.' },
-                        productos: [
-                            { producto: { _id: '2', nombre: 'Mesa de Reuniones' }, cantidad: 1 }
-                        ],
-                        estado: 'en_proceso',
-                        fechaPedido: '2024-01-20',
-                        fechaEntrega: '2024-01-30',
-                        direccionEnvio: {
-                            calle: 'Calle Secundaria 456',
-                            ciudad: 'Arequipa',
-                            departamento: 'Arequipa',
-                            codigoPostal: '04001'
-                        }
-                    }
-                ]);
-            }
-        }
-    };
+      {/* Contenido Principal */}
+      <div className="p-6">
+        <div className="max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="mb-8">
+            <h1 className="text-4xl font-bold text-indigo-600 mb-2">Módulo de Logística</h1>
+            <p className="text-gray-600 text-lg">Gestión de envíos, inventario y distribución</p>
+          </div>
 
-    const cargarClientes = async () => {
-        try {
-            const token = localStorage.getItem('token');
-            if (!token) return;
-
-            const response = await fetch('http://localhost:5000/api/clientes', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                setClientes(Array.isArray(data) ? data : []);
-            }
-        } catch (error) {
-            console.error('Error cargando clientes:', error);
-            // No manejamos error aquí para no redirigir múltiples veces
-        }
-    };
-
-    const cargarProductos = async () => {
-        try {
-            const token = localStorage.getItem('token');
-            if (!token) return;
-
-            const response = await fetch('http://localhost:5000/api/products', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                setProductos(Array.isArray(data) ? data : []);
-            }
-        } catch (error) {
-            console.error('Error cargando productos:', error);
-            // No manejamos error aquí para no redirigir múltiples veces
-        }
-    };
-
-    // Agregar producto al pedido
-    const agregarProducto = () => {
-        if (productoSeleccionado.producto && productoSeleccionado.cantidad > 0) {
-            const producto = productos.find(p => p._id === productoSeleccionado.producto);
-            if (producto) {
-                setNuevoPedido({
-                    ...nuevoPedido,
-                    productos: [
-                        ...nuevoPedido.productos,
-                        {
-                            producto: producto._id,
-                            cantidad: productoSeleccionado.cantidad
-                        }
-                    ]
-                });
-                setProductoSeleccionado({ producto: '', cantidad: 1 });
-            }
-        }
-    };
-
-    // Remover producto del pedido
-    const removerProducto = (index) => {
-        const nuevosProductos = nuevoPedido.productos.filter((_, i) => i !== index);
-        setNuevoPedido({ ...nuevoPedido, productos: nuevosProductos });
-    };
-
-    // Crear nuevo pedido
-    const crearPedido = async () => {
-        if (!nuevoPedido.cliente || nuevoPedido.productos.length === 0 || !nuevoPedido.fechaEntrega) {
-            alert('Por favor, completa todos los campos obligatorios.');
-            return;
-        }
-
-        if (!nuevoPedido.direccionEnvio.calle || !nuevoPedido.direccionEnvio.ciudad || !nuevoPedido.direccionEnvio.departamento) {
-            alert('Por favor, completa todos los campos de la dirección de envío.');
-            return;
-        }
-
-        setLoading(true);
-        setError('');
-        try {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                navigate('/login');
-                return;
-            }
-
-            const datosParaBackend = {
-                cliente: nuevoPedido.cliente,
-                productos: nuevoPedido.productos,
-                direccionEnvio: nuevoPedido.direccionEnvio,
-                fechaEntrega: nuevoPedido.fechaEntrega,
-                observaciones: nuevoPedido.observaciones
-            };
-
-            const response = await fetch('http://localhost:5000/api/logistica', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(datosParaBackend)
-            });
-
-            if (response.status === 403 || response.status === 401) {
-                throw new Error('Token expirado. Por favor, inicia sesión nuevamente.');
-            }
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || `Error ${response.status}`);
-            }
-
-            const pedidoCreado = await response.json();
-            alert(`✅ Pedido #${pedidoCreado.pedidoNumero} creado exitosamente`);
-            
-            setMostrarForm(false);
-            setNuevoPedido({
-                cliente: '',
-                productos: [],
-                direccionEnvio: { calle: '', ciudad: '', departamento: '', codigoPostal: '' },
-                fechaEntrega: '',
-                observaciones: ''
-            });
-            
-            cargarPedidos();
-            
-        } catch (error) {
-            console.error('Error creando pedido:', error);
-            setError(error.message);
-            if (error.message.includes('expirado')) {
-                setTimeout(() => navigate('/login'), 2000);
-            }
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // Actualizar estado del pedido
-    const actualizarEstado = async (pedidoId, nuevoEstado) => {
-        try {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                navigate('/login');
-                return;
-            }
-
-            const response = await fetch(`http://localhost:5000/api/logistica/${pedidoId}`, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ estado: nuevoEstado })
-            });
-
-            if (response.status === 403 || response.status === 401) {
-                throw new Error('Token expirado');
-            }
-
-            if (response.ok) {
-                alert(`✅ Estado actualizado a: ${getEstadoTexto(nuevoEstado)}`);
-                cargarPedidos();
-            } else {
-                const errorData = await response.json();
-                alert('❌ Error: ' + (errorData.error || 'Error actualizando estado'));
-            }
-        } catch (error) {
-            console.error('Error actualizando estado:', error);
-            if (error.message.includes('expirado')) {
-                alert('Tu sesión ha expirado. Serás redirigido al login.');
-                navigate('/login');
-            } else {
-                alert('❌ Error de conexión');
-            }
-        }
-    };
-
-    // Eliminar pedido
-    const eliminarPedido = async (pedidoId) => {
-        if (window.confirm('¿Estás seguro de que quieres eliminar este pedido?')) {
-            try {
-                const token = localStorage.getItem('token');
-                if (!token) {
-                    navigate('/login');
-                    return;
-                }
-
-                const response = await fetch(`http://localhost:5000/api/logistica/${pedidoId}`, {
-                    method: 'DELETE',
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-
-                if (response.status === 403 || response.status === 401) {
-                    throw new Error('Token expirado');
-                }
-
-                if (response.ok) {
-                    alert('✅ Pedido eliminado exitosamente');
-                    cargarPedidos();
-                } else {
-                    const errorData = await response.json();
-                    alert('❌ Error: ' + (errorData.error || 'Error eliminando pedido'));
-                }
-            } catch (error) {
-                console.error('Error eliminando pedido:', error);
-                if (error.message.includes('expirado')) {
-                    alert('Tu sesión ha expirado. Serás redirigido al login.');
-                    navigate('/login');
-                } else {
-                    alert('❌ Error de conexión');
-                }
-            }
-        }
-    };
-
-    // Obtener color según estado
-    const getEstadoColor = (estado) => {
-        switch (estado) {
-            case 'pendiente': return 'bg-yellow-100 text-yellow-800';
-            case 'en_proceso': return 'bg-blue-100 text-blue-800';
-            case 'despachado': return 'bg-purple-100 text-purple-800';
-            case 'entregado': return 'bg-green-100 text-green-800';
-            case 'cancelado': return 'bg-red-100 text-red-800';
-            default: return 'bg-gray-100 text-gray-800';
-        }
-    };
-
-    // Obtener texto del estado
-    const getEstadoTexto = (estado) => {
-        switch (estado) {
-            case 'pendiente': return 'Pendiente';
-            case 'en_proceso': return 'En Proceso';
-            case 'despachado': return 'Despachado';
-            case 'entregado': return 'Entregado';
-            case 'cancelado': return 'Cancelado';
-            default: return estado;
-        }
-    };
-
-    return (
-        <div className="min-h-screen bg-gray-100 p-8">
-            {/* Header */}
-            <div className="flex justify-between items-center mb-8">
+          {/* Métricas */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-indigo-500">
+              <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-4xl font-extrabold text-gray-800">Gestión de Logística</h1>
-                    <p className="text-gray-600 mt-2">Control de pedidos y envíos - Rol: {userRole}</p>
+                  <h3 className="text-sm font-semibold text-gray-600">Total Envíos</h3>
+                  <p className="text-2xl font-bold text-gray-800">{totalEnvios}</p>
                 </div>
-                <div className="flex space-x-4">
-                    <button
-                        onClick={() => setMostrarForm(!mostrarForm)}
-                        className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
-                    >
-                        {mostrarForm ? '✕ Cancelar' : '➕ Nuevo Pedido'}
-                    </button>
-                    <Link 
-                        to="/" 
-                        className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
-                    >
-                        ← Volver
-                    </Link>
+                <div className="bg-indigo-100 p-3 rounded-lg">
+                  <span className="text-indigo-600 text-xl">🚚</span>
                 </div>
+              </div>
             </div>
 
-            {/* Mensaje de error */}
-            {error && (
-                <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
-                    <div className="flex items-center">
-                        <span className="text-lg mr-2">⚠️</span>
-                        <span>{error}</span>
-                    </div>
-                    {error.includes('expirado') && (
-                        <p className="text-sm mt-1">Redirigiendo al login...</p>
-                    )}
+            <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-green-500">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-600">Entregados</h3>
+                  <p className="text-2xl font-bold text-gray-800">{enviosEntregados}</p>
                 </div>
-            )}
+                <div className="bg-green-100 p-3 rounded-lg">
+                  <span className="text-green-600 text-xl">✅</span>
+                </div>
+              </div>
+            </div>
 
-            {/* Resto del código permanece igual... */}
-            {/* [El resto del código es idéntico al anterior, solo cambia el manejo de errores] */}
-            
+            <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-blue-500">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-600">En Tránsito</h3>
+                  <p className="text-2xl font-bold text-gray-800">{enviosTransito}</p>
+                </div>
+                <div className="bg-blue-100 p-3 rounded-lg">
+                  <span className="text-blue-600 text-xl">📦</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-purple-500">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-600">Costo Total</h3>
+                  <p className="text-2xl font-bold text-gray-800">${costoTotalEnvios}</p>
+                </div>
+                <div className="bg-purple-100 p-3 rounded-lg">
+                  <span className="text-purple-600 text-xl">💰</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Pestañas */}
+          <div className="bg-white rounded-xl shadow-md mb-6">
+            <div className="border-b border-gray-200">
+              <nav className="flex -mb-px">
+                {['envios', 'inventario', 'transportistas', 'rutas'].map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`py-4 px-6 text-center border-b-2 font-medium text-sm capitalize ${
+                      activeTab === tab
+                        ? 'border-indigo-500 text-indigo-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    {tab === 'envios' && '🚚 Gestión de Envíos'}
+                    {tab === 'inventario' && '📊 Control de Inventario'}
+                    {tab === 'transportistas' && '🏢 Transportistas'}
+                    {tab === 'rutas' && '🛣️ Rutas de Distribución'}
+                  </button>
+                ))}
+              </nav>
+            </div>
+          </div>
+
+          {/* Barra de Búsqueda */}
+          <div className="mb-6">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder={`Buscar en ${activeTab}...`}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full"
+              />
+              <div className="absolute left-3 top-2.5 text-gray-400">
+                🔍
+              </div>
+            </div>
+          </div>
+
+          {/* Contenido de Pestañas */}
+          {activeTab === 'envios' && (
+            <div className="space-y-6">
+              {/* Formulario de Nuevo Envío */}
+              <div className="bg-white rounded-xl shadow-md p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-semibold text-gray-800">Nuevo Envío</h2>
+                  <button
+                    onClick={() => setShowForm(!showForm)}
+                    className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition duration-200"
+                  >
+                    {showForm ? 'Cancelar' : '+ Programar Envío'}
+                  </button>
+                </div>
+                
+                {showForm && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+                    <input
+                      type="text"
+                      placeholder="ID del Pedido"
+                      value={nuevoEnvio.pedidoId}
+                      onChange={(e) => setNuevoEnvio({...nuevoEnvio, pedidoId: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Cliente"
+                      value={nuevoEnvio.cliente}
+                      onChange={(e) => setNuevoEnvio({...nuevoEnvio, cliente: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Dirección"
+                      value={nuevoEnvio.direccion}
+                      onChange={(e) => setNuevoEnvio({...nuevoEnvio, direccion: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <select
+                      value={nuevoEnvio.transportista}
+                      onChange={(e) => setNuevoEnvio({...nuevoEnvio, transportista: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="">Seleccionar transportista</option>
+                      {transportistas.filter(t => t.estado === 'Activo').map(trans => (
+                        <option key={trans.id} value={trans.nombre}>
+                          {trans.nombre} - {trans.tipo}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="md:col-span-2 flex space-x-4">
+                      <button
+                        onClick={agregarEnvio}
+                        className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition duration-200"
+                      >
+                        Programar Envío
+                      </button>
+                      <button
+                        onClick={() => setShowForm(false)}
+                        className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition duration-200"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Lista de Envíos */}
+                <h3 className="text-xl font-semibold text-gray-800 mb-4">Envíos Programados</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pedido ID</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tracking</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ubicación</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transportista</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {enviosFiltrados.map((envio) => (
+                        <tr key={envio.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {envio.pedidoId}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                            {envio.cliente}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-blue-600 font-mono">
+                            {envio.tracking}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              envio.estado === 'Entregado' ? 'bg-green-100 text-green-800' :
+                              envio.estado === 'En tránsito' ? 'bg-blue-100 text-blue-800' :
+                              envio.estado === 'En reparto' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {envio.estado}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                            {envio.ubicacionActual}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                            {envio.transportista}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900">
+                            ${envio.costoEnvio}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
+                            <div className="flex space-x-2">
+                              {envio.estado !== 'Entregado' && (
+                                <button
+                                  onClick={() => cambiarEstadoEnvio(envio.id, 
+                                    envio.estado === 'En almacén' ? 'En tránsito' : 
+                                    envio.estado === 'En tránsito' ? 'En reparto' : 'Entregado'
+                                  )}
+                                  className="text-indigo-600 hover:text-indigo-900 text-xs"
+                                >
+                                  {envio.estado === 'En almacén' ? 'Despachar' : 
+                                   envio.estado === 'En tránsito' ? 'En Reparto' : 'Entregar'}
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'inventario' && (
+            <div className="space-y-6">
+              {/* Métricas de Inventario */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-green-500">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-600">Disponibles</h3>
+                      <p className="text-2xl font-bold text-gray-800">{productosDisponibles}</p>
+                    </div>
+                    <div className="bg-green-100 p-3 rounded-lg">
+                      <span className="text-green-600 text-xl">✅</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-yellow-500">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-600">Stock Bajo</h3>
+                      <p className="text-2xl font-bold text-gray-800">{productosStockBajo}</p>
+                    </div>
+                    <div className="bg-yellow-100 p-3 rounded-lg">
+                      <span className="text-yellow-600 text-xl">⚠️</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-red-500">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-600">Agotados</h3>
+                      <p className="text-2xl font-bold text-gray-800">{productosAgotados}</p>
+                    </div>
+                    <div className="bg-red-100 p-3 rounded-lg">
+                      <span className="text-red-600 text-xl">❌</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Lista de Inventario */}
+              <div className="bg-white rounded-xl shadow-md p-6">
+                <h2 className="text-2xl font-semibold text-gray-800 mb-6">Control de Inventario</h2>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKU</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ubicación</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {inventarioFiltrado.map((item) => (
+                        <tr key={item.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {item.producto}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 font-mono">
+                            {item.sku}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                            {item.categoria}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                            <span className={`font-semibold ${
+                              item.cantidad <= item.nivelMinimo ? 'text-red-600' : 'text-green-600'
+                            }`}>
+                              {item.cantidad}
+                            </span>
+                            <span className="text-xs text-gray-500 ml-1">/ min: {item.nivelMinimo}</span>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                            {item.ubicacion}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              item.estado === 'Disponible' ? 'bg-green-100 text-green-800' :
+                              item.estado === 'Stock Bajo' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-red-100 text-red-800'
+                            }`}>
+                              {item.estado}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'transportistas' && (
+            <div className="bg-white rounded-xl shadow-md p-6">
+              <h2 className="text-2xl font-semibold text-gray-800 mb-6">Transportistas</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {transportistasFiltrados.map((trans) => (
+                  <div key={trans.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-semibold text-gray-800">{trans.nombre}</h3>
+                      <span className={`text-xs px-2 py-1 rounded-full ${
+                        trans.estado === 'Activo' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      }`}>
+                        {trans.estado}
+                      </span>
+                    </div>
+                    <div className="space-y-2 text-sm text-gray-600">
+                      <p>📧 {trans.contacto}</p>
+                      <p>📞 {trans.telefono}</p>
+                      <p>🚛 {trans.tipo}</p>
+                      <p>💰 Costo base: ${trans.costoBase}</p>
+                      <p>🌍 Cobertura: {trans.cobertura.join(', ')}</p>
+                      <p>⏱️ Tiempo: {trans.tiempoEntrega}</p>
+                      <div className="flex items-center">
+                        <span className="text-yellow-500">⭐</span>
+                        <span className="ml-1">{trans.rating}/5.0</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'rutas' && (
+            <div className="space-y-6">
+              {/* Formulario de Nueva Ruta */}
+              <div className="bg-white rounded-xl shadow-md p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-semibold text-gray-800">Rutas de Distribución</h2>
+                  <button
+                    onClick={() => setShowForm(!showForm)}
+                    className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition duration-200"
+                  >
+                    {showForm ? 'Cancelar' : '+ Nueva Ruta'}
+                  </button>
+                </div>
+                
+                {showForm && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+                    <input
+                      type="text"
+                      placeholder="Nombre de la ruta"
+                      value={nuevaRuta.nombre}
+                      onChange={(e) => setNuevaRuta({...nuevaRuta, nombre: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Origen"
+                      value={nuevaRuta.origen}
+                      onChange={(e) => setNuevaRuta({...nuevaRuta, origen: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Destino"
+                      value={nuevaRuta.destino}
+                      onChange={(e) => setNuevaRuta({...nuevaRuta, destino: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Distancia (km)"
+                      value={nuevaRuta.distancia}
+                      onChange={(e) => setNuevaRuta({...nuevaRuta, distancia: parseInt(e.target.value) || 0})}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <select
+                      value={nuevaRuta.transportista}
+                      onChange={(e) => setNuevaRuta({...nuevaRuta, transportista: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    >
+                      <option value="">Seleccionar transportista</option>
+                      {transportistas.filter(t => t.estado === 'Activo').map(trans => (
+                        <option key={trans.id} value={trans.nombre}>
+                          {trans.nombre}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={nuevaRuta.frecuencia}
+                      onChange={(e) => setNuevaRuta({...nuevaRuta, frecuencia: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    >
+                      <option value="Diaria">Diaria</option>
+                      <option value="Semanal">Semanal</option>
+                      <option value="Quincenal">Quincenal</option>
+                      <option value="Mensual">Mensual</option>
+                    </select>
+                    <div className="md:col-span-2 flex space-x-4">
+                      <button
+                        onClick={agregarRuta}
+                        className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition duration-200"
+                      >
+                        Crear Ruta
+                      </button>
+                      <button
+                        onClick={() => setShowForm(false)}
+                        className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition duration-200"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Lista de Rutas */}
+                <h3 className="text-xl font-semibold text-gray-800 mb-4">Rutas Activas</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {rutasFiltradas.map((ruta) => (
+                    <div key={ruta.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="font-semibold text-gray-800">{ruta.nombre}</h3>
+                        <span className={`text-xs px-2 py-1 rounded-full ${
+                          ruta.estado === 'Activa' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                          {ruta.estado}
+                        </span>
+                      </div>
+                      <div className="space-y-2 text-sm text-gray-600">
+                        <p className="flex items-center">
+                          <span className="font-medium mr-2">📍 Origen:</span>
+                          {ruta.origen}
+                        </p>
+                        <p className="flex items-center">
+                          <span className="font-medium mr-2">🎯 Destino:</span>
+                          {ruta.destino}
+                        </p>
+                        <p className="flex items-center">
+                          <span className="font-medium mr-2">📏 Distancia:</span>
+                          {ruta.distancia} km
+                        </p>
+                        <p className="flex items-center">
+                          <span className="font-medium mr-2">⏱️ Duración:</span>
+                          {ruta.duracion}
+                        </p>
+                        <p className="flex items-center">
+                          <span className="font-medium mr-2">🚛 Transportista:</span>
+                          {ruta.transportista}
+                        </p>
+                        <p className="flex items-center">
+                          <span className="font-medium mr-2">🔄 Frecuencia:</span>
+                          {ruta.frecuencia}
+                        </p>
+                      </div>
+                      <div className="mt-4 flex space-x-2">
+                        <button className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded hover:bg-blue-200">
+                          Editar
+                        </button>
+                        <button 
+                          onClick={() => setRutas(rutas.filter(r => r.id !== ruta.id))}
+                          className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded hover:bg-red-200"
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-    );
+      </div>
+    </div>
+  );
 };
 
 export default LogisticaPage;
