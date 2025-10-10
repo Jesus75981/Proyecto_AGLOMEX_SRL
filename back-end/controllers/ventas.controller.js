@@ -1,4 +1,4 @@
-import Venta from "../models/venta.js";
+import Venta from "../models/venta.model.js";
 
 export const registrarVenta = async (req, res) => {
     try {

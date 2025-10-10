@@ -1,4 +1,4 @@
-import ProductoTienda from "../models/productoTienda.models.js";
+import ProductoTienda from "../models/productoTienda.model.js";
 
 // Función para generar un ID único
 const generarCodigoInterno = (nombre) => {

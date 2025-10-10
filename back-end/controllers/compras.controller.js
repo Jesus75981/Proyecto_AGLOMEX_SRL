@@ -1,4 +1,4 @@
-import Compra from "../models/compra.js";
+import Compra from "../models/compra.model.js";
 
 export const registrarCompra = async (req, res) => {
     // 1. Obtener los datos de la compra del cuerpo de la solicitud (req.body)

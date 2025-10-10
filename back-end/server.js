@@ -8,12 +8,18 @@ import dotenv from 'dotenv';
 // Configuración de variables de entorno
 dotenv.config();
 
-// Importa rutas existentes
 import finanzasRoutes from './routes/finanzas.routes.js';
+import comprasRoutes from './routes/compras.routes.js'; 
+import clientesRoutes from './routes/clientes.routes.js';
 import logisticaRoutes from './routes/logistica.routes.js';
-
-// Importa modelo de usuario
-import User from './models/user.model.js';
+import materialesRoutes from './routes/materiales.routes.js';
+import objetos3dRoutes from './routes/objetos3d.routes.js';
+import pedidosRoutes from './routes/pedidos.routes.js';
+import produccionRoutes from './routes/produccion.routes.js';
+import proveedoresRoutes from './routes/proveedores.routes.js';
+import ventasRoutes from './routes/ventas.routes.js';
+import User from './models/user.model.js'; 
+import productoTiendaRoutes from './routes/productos.routes.js';
 
 // Inicialización del servidor
 const app = express();
@@ -92,128 +98,41 @@ app.post('/api/login', async (req, res) => {
         });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ message: '❌ Error en el servidor.' });
+        res.status(500).json({ message: ' Error en el servidor.' });
     }
 });
 
-// --- RUTAS TEMPORALES PARA EL FRONTEND ---
+// RUTAS PARA EL FRONTEND 
+app.use(authMiddleware); 
+app.use('/api/compras', comprasRoutes); 
+app.use('/api/clientes', clientesRoutes);
+app.use('/api/logistica', logisticaRoutes);
+app.use('/api/materiales', materialesRoutes);
+app.use('/api/objetos3d', objetos3dRoutes);
+app.use('/api/pedidos', pedidosRoutes);
+app.use('/api/produccion', produccionRoutes);
+app.use('/api/productos', productoTiendaRoutes); 
+app.use('/api/proveedores', proveedoresRoutes);
+app.use('/api/ventas', ventasRoutes);
+app.use('/api/finanzas', finanzasRoutes);
 
-// Clientes (para módulo de ventas)
-app.get('/api/clientes', authMiddleware, (req, res) => {
-    res.json([
-        { _id: '1', nombre: 'Cliente Corporativo S.A.', nit: '1234567890', telefono: '123456789' },
-        { _id: '2', nombre: 'Empresa XYZ Ltda.', nit: '0987654321', telefono: '987654321' },
-        { _id: '3', nombre: 'Juan Pérez', nit: '1111111111', telefono: '555555555' }
-    ]);
-});
-
-// Productos (para módulo de ventas e inventario)
-app.get('/api/products', authMiddleware, (req, res) => {
-    res.json([
-        { 
-            _id: '1', 
-            idProductoTienda: 'SILLA-001', 
-            nombre: 'Silla Ejecutiva Premium', 
-            descripcion: 'Silla ergonómica para oficina',
-            precioVenta: 350, 
-            precioCompra: 180,
-            cantidad: 25,
-            categoria: 'Sillas'
-        },
-        { 
-            _id: '2', 
-            idProductoTienda: 'MESA-001', 
-            nombre: 'Mesa de Reuniones', 
-            descripcion: 'Mesa para sala de juntas',
-            precioVenta: 1200, 
-            precioCompra: 650,
-            cantidad: 10,
-            categoria: 'Mesas'
-        }
-    ]);
-});
-
-// Proveedores (para módulo de compras)
-app.get('/api/suppliers', authMiddleware, (req, res) => {
-    res.json([
-        { _id: '1', nombre: 'Maderera El Bosque S.A.', contacto: 'Carlos Rodríguez', telefono: '111222333' },
-        { _id: '2', nombre: 'Telas Premium Ltda.', contacto: 'María González', telefono: '444555666' }
-    ]);
-});
-
-// Compras (módulo de compras)
-app.get('/api/purchases', authMiddleware, (req, res) => {
-    res.json([
-        { _id: '1', numero: 'COMP-001', proveedor: 'Maderera El Bosque S.A.', fecha: '2024-01-15', total: 4500 },
-        { _id: '2', numero: 'COMP-002', proveedor: 'Telas Premium Ltda.', fecha: '2024-01-20', total: 3200 }
-    ]);
-});
-
-app.post('/api/purchases', authMiddleware, (req, res) => {
-    res.json({ message: '✅ Compra registrada exitosamente', id: 'COMP-003' });
-});
-
-// Recetas (para módulo de fabricación)
-app.get('/api/recipes', authMiddleware, (req, res) => {
-    res.json([
-        { _id: '1', nombre: 'Silla Ejecutiva', productos: ['Madera', 'Tela', 'Espuma'], tiempoFabricacion: 4 },
-        { _id: '2', nombre: 'Mesa de Reuniones', productos: ['Madera', 'Vidrio', 'Metal'], tiempoFabricacion: 6 }
-    ]);
-});
-
-// Fabricaciones
-app.get('/api/fabrications', authMiddleware, (req, res) => {
-    res.json([
-        { _id: '1', producto: 'Silla Ejecutiva', cantidad: 10, estado: 'Completado', fecha: '2024-01-18' },
-        { _id: '2', producto: 'Mesa de Reuniones', cantidad: 5, estado: 'En Proceso', fecha: '2024-01-20' }
-    ]);
-});
-
-// Ventas
-app.get('/api/ventas', authMiddleware, (req, res) => {
-    res.json([
-        { _id: '1', numero: 'VENT-001', cliente: 'Cliente Corporativo S.A.', fecha: '2024-01-10', total: 3500 },
-        { _id: '2', numero: 'VENT-002', cliente: 'Empresa XYZ Ltda.', fecha: '2024-01-12', total: 1200 }
-    ]);
-});
-
-app.post('/api/ventas', authMiddleware, (req, res) => {
-    res.json({ message: '✅ Venta registrada exitosamente', numero: 'VENT-003' });
-});
-
-// --- Rutas protegidas existentes ---
-app.use('/api/finanzas', authMiddleware, finanzasRoutes);
-app.use('/api/logistica', authMiddleware, logisticaRoutes);
-
-// Ruta de prueba básica
-app.get('/api/test', (req, res) => {
-    res.json({ message: '✅ API funcionando correctamente', timestamp: new Date().toISOString() });
-});
-
-// Ruta de salud
-app.get('/api/health', (req, res) => {
-    res.json({ 
-        status: 'OK', 
-        database: mongoose.connection.readyState === 1 ? 'Conectado' : 'Desconectado',
-        timestamp: new Date().toISOString()
-    });
-});
-
-// ✅ CORRECCIÓN: Manejo de rutas no encontradas (SIN '*' )
-app.use((req, res) => {
-    res.status(404).json({ message: '❌ Ruta no encontrada: ' + req.originalUrl });
+//  MANEJO DE ERRORES FINAL
+// Manejo de rutas no encontradas (404) 
+app.use((req, res, next) => {
+    res.status(404).json({ message: '❌ Ruta no encontrada: ' + req.originalUrl });
 });
 
 // Manejo de errores global
 app.use((err, req, res, next) => {
-    console.error('❌ Error del servidor:', err);
-    res.status(500).json({ message: 'Error interno del servidor' });
+    console.error('❌ Error del servidor:', err);
+    res.status(500).json({ message: 'Error interno del servidor' });
 });
 
-// Servidor escuchando
+// INICIO DEL SERVIDOR
+
+
 app.listen(PORT, () => {
-    console.log(`🚀 Servidor escuchando en http://localhost:${PORT}`);
-    console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
-    console.log(`🧪 Test route: http://localhost:${PORT}/api/test`);
-    console.log(`🔐 Login: http://localhost:${PORT}/api/login`);
+    console.log(`Servidor escuchando en http://localhost:${PORT}`);
+    console.log(` Health check: http://localhost:${PORT}/api/health`);
+    console.log(` Login: http://localhost:${PORT}/api/login`);
 });

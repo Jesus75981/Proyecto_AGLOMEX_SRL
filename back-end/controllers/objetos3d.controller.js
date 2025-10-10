@@ -1,5 +1,5 @@
 // controllers/objetos3d.controller.js
-import Objeto3D from "../../src/models/objetos3d.models.js";
+import Objeto3D from "../models/objetos3d.model.js";
 
 // crea registro y encola trabajo
 export const crearObjeto3D = async (req, res) => {

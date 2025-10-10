@@ -1,4 +1,4 @@
-import Produccion from "../../src/models/produccion.models.js";
+import Produccion from "../models/produccion.model.js";
 
 
 

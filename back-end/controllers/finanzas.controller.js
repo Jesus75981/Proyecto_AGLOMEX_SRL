@@ -1,5 +1,5 @@
 // controllers/finanzas.controller.js
-import Finanzas from '../models/Finanzas.js';
+import Finanzas from '../models/finanzas.model.js';
 
 // Obtener todas las transacciones
 export const getTransactions = async (req, res) => {
