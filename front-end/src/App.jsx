@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, useNavigate, BrowserRouter } from 'react-router-dom';
+import { Routes, Route, useNavigate, BrowserRouter, Navigate } from 'react-router-dom'; // AGREGADO: Navigate
+import axios from 'axios'; // AGREGADO: Para headers de auth en API calls
 
 // ✅ IMPORTACIONES DIRECTAS
 import HomePage from "./assets/pages/HomePage.jsx";
@@ -50,6 +51,16 @@ function AppContent() {
     initializeApp();
   }, []);
 
+  // AGREGADO: Setea header Authorization para todas las llamadas Axios (para auth JWT)
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    } else {
+      delete axios.defaults.headers.common['Authorization'];
+    }
+  }, [userRole]); // Re-ejecuta después de login/logout
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -86,6 +97,8 @@ function AppContent() {
             <Route path="/logistica" element={<LogisticaPage userRole={userRole} />} />
             <Route path="/admin-catalogo" element={<AdminCatalogPage userRole={userRole} />} />
             <Route path="/reporte-ventas-diario" element={<ReporteVentasDiario userRole={userRole} />} />
+            {/* AGREGADO: Fallback para rutas inválidas cuando logueado - redirige a home */}
+            <Route path="*" element={<Navigate to="/home" replace />} />
           </>
         ) : (
           <Route 

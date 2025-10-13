@@ -19,7 +19,8 @@ import produccionRoutes from './routes/produccion.routes.js';
 import proveedoresRoutes from './routes/proveedores.routes.js';
 import ventasRoutes from './routes/ventas.routes.js';
 import User from './models/user.model.js'; 
-import productoTiendaRoutes from './routes/productos.routes.js';
+import productosRoutes from './routes/productos.routes.js'; 
+import anticiposRoutes from './routes/anticipos.routes.js';
 
 // Inicialización del servidor
 const app = express();
@@ -71,7 +72,7 @@ app.post('/api/create-test-users', async (req, res) => {
     }
 });
 
-// Login
+// Login (RUTA PÚBLICA)
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
     
@@ -102,37 +103,48 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// RUTAS PARA EL FRONTEND 
-app.use(authMiddleware); 
-app.use('/api/compras', comprasRoutes); 
-app.use('/api/clientes', clientesRoutes);
-app.use('/api/logistica', logisticaRoutes);
-app.use('/api/materiales', materialesRoutes);
-app.use('/api/objetos3d', objetos3dRoutes);
-app.use('/api/pedidos', pedidosRoutes);
-app.use('/api/produccion', produccionRoutes);
-app.use('/api/productos', productoTiendaRoutes); 
-app.use('/api/proveedores', proveedoresRoutes);
-app.use('/api/ventas', ventasRoutes);
-app.use('/api/finanzas', finanzasRoutes);
+// === RUTAS PROTEGIDAS (con autenticación) ===
+app.use('/api/compras', authMiddleware, comprasRoutes); 
+app.use('/api/clientes', authMiddleware, clientesRoutes);
+app.use('/api/logistica', authMiddleware, logisticaRoutes);
+app.use('/api/materiales', authMiddleware, materialesRoutes);
+app.use('/api/objetos3d', authMiddleware, objetos3dRoutes);
+app.use('/api/pedidos', authMiddleware, pedidosRoutes);
+app.use('/api/produccion', authMiddleware, produccionRoutes);
+app.use('/api/productos', authMiddleware, productosRoutes); 
+app.use('/api/proveedores', authMiddleware, proveedoresRoutes);
+app.use('/api/ventas', authMiddleware, ventasRoutes);
+app.use('/api/finanzas', authMiddleware, finanzasRoutes);
+app.use('/api/anticipos', authMiddleware, anticiposRoutes);
 
-//  MANEJO DE ERRORES FINAL
-// Manejo de rutas no encontradas (404) 
-app.use((req, res, next) => {
-    res.status(404).json({ message: '❌ Ruta no encontrada: ' + req.originalUrl });
+// Ruta de salud pública
+app.get('/api/health', (req, res) => {
+    res.json({ 
+        status: 'OK', 
+        database: mongoose.connection.readyState === 1 ? 'Conectado' : 'Desconectado',
+        timestamp: new Date().toISOString()
+    });
 });
 
-// Manejo de errores global
+// Ruta de prueba pública
+app.get('/api/test', (req, res) => {
+    res.json({ message: '✅ API funcionando correctamente' });
+});
+
+//  MANEJO DE ERRORES FINAL
+app.use((req, res, next) => {
+    res.status(404).json({ message: '❌ Ruta no encontrada: ' + req.originalUrl });
+});
+
 app.use((err, req, res, next) => {
-    console.error('❌ Error del servidor:', err);
-    res.status(500).json({ message: 'Error interno del servidor' });
+    console.error('❌ Error del servidor:', err);
+    res.status(500).json({ message: 'Error interno del servidor' });
 });
 
 // INICIO DEL SERVIDOR
-
-
 app.listen(PORT, () => {
-    console.log(`Servidor escuchando en http://localhost:${PORT}`);
-    console.log(` Health check: http://localhost:${PORT}/api/health`);
-    console.log(` Login: http://localhost:${PORT}/api/login`);
+    console.log(`🚀 Servidor escuchando en http://localhost:${PORT}`);
+    console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
+    console.log(`🔐 Login: http://localhost:${PORT}/api/login`);
+    console.log(`💰 Anticipos: http://localhost:${PORT}/api/anticipos`);
 });
