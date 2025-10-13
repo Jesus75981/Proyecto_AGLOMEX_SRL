@@ -2,22 +2,51 @@ import ProductoTienda from "../models/productoTienda.model.js";
 
 // Función para generar un ID único
 const generarCodigoInterno = (nombre) => {
-  const prefijo = nombre.substring(0, 3).toUpperCase();
-  const timestamp = Date.now().toString().slice(-5);
-  const random = Math.floor(Math.random() * 1000);
-  return `${prefijo}-${timestamp}-${random}`;
+    // Genera un código simple: primeras 3 letras del nombre + 4 dígitos aleatorios
+    const prefix = nombre ? nombre.substring(0, 3).toUpperCase() : 'PRO';
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    return `${prefix}-${randomSuffix}`;
 };
 
+
 export const crearProducto = async (req, res) => {
-  try {
-    const idProductoTienda = generarCodigoInterno(req.body.nombre);
-    const productoData = { ...req.body, idProductoTienda };
-    const producto = new ProductoTienda(productoData);
-    await producto.save();
-    res.status(201).json(producto);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
+    // Los datos que se esperan en req.body son:
+    // { nombre: String, imagen: String, dimensiones: { alto: N, ancho: N, profundidad: N } }
+    try {
+        // 1. Generar el código interno usando el nombre (requerido)
+        if (!req.body.nombre) {
+            return res.status(400).json({ error: 'El campo "nombre" es obligatorio para generar el código interno.' });
+        }
+        
+        const idProductoTienda = generarCodigoInterno(req.body.nombre);
+        
+        // 2. Combinar los datos del body con el código generado
+        const productoData = { 
+            ...req.body, 
+            idProductoTienda: idProductoTienda,
+            // Los campos 'precioVenta', 'cantidad' y 'descripcion'
+            // se omiten si no se envían, y se permiten vacíos por el esquema.
+        };
+        
+        // 3. Crear y guardar el producto
+        const producto = new ProductoTienda(productoData);
+        await producto.save();
+
+        // 4. Respuesta exitosa
+        res.status(201).json(producto);
+    } catch (err) {
+        // Mongoose Validation Errors (por ejemplo, si falta 'imagen' o 'dimensiones')
+        if (err.name === 'ValidationError') {
+            const errors = Object.values(err.errors).map(val => val.message);
+            return res.status(400).json({ error: errors.join(', ') });
+        }
+        // Duplicate key error (si el nombre o idProductoTienda ya existen)
+        if (err.code === 11000) {
+            return res.status(400).json({ error: 'El nombre o código interno de este producto ya existe.' });
+        }
+        // Otros errores del servidor
+        res.status(500).json({ error: 'Error interno del servidor al crear producto.' });
+    }
 };
 
 export const listarProductos = async (req, res) => {
