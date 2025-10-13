@@ -1,4 +1,55 @@
 import Compra from "../models/compra.model.js";
+const generarCodigoInterno = (nombre) => {
+    // Genera un código simple: primeras 3 letras del nombre + 4 dígitos aleatorios
+    const prefix = nombre ? nombre.substring(0, 3).toUpperCase() : 'PRO';
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    return `${prefix}-${randomSuffix}`;
+};
+
+/**
+ * Función que encuentra un producto por ID o Nombre. Si no existe, lo crea automáticamente
+ * con los datos mínimos requeridos (nombre, dimensiones, imagen).
+ * @param {Object} itemData - Datos del producto proporcionados en el array de la compra.
+ * @returns {Promise<string>} El ID de MongoDB (_id) del producto encontrado o creado.
+ */
+const encontrarOCrearProducto = async (itemData) => {
+    const { productoId, nombreProducto, dimensiones, imagenProducto } = itemData;
+
+    let producto = null;
+
+    // 1. Intentar buscar por ID (ObjectId) si se proporciona (para productos existentes)
+    if (productoId) {
+        producto = await ProductoTienda.findById(productoId);
+    }
+    
+    // 2. Si no se encontró por ID, intentar buscar por Nombre (si se proporciona)
+    if (!producto && nombreProducto) {
+        producto = await ProductoTienda.findOne({ nombre: nombreProducto });
+    }
+
+    // 3. Si AÚN no se encuentra, crearlo automáticamente con los datos mínimos.
+    if (!producto) {
+        if (!nombreProducto || !dimensiones || !imagenProducto) {
+             throw new Error("Datos insuficientes para crear un nuevo producto. Se requiere nombre, dimensiones e imagen.");
+        }
+
+        const idProductoTienda = generarCodigoInterno(nombreProducto);
+        
+        // Creamos la nueva REFERENCIA en ProductoTienda con la cantidad inicial en 0
+        const nuevoProducto = new ProductoTienda({
+            nombre: nombreProducto,
+            idProductoTienda: idProductoTienda,
+            dimensiones: dimensiones,
+            imagen: imagenProducto,
+            // Los campos 'cantidad', 'precioCompra', 'precioVenta' quedan en sus defaults/null.
+        });
+
+        producto = await nuevoProducto.save();
+        console.log(`[INVENTARIO]: Nueva referencia de producto creada: ${producto.nombre} (${producto._id})`);
+    }
+
+    return producto._id; // Retornamos el ID de MongoDB (ObjectId) del producto
+};
 
 export const registrarCompra = async (req, res) => {
     // 1. Obtener los datos de la compra del cuerpo de la solicitud (req.body)
