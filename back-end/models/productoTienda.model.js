@@ -1,46 +1,35 @@
 import mongoose from "mongoose";
 import crypto from 'crypto'; 
 
+
+const DimensionesSchema = new mongoose.Schema({
+    alto: { type: Number, required: true },
+    ancho: { type: Number, required: true },
+    profundidad: { type: Number, required: true }
+}, { _id: false });
 const productoTiendaSchema = new mongoose.Schema({
-  idProductoTienda: {
-    type: String,
-    required: true,
-    unique: true
-  },
   nombre: {
-    type: String,
-    required: true
-  },
-  descripcion: {
-    type: String,
-    default: ""
-  },
-  cantidad: {
-    type: Number,
-    required: true,
-    default: 0
-  },
-  precioCompra: {
-    type: Number,
-    required: true
-  },
-  precioVenta: {
-    type: Number,
-    required: true
-  },
-  proveedor: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Proveedor"
-  },
-  imagen: {
-    type: String,
-    default: ""
-  },
-  dimensiones: {
-    alto: { type: Number },
-    ancho: { type: Number },
-    profundidad: { type: Number }
-  },
+        type: String,
+        required: [true, 'El nombre del producto es obligatorio.'],
+        trim: true,
+        unique: true
+    },
+    idProductoTienda: {
+        type: String,
+        required: true,
+        unique: true,
+        uppercase: true,
+        trim: true
+    },
+    imagen: {
+        type: String,
+        required: [true, 'La URL de la imagen es obligatoria.'],
+    },
+    dimensiones: {
+        type: DimensionesSchema,
+        required: [true, 'Las dimensiones del producto son obligatorias.'],
+    },
+  
   objeto3D: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Objeto3D" // para vincular con el modelo 3D en RA
