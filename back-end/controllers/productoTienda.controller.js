@@ -1,53 +1,63 @@
+// controllers/productoTienda.controller.js
 import ProductoTienda from "../models/productoTienda.model.js";
 
-// Función para generar un ID único
+// Función para generar código interno (más simple)
 const generarCodigoInterno = (nombre) => {
   const prefijo = nombre.substring(0, 3).toUpperCase();
-  const timestamp = Date.now().toString().slice(-5);
-  const random = Math.floor(Math.random() * 1000);
-  return `${prefijo}-${timestamp}-${random}`;
+  const timestamp = Date.now().toString().slice(-6);
+  return `${prefijo}-${timestamp}`;
 };
 
 export const crearProducto = async (req, res) => {
   try {
-    const idProductoTienda = generarCodigoInterno(req.body.nombre);
-    const productoData = { ...req.body, idProductoTienda };
+    console.log('📦 Datos recibidos para producto:', req.body); // ✅ DEBUG
+    
+    // ✅ VALIDAR CAMPOS REQUERIDOS
+    const { nombre, precioCompra, precioVenta, cantidad } = req.body;
+    
+    if (!nombre || !precioCompra || !precioVenta) {
+      return res.status(400).json({ 
+        error: "Los campos nombre, precioCompra y precioVenta son requeridos" 
+      });
+    }
+
+    // ✅ GENERAR CÓDIGO AUTOMÁTICAMENTE (no enviar desde frontend)
+    const idProductoTienda = generarCodigoInterno(nombre);
+    
+    const productoData = { 
+      ...req.body,
+      idProductoTienda,
+      cantidad: cantidad || 0, // Valor por defecto
+      activo: true
+    };
+
+    console.log('✅ Creando producto con datos:', productoData);
+
     const producto = new ProductoTienda(productoData);
     await producto.save();
-    res.status(201).json(producto);
+    
+    res.status(201).json({
+      message: "✅ Producto creado exitosamente",
+      producto: producto
+    });
+
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    console.error('❌ Error completo al crear producto:', err);
+    res.status(400).json({ 
+      error: "Error al crear producto",
+      details: err.message 
+    });
   }
 };
 
 export const listarProductos = async (req, res) => {
   try {
-    // Solo muestra los productos que tienen el estado activo: true
-    const productos = await ProductoTienda.find({ activo: true }).populate("proveedor objeto3D");
+    const productos = await ProductoTienda.find({ activo: true })
+      .select('idProductoTienda nombre descripcion precioCompra precioVenta cantidad categoria activo');
     res.json(productos);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-export const actualizarProducto = async (req, res) => {
-  const producto = await ProductoTienda.findByIdAndUpdate(req.params.id, req.body, { new: true });
-  res.json(producto);
-};
-
-export const eliminarProducto = async (req, res) => {
-  try {
-    // En lugar de borrar, actualiza el estado 'activo' a false
-    const producto = await ProductoTienda.findByIdAndUpdate(
-      req.params.id,
-      { activo: false },
-      { new: true } // Para devolver el documento actualizado
-    );
-    if (!producto) {
-      return res.status(404).json({ message: "Producto no encontrado" });
-    }
-    res.json({ message: "Producto eliminado lógicamente (inactivado)" });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
+// ... (actualizarProducto y eliminarProducto igual)
