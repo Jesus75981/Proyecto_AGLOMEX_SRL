@@ -33,7 +33,15 @@ const productoTiendaSchema = new mongoose.Schema({
     // required: true <--- Eliminado: Se define posteriormente o se inicializa
   },
   // -----------------------------------------------------------
-  
+  color: { // <-- NUEVO CAMPO REQUERIDO
+        type: String,
+        required: true
+    },
+    categoria: { // <-- NUEVO CAMPO REQUERIDO
+        type: String,
+        enum: ["Silla", "Mesa", "Sofá", "Estantería", "Armario", "Otro"], // O ajusta las categorías
+        required: true
+    },
   proveedor: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Proveedor"

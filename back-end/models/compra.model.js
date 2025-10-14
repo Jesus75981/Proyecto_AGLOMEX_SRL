@@ -1,5 +1,24 @@
 import mongoose from "mongoose";
 
+const pagoSchema = new mongoose.Schema({
+    tipo: {
+        type: String,
+        // ENUM ACTUALIZADO: Incluye los 4 métodos de pago solicitados
+        enum: ["Efectivo", "Transferencia", "Cheque", "Credito"],
+        required: true,
+    },
+    monto: { // Monto específico pagado con este método
+        type: Number,
+        required: true,
+        min: 0.01
+    },
+    referencia: String, // Número de Cheque, ID de transferencia, o número de operación
+    cuenta: String, // Por ejemplo: "BANCO 01", "ANTICIPO 02", etc.
+    fechaPago: {
+        type: Date,
+        default: Date.now
+    }
+}, { _id: false });
 const compraSchema = new mongoose.Schema({
   numCompra: {
     type: Number,
@@ -10,38 +29,46 @@ const compraSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
-  proveedor: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Proveedor", // relación con proveedores.model.js
-    required: true
-  },
+  
   tipoCompra: {
     type: String,
     enum: ["Materia Prima", "Producto Terminado"],
     required: true,
   },
-  productos: [
-    {
-      producto: {
+  proveedor: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "ProductoTienda", // Asume un solo modelo para simplicidad
+        ref: "Proveedor", // Solo un proveedor por compra
         required: true,
-      },
-      cantidad: Number,
-      precioUnitario: Number,
-      precioTotal: Number,
-      codigoProveedor: String, // Se mantiene para rastrear el código de proveedor
     },
-  ],
-  metodoPago: {
-    type: String,
-    enum: ["Efectivo", "Transferencia", "Cheque", "Credito"],
-    required: true
-  },
-  banco: String,
-  anticipo: { type: Number, default: 0 },
-  numFactura: { type: String, required: true },
-  observaciones: String
+    productos: [ // <--- ¡ESTE ES EL ARRAY CLAVE!
+        {
+            producto: { 
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "ProductoTienda", 
+                required: true,
+            },
+            cantidad: { type: Number, required: true },
+            precioUnitario: { type: Number, required: true },
+            codigoProveedor: String
+        },
+    ],
+   metodosPago: {
+        type: [pagoSchema], // Un array de los pagos realizados
+        required: true,
+        validate: { // Validación personalizada para asegurar que el array no esté vacío
+            validator: function(v) {
+                return v.length > 0;
+            },
+            message: 'Debe especificar al menos un método de pago.'
+        }
+    },
+    
+    estado: {
+        type: String,
+        enum: ["Pendiente", "Pagada", "Parcialmente Pagada", "Cancelada"],
+        default: "Pagada"
+    },
+    observaciones: String
 }, { timestamps: true });
 
 
