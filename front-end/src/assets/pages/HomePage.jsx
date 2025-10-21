@@ -1,6 +1,8 @@
 // front-end/src/assets/pages/HomePage.jsx
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import Aglomex1 from '../images/Aglomex1.jpg';
+import aglomex7 from '../images/aglomex7.jpg';
 
 const HomePage = ({ userRole, onLogout }) => {
   const navigate = useNavigate();
@@ -13,9 +15,9 @@ const HomePage = ({ userRole, onLogout }) => {
   return (
     <div className="relative min-h-screen bg-gradient-to-br from-gray-100 to-gray-200">
       {/* Background with Aglomex image */}
-      <div 
+      <div
         className="absolute inset-0 bg-cover bg-center opacity-10"
-        style={{ backgroundImage: `url('/Aglomex1.jpg')` }}
+        style={{ backgroundImage: `url(${Aglomex1})` }}
       ></div>
 
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-6">
@@ -28,10 +30,10 @@ const HomePage = ({ userRole, onLogout }) => {
         </button>
 
         {/* Aglomex Logo */}
-        <img 
-          src='/aglomex7.jpg'
-          alt="Aglomex Logo" 
-          className="w-48 h-auto mb-6 drop-shadow-lg" 
+        <img
+          src={aglomex7}
+          alt="Aglomex Logo"
+          className="w-48 h-auto mb-6 drop-shadow-lg"
         />
         
         <h1 className="text-5xl font-extrabold text-gray-900 mb-2 drop-shadow-md">
