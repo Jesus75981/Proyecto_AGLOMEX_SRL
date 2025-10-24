@@ -4,6 +4,15 @@ import { useNavigate } from 'react-router-dom';
 const FabricacionPage = ({ userRole }) => {
   const navigate = useNavigate();
 
+  // Verificar autenticación al cargar el componente
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+  }, [navigate]);
+
   // ✅ CORREGIDO: Volver al HOME (menú principal)
   const volverAlHome = () => {
     navigate('/home');
@@ -153,14 +162,27 @@ const FabricacionPage = ({ userRole }) => {
   ]);
 
   const [nuevaOrden, setNuevaOrden] = useState({
+    fecha: new Date().toISOString().split('T')[0],
     producto: '',
+    codigoProducto: '',
+    categoria: '',
+    proveedor: 'Aglomex',
     cantidad: 1,
-    fechaInicio: '',
-    fechaFin: '',
-    prioridad: 'Media',
-    materiales: [],
-    responsable: ''
+    nombreProducto: '',
+    codigo: '',
+    color: '',
+    costoUnitario: 0,
+    costoTotal: 0,
+    insumosSeleccionados: [],
+    responsable: '',
+    progreso: 0,
+    estado: 'Pendiente'
   });
+
+  const [insumoSearchTerm, setInsumoSearchTerm] = useState('');
+  const [showInsumoDropdown, setShowInsumoDropdown] = useState(false);
+  const [insumosSeleccionados, setInsumosSeleccionados] = useState([]);
+  const [inventario, setInventario] = useState([]); // Para agregar productos fabricados al inventario
 
   const [nuevoMaterial, setNuevoMaterial] = useState({
     nombre: '',
@@ -192,30 +214,103 @@ const FabricacionPage = ({ userRole }) => {
   );
 
   // Funciones para órdenes de fabricación
-  const cambiarEstadoOrden = (id, nuevoEstado) => {
-    setOrdenesFabricacion(ordenesFabricacion.map(orden =>
-      orden.id === id ? { 
-        ...orden, 
-        estado: nuevoEstado,
-        progreso: nuevoEstado === 'Completada' ? 100 : 
-                 nuevoEstado === 'En producción' ? 75 :
-                 nuevoEstado === 'En ensamblaje' ? 45 :
-                 nuevoEstado === 'Pendiente' ? 0 : orden.progreso
-      } : orden
-    ));
+  const iniciarProduccionAutomatica = async (id) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/produccion/${id}/iniciar`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        alert('✅ Producción iniciada automáticamente. El progreso se actualizará cada 5 minutos.');
+        // Recargar la lista de producciones
+        cargarProducciones();
+      } else {
+        alert('❌ Error al iniciar producción');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert('❌ Error de conexión');
+    }
   };
 
-  const actualizarProgreso = (id, nuevoProgreso) => {
-    setOrdenesFabricacion(ordenesFabricacion.map(orden =>
-      orden.id === id ? { 
-        ...orden, 
-        progreso: Math.min(100, Math.max(0, nuevoProgreso)),
-        estado: nuevoProgreso >= 100 ? 'Completada' : 
-               nuevoProgreso >= 75 ? 'En producción' :
-               nuevoProgreso >= 45 ? 'En ensamblaje' : 'Pendiente'
-      } : orden
-    ));
+  const confirmarProduccion = async (id) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/produccion/${id}/confirmar`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (response.ok) {
+        alert('✅ Producción confirmada exitosamente');
+        cargarProducciones();
+      } else {
+        alert('❌ Error al confirmar producción');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert('❌ Error de conexión');
+    }
   };
+
+  const cargarProducciones = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      alert('Sesión expirada. Redirigiendo al login.');
+      navigate('/login');
+      return;
+    }
+
+    try {
+      const response = await fetch('http://localhost:5000/api/produccion', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const producciones = await response.json();
+        // Convertir datos del backend a formato del frontend
+        const ordenesConvertidas = producciones.map(prod => ({
+          id: prod._id,
+          numero: prod.idProduccion,
+          producto: prod.nombre,
+          cantidad: prod.cantidad,
+          fechaInicio: prod.fechaInicio ? new Date(prod.fechaInicio).toLocaleDateString() : 'No iniciada',
+          fechaFin: prod.fechaInicio ? new Date(new Date(prod.fechaInicio).getTime() + prod.tiempoEstimado * 60 * 60 * 1000).toLocaleDateString() : 'No estimada',
+          estado: prod.estado === 'En Progreso' ? 'En producción' :
+                 prod.estado === 'Completado' ? 'Completada' :
+                 prod.estado === 'Retrasado' ? 'Retrasada' : 'Pendiente',
+          prioridad: 'Media', // Default
+          progreso: prod.progreso,
+          materiales: prod.materiales.map(m => m.material?.nombre || 'Material').join(', '),
+          responsable: 'Sistema Automático',
+          tiempoEstimado: prod.tiempoEstimado,
+          tiempoTranscurrido: prod.tiempoTranscurrido
+        }));
+        setOrdenesFabricacion(ordenesConvertidas);
+      } else if (response.status === 403) {
+        alert('Sesión expirada. Redirigiendo al login.');
+        navigate('/login');
+      } else {
+        console.error('Error cargando producciones:', response.status);
+      }
+    } catch (error) {
+      console.error('Error cargando producciones:', error);
+    }
+  };
+
+  // Cargar producciones al montar el componente
+  useEffect(() => {
+    cargarProducciones();
+  }, []);
 
   const agregarOrden = () => {
     if (!nuevaOrden.producto || !nuevaOrden.responsable) return;
@@ -563,6 +658,7 @@ const FabricacionPage = ({ userRole }) => {
                               orden.estado === 'Completada' ? 'bg-green-100 text-green-800' :
                               orden.estado === 'En producción' ? 'bg-blue-100 text-blue-800' :
                               orden.estado === 'En ensamblaje' ? 'bg-yellow-100 text-yellow-800' :
+                              orden.estado === 'Retrasada' ? 'bg-red-100 text-red-800' :
                               'bg-gray-100 text-gray-800'
                             }`}>
                               {orden.estado}
@@ -573,21 +669,26 @@ const FabricacionPage = ({ userRole }) => {
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
                             <div className="flex space-x-2">
-                              {orden.estado !== 'Completada' && (
-                                <>
-                                  <button
-                                    onClick={() => actualizarProgreso(orden.id, orden.progreso + 25)}
-                                    className="text-green-600 hover:text-green-900 text-xs"
-                                  >
-                                    Avanzar
-                                  </button>
-                                  <button
-                                    onClick={() => cambiarEstadoOrden(orden.id, 'Completada')}
-                                    className="text-blue-600 hover:text-blue-900 text-xs"
-                                  >
-                                    Completar
-                                  </button>
-                                </>
+                              {orden.estado === 'Pendiente' && (
+                                <button
+                                  onClick={() => iniciarProduccionAutomatica(orden.id)}
+                                  className="text-blue-600 hover:text-blue-900 text-xs bg-blue-50 px-2 py-1 rounded"
+                                >
+                                  Iniciar Producción
+                                </button>
+                              )}
+                              {orden.estado === 'Completada' && (
+                                <button
+                                  onClick={() => confirmarProduccion(orden.id)}
+                                  className="text-green-600 hover:text-green-900 text-xs bg-green-50 px-2 py-1 rounded"
+                                >
+                                  Confirmar
+                                </button>
+                              )}
+                              {orden.estado === 'Retrasada' && (
+                                <span className="text-red-600 text-xs bg-red-50 px-2 py-1 rounded">
+                                  ⚠️ Retrasada
+                                </span>
                               )}
                             </div>
                           </td>

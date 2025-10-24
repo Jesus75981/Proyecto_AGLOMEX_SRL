@@ -1,26 +1,87 @@
+  
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
 
-const API_BASE = 'http://localhost:5000/api'; // Tu PORT=5000 de server.js
+// --- API Helper ---
+const API_URL = 'http://localhost:5000/api';
+
+const getAuthToken = () => {
+  return localStorage.getItem('token');
+};
+
+const apiFetch = async (endpoint, options = {}) => {
+  const token = getAuthToken();
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  } else {
+    throw new Error('Token no válido');
+  }
+
+  const response = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
+
+  if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error('Token no válido');
+    }
+    const errorData = await response.json();
+    throw new Error(errorData.message || errorData.error || 'Error en la petición a la API');
+  }
+
+  return response.json();
+};
+
 
 const ComprasPage = ({ userRole }) => {
   const navigate = useNavigate();
 
+  // Verificar autenticación al cargar el componente
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+  }, [navigate]);
+
   const volverAlHome = () => navigate('/home');
 
-  // Estados (vacíos para DB)
+  // --- Estados ---
   const [activeSection, setActiveSection] = useState('realizarCompra');
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Data from API
+  const [proveedores, setProveedores] = useState([]);
+  const [productos, setProductos] = useState([]);
+  const [categorias, setCategorias] = useState([]);
+
+  // Search & Filtering
   const [busquedaProveedor, setBusquedaProveedor] = useState('');
   const [busquedaProducto, setBusquedaProducto] = useState('');
   const [proveedoresFiltrados, setProveedoresFiltrados] = useState([]);
   const [productosFiltrados, setProductosFiltrados] = useState([]);
   const [mostrarResultadosProveedor, setMostrarResultadosProveedor] = useState(false);
   const [mostrarResultadosProducto, setMostrarResultadosProducto] = useState(false);
+
+  // Generate automatic purchase number
+  const generarNumeroCompra = () => {
+    const fecha = new Date();
+    const year = fecha.getFullYear();
+    const month = String(fecha.getMonth() + 1).padStart(2, '0');
+    const day = String(fecha.getDate()).padStart(2, '0');
+    const timestamp = Date.now().toString().slice(-4); // Last 4 digits of timestamp
+    return `COMP-${year}${month}${day}-${timestamp}`;
+  };
+
+  // Main Purchase Form
   const [compra, setCompra] = useState({
     fecha: new Date().toISOString().split('T')[0],
-    numeroCompra: `COMP-${Date.now()}`,
+    numeroCompra: generarNumeroCompra(), // Automatic generation
+    tipoCompra: 'Materia Prima', // Default value, can be changed
     proveedorId: '',
     proveedorNombre: '',
     observaciones: '',
@@ -29,57 +90,86 @@ const ComprasPage = ({ userRole }) => {
     productos: [],
     anticipos: []
   });
+
+  // Temporary states for forms
+  const [productoTemporal, setProductoTemporal] = useState({
+    productoId: '',
+    productoNombre: '',
+    cantidad: 1,
+    costoUnitario: 0
+  });
+
+  // Form visibility
   const [showProveedorForm, setShowProveedorForm] = useState(false);
   const [showProductoForm, setShowProductoForm] = useState(false);
-  const [showAnticipoForm, setShowAnticipoForm] = useState(false);
-  const [proveedores, setProveedores] = useState([]);
-  const [productos, setProductos] = useState([]);
-  const [comprasRegistradas, setComprasRegistradas] = useState([]);
-  const [anticipos, setAnticipos] = useState([]);
-  const [nuevoProveedor, setNuevoProveedor] = useState({ nombre: '', contacto: '', telefono: '', direccion: '', nit: '', estado: 'Activo' });
-  const [nuevoProducto, setNuevoProducto] = useState({ nombre: '', codigo: '', color: '', categoria: '', costoUnitario: 0, precioVenta: 0 });
-  const [productoTemporal, setProductoTemporal] = useState({ productoId: '', productoNombre: '', cantidad: 1, costoUnitario: 0 });
-  const [nuevoAnticipo, setNuevoAnticipo] = useState({ compraId: '', monto: 0, metodoPago: 'Transferencia', banco: '', fecha: new Date().toISOString().split('T')[0] });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
-  const metodosPago = ['Efectivo', 'Transferencia', 'Cheque', 'Crédito'];
-  const bancos = ['Banco 01', 'Banco 02', 'Banco 03', 'Banco 04'];
+  // Payment - now checkboxes with amounts
+  const [metodoPagoSeleccionado, setMetodoPagoSeleccionado] = useState([]);
+  const [pagos, setPagos] = useState({ Efectivo: 0, Transferencia: 0, Cheque: 0, Credito: 0 });
+  const [chequeImage, setChequeImage] = useState(null);
 
-  const totalCompra = compra.productos.reduce((total, item) => total + (item.cantidad * item.costoUnitario), 0);
-  const totalAnticipos = compra.anticipos.reduce((total, a) => total + a.monto, 0);
-  const saldoPendiente = totalCompra - totalAnticipos;
+  // New item forms
+  const [nuevoProveedor, setNuevoProveedor] = useState({
+    nombre: '',
+    contacto: { telefono: '', email: '' },
+    direccion: '',
+    nit: ''
+  });
+  const [nuevoProducto, setNuevoProducto] = useState({
+    nombre: '',
+    categoria: '',
+    color: '',
+    marca: '',
+    ubicacion: '',
+    proveedor: '',
+    dimensiones: {
+      alto: '',
+      ancho: '',
+      profundidad: ''
+    }
+  });
 
-  // Fetch de DB (usa token via defaults)
+  // --- Data Loading ---
   useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+
     const fetchData = async () => {
-      setLoading(true);
-      setError(null);
       try {
-        const [prov, prod, comp, anti] = await Promise.all([
-          axios.get(`${API_BASE}/proveedores`),
-          axios.get(`${API_BASE}/productos`), // Tu ruta productoTiendaRoutes
-          axios.get(`${API_BASE}/compras`),
-          axios.get(`${API_BASE}/anticipos`) // Si no tienes, comenta o crea ruta
+        const [proveedoresData, productosData] = await Promise.all([
+          apiFetch('/proveedores'),
+          apiFetch('/productos')
         ]);
-        setProveedores(prov.data || []);
-        setProductos(prod.data || []);
-        setComprasRegistradas(comp.data || []);
-        setAnticipos(anti.data || []);
-      } catch (err) {
-        setError('Error en API: ' + (err.response?.data?.message || err.message));
-        console.error(err);
-      } finally {
-        setLoading(false);
+        setProveedores(proveedoresData);
+        setProductos(productosData);
+
+        // Extract unique categories from products
+        const uniqueCategorias = [...new Set(productosData.map(p => p.categoria))];
+        setCategorias(uniqueCategorias);
+
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        if (error.message.includes('Token no válido') || error.message.includes('403') || error.message.includes('Forbidden')) {
+          alert('Sesión expirada. Redirigiendo al login.');
+          navigate('/login');
+        } else {
+          alert('No se pudo cargar la información inicial. Verifique la conexión con el servidor.');
+        }
       }
     };
     fetchData();
-  }, []);
+  }, [navigate]);
 
-  // Búsquedas useEffect (ahora con proveedores de DB)
+  // --- Search Effects ---
   useEffect(() => {
     if (busquedaProveedor) {
-      const filtrados = proveedores.filter(p => p.nombre.toLowerCase().includes(busquedaProveedor.toLowerCase()) || p.nit.toLowerCase().includes(busquedaProveedor.toLowerCase()));
+      const filtrados = proveedores.filter(p =>
+        p.nombre.toLowerCase().includes(busquedaProveedor.toLowerCase()) ||
+        (p.nit && p.nit.toLowerCase().includes(busquedaProveedor.toLowerCase()))
+      );
       setProveedoresFiltrados(filtrados);
       setMostrarResultadosProveedor(true);
     } else {
@@ -90,7 +180,10 @@ const ComprasPage = ({ userRole }) => {
 
   useEffect(() => {
     if (busquedaProducto) {
-      const filtrados = productos.filter(p => p.nombre.toLowerCase().includes(busquedaProducto.toLowerCase()) || p.codigo.toLowerCase().includes(busquedaProducto.toLowerCase()) || p.categoria.toLowerCase().includes(busquedaProducto.toLowerCase()));
+      const filtrados = productos.filter(p =>
+        p.nombre.toLowerCase().includes(busquedaProducto.toLowerCase()) ||
+        p.codigo.toLowerCase().includes(busquedaProducto.toLowerCase())
+      );
       setProductosFiltrados(filtrados);
       setMostrarResultadosProducto(true);
     } else {
@@ -99,125 +192,213 @@ const ComprasPage = ({ userRole }) => {
     }
   }, [busquedaProducto, productos]);
 
-  // Agregar Proveedor (POST a DB)
-  const agregarProveedor = async () => {
-    if (!nuevoProveedor.nombre || !nuevoProveedor.nit) return alert('Nombre y NIT requeridos');
+  // --- Calculations ---
+  const totalCompra = compra.productos.reduce((total, item) => total + item.costoTotal, 0);
+  const totalPagado = Object.values(pagos).reduce((total, valor) => total + valor, 0);
+
+  // --- Handlers ---
+
+  const handleCrearProveedor = async () => {
+    if (!nuevoProveedor.nombre || !nuevoProveedor.nit) {
+        alert('Nombre y NIT del proveedor son requeridos.');
+        return;
+    }
+    // Validación de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (nuevoProveedor.contacto.email && !emailRegex.test(nuevoProveedor.contacto.email)) {
+        alert('Por favor ingrese un email válido.');
+        return;
+    }
+    // Validación de teléfono (ejemplo: solo números, mínimo 7 dígitos)
+    const phoneRegex = /^\d{7,15}$/;
+    if (nuevoProveedor.contacto.telefono && !phoneRegex.test(nuevoProveedor.contacto.telefono)) {
+        alert('Por favor ingrese un número de teléfono válido (solo números, 7-15 dígitos).');
+        return;
+    }
     try {
-      const res = await axios.post(`${API_BASE}/proveedores`, nuevoProveedor);
-      const proveedor = res.data;
-      setProveedores([...proveedores, proveedor]);
-      setNuevoProveedor({ nombre: '', contacto: '', telefono: '', direccion: '', nit: '', estado: 'Activo' });
-      setShowProveedorForm(false);
-      setCompra({ ...compra, proveedorId: proveedor._id, proveedorNombre: proveedor.nombre });
-      setBusquedaProveedor(proveedor.nombre);
-      setMostrarResultadosProveedor(false);
-    } catch (err) {
-      alert('Error: ' + (err.response?.data?.message || 'No se pudo guardar'));
+        const proveedorCreado = await apiFetch('/proveedores', {
+            method: 'POST',
+            body: JSON.stringify(nuevoProveedor)
+        });
+        setProveedores([...proveedores, proveedorCreado]);
+        setShowProveedorForm(false);
+        setNuevoProveedor({ nombre: '', contacto: { telefono: '', email: '' }, direccion: '', nit: '' });
+        seleccionarProveedor(proveedorCreado); // Auto-select the new provider
+        alert('Proveedor creado y seleccionado exitosamente.');
+    } catch (error) {
+        console.error("Error creando proveedor:", error);
+        alert(`Error creando proveedor: ${error.message}`);
     }
   };
-
+  
   const seleccionarProveedor = (proveedor) => {
-    setCompra({ ...compra, proveedorId: proveedor._id, proveedorNombre: proveedor.nombre });
+    setCompra({
+      ...compra,
+      proveedorId: proveedor._id,
+      proveedorNombreX: proveedor.nombre
+    });
     setBusquedaProveedor(proveedor.nombre);
     setMostrarResultadosProveedor(false);
   };
 
-  // Agregar Producto (similar)
-  const agregarProducto = async () => {
-    if (!nuevoProducto.nombre || !nuevoProducto.codigo) return alert('Nombre y Código requeridos');
-    const payload = { ...nuevoProducto, stock: 0 };
+  const handleCrearProducto = async () => {
+    if (!nuevoProducto.nombre || !nuevoProducto.categoria || !nuevoProducto.color) {
+        alert('Nombre, Categoría y Color son requeridos para el nuevo producto.');
+        return;
+    }
     try {
-      const res = await axios.post(`${API_BASE}/productos`, payload);
-      const producto = res.data;
-      setProductos([...productos, producto]);
-      setNuevoProducto({ nombre: '', codigo: '', color: '', categoria: '', costoUnitario: 0, precioVenta: 0 });
-      setShowProductoForm(false);
-      setProductoTemporal({ productoId: producto._id, productoNombre: producto.nombre, cantidad: 1, costoUnitario: producto.costoUnitario });
-      setBusquedaProducto(producto.nombre);
-      setMostrarResultadosProducto(false);
-    } catch (err) {
-      alert('Error: ' + (err.response?.data?.message || 'No se pudo guardar'));
+        // Filtrar campos vacíos para evitar errores de ObjectId
+        const productoData = { ...nuevoProducto };
+        if (!productoData.proveedor || productoData.proveedor === '') {
+            delete productoData.proveedor;
+        }
+        if (!productoData.marca || productoData.marca === '') {
+            delete productoData.marca;
+        }
+
+        const productoCreado = await apiFetch('/productos', {
+            method: 'POST',
+            body: JSON.stringify(productoData)
+        });
+        setProductos([...productos, productoCreado]);
+        setShowProductoForm(false);
+        setNuevoProducto({ nombre: '', categoria: '', color: '', marca: '', ubicacion: '', proveedor: '', dimensiones: { alto: '', ancho: '', profundidad: '' } });
+        alert('Producto creado exitosamente.');
+    } catch (error) {
+        console.error("Error creando producto:", error);
+        alert(`Error creando producto: ${error.message}`);
     }
   };
 
   const seleccionarProducto = (producto) => {
-    setProductoTemporal({ productoId: producto._id, productoNombre: producto.nombre, cantidad: 1, costoUnitario: producto.costoUnitario });
+    setProductoTemporal({
+      productoId: producto._id,
+      productoNombre: producto.nombre,
+      cantidad: 1,
+      costoUnitario: producto.precioCompra || 0 // Use precioCompra from DB
+    });
     setBusquedaProducto(producto.nombre);
     setMostrarResultadosProducto(false);
   };
 
   const agregarProductoACompra = () => {
-    if (!productoTemporal.productoId || !productoTemporal.cantidad) return alert('Producto y cantidad requeridos');
-    const prodSel = productos.find(p => p._id === productoTemporal.productoId);
-    if (!prodSel) return;
+    if (!productoTemporal.productoId || productoTemporal.cantidad <= 0 || productoTemporal.costoUnitario <= 0) {
+        alert('Seleccione un producto y asegúrese que la cantidad y el costo son mayores a 0.');
+        return;
+    }
+
+    const productoSeleccionado = productos.find(p => p._id === productoTemporal.productoId);
+    if (!productoSeleccionado) return;
+
     const productoCompra = {
-      id: Date.now(),
-      productoId: prodSel._id,
-      nombre: prodSel.nombre,
-      codigo: prodSel.codigo,
-      color: prodSel.color,
+      _id: productoSeleccionado._id,
+      nombre: productoSeleccionado.nombre,
+      codigo: productoSeleccionado.codigo,
+      color: productoSeleccionado.color,
       cantidad: productoTemporal.cantidad,
-      costoUnitario: productoTemporal.costoUnitario || prodSel.costoUnitario,
-      costoTotal: productoTemporal.cantidad * (productoTemporal.costoUnitario || prodSel.costoUnitario)
+      costoUnitario: productoTemporal.costoUnitario,
+      costoTotal: productoTemporal.cantidad * productoTemporal.costoUnitario
     };
-    setCompra({ ...compra, productos: [...compra.productos, productoCompra] });
+
+    setCompra({
+      ...compra,
+      productos: [...compra.productos, productoCompra]
+    });
+
+    // Reset temporary product form
     setProductoTemporal({ productoId: '', productoNombre: '', cantidad: 1, costoUnitario: 0 });
     setBusquedaProducto('');
   };
 
-  const eliminarProductoDeCompra = (id) => setCompra({ ...compra, productos: compra.productos.filter(p => p.id !== id) });
-
   const toggleMetodoPago = (metodo) => {
-    const nuevos = compra.metodoPago.includes(metodo) ? compra.metodoPago.filter(m => m !== metodo) : [...compra.metodoPago, metodo];
-    setCompra({ ...compra, metodoPago: nuevos });
+    const nuevosMetodos = compra.metodoPago.includes(metodo)
+      ? compra.metodoPago.filter(m => m !== metodo)
+      : [...compra.metodoPago, metodo];
+    setCompra({ ...compra, metodoPago: nuevosMetodos });
   };
-
-  const agregarAnticipo = async () => {
-    if (!nuevoAnticipo.monto) return alert('Monto requerido');
-    const payload = { ...nuevoAnticipo, fecha: new Date().toISOString().split('T')[0] };
-    try {
-      const res = await axios.post(`${API_BASE}/anticipos`, payload); // Si no tienes ruta, crea
-      const anticipo = res.data;
-      setCompra({ ...compra, anticipos: [...compra.anticipos, anticipo] });
-      setAnticipos([...anticipos, anticipo]);
-      setNuevoAnticipo({ compraId: '', monto: 0, metodoPago: 'Transferencia', banco: '', fecha: new Date().toISOString().split('T')[0] });
-      setShowAnticipoForm(false);
-    } catch (err) {
-      alert('Error: ' + (err.response?.data?.message || 'No se pudo guardar'));
-    }
-  };
-
-  const eliminarAnticipo = (id) => setCompra({ ...compra, anticipos: compra.anticipos.filter(a => a.id !== id) });
 
   const confirmarCompra = async () => {
-    if (!compra.proveedorId || compra.productos.length === 0) return alert('Proveedor y productos requeridos');
-    const payload = {
-      ...compra,
-      total: totalCompra,
-      estado: saldoPendiente > 0 ? 'Pendiente' : 'Completada'
-    };
-    try {
-      const res = await axios.post(`${API_BASE}/compras`, payload);
-      const nueva = res.data;
-      setComprasRegistradas([...comprasRegistradas, nueva]);
-      setCompra({
-        fecha: new Date().toISOString().split('T')[0],
-        numeroCompra: `COMP-${Date.now()}`,
-        proveedorId: '', proveedorNombre: '', observaciones: '', numeroFactura: '', metodoPago: [], productos: [], anticipos: []
-      });
-      setBusquedaProveedor(''); setBusquedaProducto('');
-      alert('Compra guardada en DB!');
-    } catch (err) {
-      alert('Error: ' + (err.response?.data?.message || 'No se pudo guardar'));
-    }
+      if (!compra.proveedorId || compra.productos.length === 0) {
+          alert('Debe seleccionar un proveedor y agregar al menos un producto.');
+          return;
+      }
+
+      // Validación para pago con cheque: verificar imagen y monto
+      if (pagos.Cheque > 0) {
+          if (!chequeImage) {
+              alert('Debe subir una imagen del cheque para pagos con cheque.');
+              return;
+          }
+          // Aquí podrías agregar lógica para verificar el monto en la imagen, pero por ahora solo validamos que esté presente
+          // En un futuro, integrar OCR para leer el monto del cheque
+      }
+
+      const compraData = {
+          numCompra: compra.numeroCompra,
+          fecha: compra.fecha,
+          tipoCompra: compra.tipoCompra,
+          proveedor: compra.proveedorId,
+          productos: compra.productos.map(p => ({
+              producto: p._id,
+              cantidad: p.cantidad,
+              precioUnitario: p.costoUnitario,
+              nombreProducto: p.nombre,
+              colorProducto: p.color,
+              categoriaProducto: p.categoria,
+              dimensiones: { alto: 0, ancho: 0, profundidad: 0 }, // Default dimensions
+              imagenProducto: '' // Default empty image
+          })),
+          metodosPago: Object.entries(pagos).filter(([key, value]) => value > 0).map(([tipo, monto]) => ({
+              tipo,
+              monto,
+              referencia: tipo === 'Cheque' ? 'REF-CHQ-' + Date.now() : '',
+              cuenta: ''
+          })),
+          totalCompra: totalCompra,
+          estado: 'Pagada',
+          observaciones: compra.observaciones,
+          chequeImage: chequeImage ? chequeImage.name : null // Solo el nombre por ahora, en producción subir a servidor
+      };
+
+      try {
+          const compraCreada = await apiFetch('/compras', {
+              method: 'POST',
+              body: JSON.stringify(compraData)
+          });
+          alert(`Compra registrada exitosamente. Total: $${totalCompra.toFixed(2)}. Redirigiendo al módulo de inventario para verificar.`);
+          // Reset form
+          setCompra({
+              fecha: new Date().toISOString().split('T')[0],
+              numeroCompra: generarNumeroCompra(), // Generate new automatic number
+              tipoCompra: 'Materia Prima', // Reset to default
+              proveedorId: '',
+              proveedorNombre: '',
+              observaciones: '',
+              numeroFactura: '',
+              metodoPago: [],
+              productos: [],
+              anticipos: []
+          });
+          setPagos({ Efectivo: 0, Transferencia: 0, Cheque: 0, Credito: 0 });
+          setChequeImage(null);
+          // Redirect to inventory module
+          navigate('/inventario');
+      } catch (error) {
+          console.error("Error al confirmar la compra:", error);
+          alert(`Error al registrar la compra: ${error.message}`);
+      }
   };
 
-  // Filtros
-  const comprasFiltradas = comprasRegistradas.filter(c => c.numeroCompra.toLowerCase().includes(searchTerm.toLowerCase()) || c.proveedor.toLowerCase().includes(searchTerm.toLowerCase()));
-  const proveedoresFiltradosR = proveedores.filter(p => p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || p.nit.toLowerCase().includes(searchTerm.toLowerCase()));
+  const handlePagoChange = (metodo, valor) => {
+    setPagos(prevPagos => ({
+      ...prevPagos,
+      [metodo]: valor
+    }));
+  };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center">Cargando de MongoDB...</div>;
-  if (error) return <div className="min-h-screen flex items-center justify-center text-red-500">{error} <button onClick={() => window.location.reload()} className="ml-2 px-2 py-1 bg-blue-500 text-white rounded">Reintentar</button></div>;
+  const metodosPago = ['Efectivo', 'Transferencia', 'Cheque', 'Crédito'];
+
+  const metodosPagoOptions = ['Efectivo', 'Transferencia', 'Cheque', 'Credito'];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -225,350 +406,252 @@ const ComprasPage = ({ userRole }) => {
       <nav className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-4">
-              <button onClick={volverAlHome} className="flex items-center space-x-2 bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition">
-                <span>←</span> <span>Volver al Home</span>
-              </button>
-              <h1 className="text-2xl font-bold text-gray-800">Sistema Aglomex</h1>
-            </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">Módulo de Compras</span>
-              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">{userRole || 'Usuario'}</span>
-            </div>
+            <button onClick={volverAlHome} className="flex items-center space-x-2 bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition">
+              <span>←</span> <span>Volver al Home</span>
+            </button>
+            <h1 className="text-2xl font-bold text-gray-800">Módulo de Compras</h1>
           </div>
         </div>
       </nav>
 
       <div className="p-6">
         <div className="max-w-7xl mx-auto">
+          {/* Header */}
           <div className="mb-8">
-            <h1 className="text-4xl font-bold text-purple-600 mb-2">Módulo de Compras</h1>
-            <p className="text-gray-600 text-lg">Gestión de compras, proveedores y anticipos</p>
+            <h1 className="text-4xl font-bold text-purple-600 mb-2">Realizar Compra</h1>
+            <p className="text-gray-600 text-lg">Gestión de compras, proveedores y productos</p>
           </div>
 
-          {/* Tabs */}
-          <div className="bg-white rounded-xl shadow-md mb-6">
-            <div className="border-b border-gray-200">
-              <nav className="flex -mb-px">
-                {[
-                  { key: 'realizarCompra', label: '🛒 Realizar Compra' },
-                  { key: 'registrarAnticipos', label: '💰 Registrar Anticipos' },
-                  { key: 'reporteCompras', label: '📊 Reporte Compras' },
-                  { key: 'reporteProveedores', label: '🏢 Reporte Proveedores' }
-                ].map((item) => (
-                  <button
-                    key={item.key}
-                    onClick={() => setActiveSection(item.key)}
-                    className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${
-                      activeSection === item.key ? 'border-purple-500 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </nav>
-            </div>
-          </div>
-
-          {/* Search para reportes */}
-          {(activeSection === 'reporteCompras' || activeSection === 'reporteProveedores') && (
-            <div className="mb-6">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder={`Buscar en ${activeSection === 'reporteCompras' ? 'compras' : 'proveedores'}...`}
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 w-full"
-                />
-                <div className="absolute left-3 top-2.5 text-gray-400">🔍</div>
+          {/* Purchase Form */}
+          <div className="space-y-6">
+            <div className="bg-white rounded-xl shadow-md p-6">
+              <h2 className="text-2xl font-semibold text-gray-800 mb-6 border-b pb-4">Información General de la Compra</h2>
+              
+              {/* Basic Info */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Fecha</label>
+                  <input type="date" value={compra.fecha} onChange={(e) => setCompra({...compra, fecha: e.target.value})} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Número de Compra (Automático)</label>
+                  <input type="text" value={compra.numeroCompra} readOnly className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Compra</label>
+                  <select value={compra.tipoCompra} onChange={(e) => setCompra({...compra, tipoCompra: e.target.value})} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <option value="Materia Prima">Materia Prima</option>
+                    <option value="Producto Terminado">Producto Terminado</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Número de Factura</label>
+                  <input type="text" placeholder="Ingrese número de factura" value={compra.numeroFactura} onChange={(e) => setCompra({...compra, numeroFactura: e.target.value})} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                </div>
               </div>
-            </div>
-          )}
 
-          {/* Sección Realizar Compra */}
-          {activeSection === 'realizarCompra' && (
-            <div className="space-y-6">
-              <div className="bg-white rounded-xl shadow-md p-6">
-                <h2 className="text-2xl font-semibold text-gray-800 mb-6">Realizar Compra</h2>
-                {/* Info Básica */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">FECHA</label>
-                    <input type="date" value={compra.fecha} onChange={(e) => setCompra({...compra, fecha: e.target.value})} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">NUM DE COMPRA</label>
-                    <input type="text" value={compra.numeroCompra} readOnly className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50" />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">PROVEEDOR</label>
-                    <div className="flex space-x-3">
-                      <div className="flex-1 relative">
-                        <input
-                          type="text"
-                          placeholder="Buscar proveedor..."
-                          value={busquedaProveedor}
-                          onChange={(e) => setBusquedaProveedor(e.target.value)}
-                          onFocus={() => busquedaProveedor && setMostrarResultadosProveedor(true)}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        />
-                        {mostrarResultadosProveedor && proveedoresFiltrados.length > 0 && (
-                          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                            {proveedoresFiltrados.map(proveedor => (
-                              <div key={proveedor._id} onClick={() => seleccionarProveedor(proveedor)} className="px-4 py-2 hover:bg-purple-50 cursor-pointer border-b border-gray-100 last:border-b-0">
-                                <div className="font-medium text-gray-800">{proveedor.nombre}</div>
-                                <div className="text-sm text-gray-600">NIT: {proveedor.nit} - {proveedor.contacto}</div>
-                              </div>
-                            ))}
+              {/* Supplier */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Proveedor</label>
+                <div className="flex space-x-3">
+                  <div className="flex-1 relative">
+                    <input type="text" placeholder="Buscar proveedor por nombre o NIT..." value={busquedaProveedor} onChange={(e) => setBusquedaProveedor(e.target.value)} onFocus={() => busquedaProveedor && setMostrarResultadosProveedor(true)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                    {mostrarResultadosProveedor && (
+                      <div className="absolute z-20 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        {proveedoresFiltrados.length > 0 ? proveedoresFiltrados.map(p => (
+                          <div key={p._id} onClick={() => seleccionarProveedor(p)} className="px-4 py-2 hover:bg-purple-50 cursor-pointer">
+                            <div className="font-medium text-gray-800">{p.nombre}</div>
+                            <div className="text-sm text-gray-600">NIT: {p.nit}</div>
                           </div>
-                        )}
-                        {mostrarResultadosProveedor && proveedoresFiltrados.length === 0 && busquedaProveedor && (
-                          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
-                            <div className="px-4 py-3 text-gray-500 text-center">No se encontraron proveedores</div>
-                          </div>
-                        )}
-                      </div>
-                      <button onClick={() => setShowProveedorForm(!showProveedorForm)} className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition whitespace-nowrap">
-                        + Crear Proveedor
-                      </button>
-                    </div>
-                    {compra.proveedorNombre && (
-                      <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded">
-                        <span className="text-sm text-green-800">✅ Proveedor seleccionado: <strong>{compra.proveedorNombre}</strong></span>
+                        )) : <div className="px-4 py-3 text-gray-500 text-center">No se encontraron proveedores</div>}
                       </div>
                     )}
                   </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">OBSERVACIONES</label>
-                    <textarea
-                      value={compra.observaciones}
-                      onChange={(e) => setCompra({...compra, observaciones: e.target.value})}
-                      placeholder="Ej: El proveedor enviará la mercadería una vez se cancele el saldo."
-                      rows="3"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">NUM DE FACTURA</label>
-                    <input
-                      type="text"
-                      value={compra.numeroFactura}
-                      onChange={(e) => setCompra({...compra, numeroFactura: e.target.value})}
-                      placeholder="Ingrese número de factura"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
-                  </div>
+                  <button onClick={() => setShowProveedorForm(!showProveedorForm)} className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition whitespace-nowrap">
+                    {showProveedorForm ? 'Cancelar' : '+ Crear Proveedor'}
+                  </button>
                 </div>
-
-                {/* Form Nuevo Proveedor */}
-                {showProveedorForm && (
-                  <div className="mb-6 p-4 bg-green-50 rounded-lg border border-green-200">
-                    <h3 className="text-lg font-semibold text-green-800 mb-4">Nuevo Proveedor</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <input placeholder="Nombre" value={nuevoProveedor.nombre} onChange={(e) => setNuevoProveedor({...nuevoProveedor, nombre: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
-                      <input placeholder="NIT" value={nuevoProveedor.nit} onChange={(e) => setNuevoProveedor({...nuevoProveedor, nit: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
-                      <input placeholder="Contacto" value={nuevoProveedor.contacto} onChange={(e) => setNuevoProveedor({...nuevoProveedor, contacto: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
-                      <input placeholder="Teléfono" value={nuevoProveedor.telefono} onChange={(e) => setNuevoProveedor({...nuevoProveedor, telefono: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
-                      <input placeholder="Dirección" value={nuevoProveedor.direccion} onChange={(e) => setNuevoProveedor({...nuevoProveedor, direccion: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg md:col-span-2 focus:outline-none focus:ring-2 focus:ring-green-500" />
-                      <div className="md:col-span-2 flex space-x-4">
-                        <button onClick={agregarProveedor} className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition">Guardar</button>
-                        <button onClick={() => setShowProveedorForm(false)} className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition">Cancelar</button>
-                      </div>
-                    </div>
+                {compra.proveedorNombre && (
+                  <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded">
+                    <span className="text-sm text-green-800">✅ Proveedor seleccionado: <strong>{compra.proveedorNombre}</strong></span>
                   </div>
                 )}
+              </div>
 
-                {/* Buscar Producto - igual estructura, con key={producto._id} */}
+              {/* New Supplier Form */}
+              {showProveedorForm && (
+                <div className="mb-6 p-4 bg-green-50 rounded-lg border border-green-200">
+                  <h3 className="text-lg font-semibold text-green-800 mb-4">Nuevo Proveedor</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input type="text" placeholder="Nombre del proveedor" value={nuevoProveedor.nombre} onChange={(e) => setNuevoProveedor({...nuevoProveedor, nombre: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                    <input type="text" placeholder="NIT" value={nuevoProveedor.nit} onChange={(e) => setNuevoProveedor({...nuevoProveedor, nit: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                    <input type="text" placeholder="Teléfono" value={nuevoProveedor.contacto.telefono} onChange={(e) => setNuevoProveedor({...nuevoProveedor, contacto: {...nuevoProveedor.contacto, telefono: e.target.value}})} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                    <input type="email" placeholder="Email" value={nuevoProveedor.contacto.email} onChange={(e) => setNuevoProveedor({...nuevoProveedor, contacto: {...nuevoProveedor.contacto, email: e.target.value}})} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                    <div className="md:col-span-2">
+                      <input type="text" placeholder="Dirección" value={nuevoProveedor.direccion} onChange={(e) => setNuevoProveedor({...nuevoProveedor, direccion: e.target.value})} className="w-full px-4 py-2 border border-gray-300 rounded-lg" />
+                    </div>
+                    <div className="md:col-span-2 flex space-x-4">
+                      <button onClick={handleCrearProveedor} className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">Guardar</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Observations */}
+              <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Observaciones</label>
+                  <textarea value={compra.observaciones} onChange={(e) => setCompra({...compra, observaciones: e.target.value})} placeholder="Ej: El proveedor enviará la mercadería una vez se cancele el saldo." rows="3" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" />
+              </div>
+
+              {/* --- Products Section --- */}
+              <div className="border-t pt-6">
+                 <h2 className="text-2xl font-semibold text-gray-800 mb-6">Productos de la Compra</h2>
+                
+                {/* Search and Add Product */}
                 <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <h3 className="text-lg font-semibold text-blue-800 mb-4">BUSCAR PRODUCTO - CREAR</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                  <h3 className="text-lg font-semibold text-blue-800 mb-4">Buscar y Agregar Producto</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 items-end">
                     <div className="md:col-span-2 relative">
-                      <input
-                        type="text"
-                        placeholder="Buscar producto..."
-                        value={busquedaProducto}
-                        onChange={(e) => setBusquedaProducto(e.target.value)}
-                        onFocus={() => busquedaProducto && setMostrarResultadosProducto(true)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      {mostrarResultadosProducto && productosFiltrados.length > 0 && (
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Buscar Producto</label>
+                      <input type="text" placeholder="Buscar por nombre o código..." value={busquedaProducto} onChange={(e) => setBusquedaProducto(e.target.value)} onFocus={() => busquedaProducto && setMostrarResultadosProducto(true)} className="w-full px-4 py-2 border border-gray-300 rounded-lg" />
+                       {mostrarResultadosProducto && (
                         <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                          {productosFiltrados.map(producto => (
-                            <div key={producto._id} onClick={() => seleccionarProducto(producto)} className="px-4 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0">
-                              <div className="font-medium text-gray-800">{producto.nombre}</div>
-                              <div className="text-sm text-gray-600">Código: {producto.codigo} - ${producto.costoUnitario} - Stock: {producto.stock}</div>
+                          {productosFiltrados.length > 0 ? productosFiltrados.map(p => (
+                            <div key={p._id} onClick={() => seleccionarProducto(p)} className="px-4 py-2 hover:bg-blue-50 cursor-pointer">
+                              <div className="font-medium text-gray-800">{p.nombre} ({p.codigo})</div>
+                              <div className="text-sm text-gray-600">Color: {p.color} - Cat: {p.categoria}</div>
                             </div>
-                          ))}
-                        </div>
-                      )}
-                      {mostrarResultadosProducto && productosFiltrados.length === 0 && busquedaProducto && (
-                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
-                          <div className="px-4 py-3 text-gray-500 text-center">No se encontraron productos</div>
+                          )) : <div className="px-4 py-3 text-gray-500 text-center">No se encontraron productos</div>}
                         </div>
                       )}
                     </div>
-                    <input type="number" placeholder="Cantidad" value={productoTemporal.cantidad} onChange={(e) => setProductoTemporal({...productoTemporal, cantidad: parseInt(e.target.value) || 0})} className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    <input type="number" step="0.01" placeholder="Costo Unitario" value={productoTemporal.costoUnitario} onChange={(e) => setProductoTemporal({...productoTemporal, costoUnitario: parseFloat(e.target.value) || 0})} className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Cantidad</label>
+                      <input type="number" placeholder="Cantidad" value={productoTemporal.cantidad} onChange={(e) => setProductoTemporal({...productoTemporal, cantidad: parseInt(e.target.value) || 0})} className="w-full px-4 py-2 border border-gray-300 rounded-lg" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Costo Unitario</label>
+                      <input type="number" step="0.01" placeholder="Costo" value={productoTemporal.costoUnitario} onChange={(e) => setProductoTemporal({...productoTemporal, costoUnitario: parseFloat(e.target.value) || 0})} className="w-full px-4 py-2 border border-gray-300 rounded-lg" />
+                    </div>
                   </div>
-                  {productoTemporal.productoNombre && (
-                    <div className="mb-4 p-2 bg-blue-50 border border-blue-200 rounded">
-                      <span className="text-sm text-blue-800">✅ Producto: <strong>{productoTemporal.productoNombre}</strong> {productoTemporal.costoUnitario > 0 && `- Costo: $${productoTemporal.costoUnitario}`}</span>
+                   {productoTemporal.productoNombre && (
+                    <div className="mb-4 p-2 bg-blue-100 border border-blue-200 rounded">
+                      <span className="text-sm text-blue-800">✅ Producto: <strong>{productoTemporal.productoNombre}</strong></span>
                     </div>
                   )}
                   <div className="flex space-x-3">
-                    <button onClick={agregarProductoACompra} disabled={!productoTemporal.productoId} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed">
-                      Agregar Producto
+                    <button onClick={agregarProductoACompra} disabled={!productoTemporal.productoId} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-400">
+                      Agregar Producto a la Compra
                     </button>
-                    <button onClick={() => setShowProductoForm(!showProductoForm)} className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition">+ Crear Producto</button>
+                    <button onClick={() => setShowProductoForm(!showProductoForm)} className="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700">
+                      {showProductoForm ? 'Cancelar' : '+ Crear Nuevo Producto'}
+                    </button>
                   </div>
                 </div>
 
-                {/* Form Nuevo Producto */}
+                {/* New Product Form */}
                 {showProductoForm && (
-                  <div className="mb-6 p-4 bg-green-50 rounded-lg border border-green-200">
-                    <h3 className="text-lg font-semibold text-green-800 mb-4">Nuevo Producto</h3>
+                  <div className="mb-6 p-4 bg-teal-50 rounded-lg border border-teal-200">
+                    <h3 className="text-lg font-semibold text-teal-800 mb-4">Crear Nuevo Producto</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <input placeholder="Nombre" value={nuevoProducto.nombre} onChange={(e) => setNuevoProducto({...nuevoProducto, nombre: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
-                      <input placeholder="Código" value={nuevoProducto.codigo} onChange={(e) => setNuevoProducto({...nuevoProducto, codigo: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
-                      <input placeholder="Color" value={nuevoProducto.color} onChange={(e) => setNuevoProducto({...nuevoProducto, color: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
-                      <input placeholder="Categoría" value={nuevoProducto.categoria} onChange={(e) => setNuevoProducto({...nuevoProducto, categoria: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
-                      <input type="number" step="0.01" placeholder="Costo Unitario" value={nuevoProducto.costoUnitario} onChange={(e) => setNuevoProducto({...nuevoProducto, costoUnitario: parseFloat(e.target.value) || 0})} className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
-                      <input type="number" step="0.01" placeholder="Precio Venta" value={nuevoProducto.precioVenta} onChange={(e) => setNuevoProducto({...nuevoProducto, precioVenta: parseFloat(e.target.value) || 0})} className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
+                      <input type="text" placeholder="Nombre del producto" value={nuevoProducto.nombre} onChange={(e) => setNuevoProducto({...nuevoProducto, nombre: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
+
+                      <input list="categorias-list" type="text" placeholder="Categoría" value={nuevoProducto.categoria} onChange={(e) => setNuevoProducto({...nuevoProducto, categoria: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                      <datalist id="categorias-list">
+                        {categorias.map(cat => <option key={cat} value={cat} />)}
+                      </datalist>
+
+                      <input type="text" placeholder="Color" value={nuevoProducto.color} onChange={(e) => setNuevoProducto({...nuevoProducto, color: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                      <input type="text" placeholder="Marca" value={nuevoProducto.marca} onChange={(e) => setNuevoProducto({...nuevoProducto, marca: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
+
+                      <input type="number" step="0.01" placeholder="Alto (cm)" value={nuevoProducto.dimensiones.alto} onChange={(e) => setNuevoProducto({...nuevoProducto, dimensiones: {...nuevoProducto.dimensiones, alto: e.target.value}})} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                      <input type="number" step="0.01" placeholder="Ancho (cm)" value={nuevoProducto.dimensiones.ancho} onChange={(e) => setNuevoProducto({...nuevoProducto, dimensiones: {...nuevoProducto.dimensiones, ancho: e.target.value}})} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                      <input type="number" step="0.01" placeholder="Profundidad (cm)" value={nuevoProducto.dimensiones.profundidad} onChange={(e) => setNuevoProducto({...nuevoProducto, dimensiones: {...nuevoProducto.dimensiones, profundidad: e.target.value}})} className="px-4 py-2 border border-gray-300 rounded-lg" />
+
+                      <input type="text" placeholder="Ubicación" value={nuevoProducto.ubicacion} onChange={(e) => setNuevoProducto({...nuevoProducto, ubicacion: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                      <select value={nuevoProducto.proveedor} onChange={(e) => setNuevoProducto({...nuevoProducto, proveedor: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg">
+                          <option value="">-- Seleccionar Proveedor --</option>
+                          {proveedores.map(p => <option key={p._id} value={p._id}>{p.nombre}</option>)}
+                      </select>
                       <div className="md:col-span-2 flex space-x-4">
-                        <button onClick={agregarProducto} className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition">Guardar</button>
-                        <button onClick={() => setShowProductoForm(false)} className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition">Cancelar</button>
+                        <button onClick={handleCrearProducto} className="bg-teal-600 text-white px-6 py-2 rounded-lg hover:bg-teal-700">Guardar Producto</button>
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* Tabla Productos */}
-                {compra.productos.length > 0 && (
-                  <div className="mb-6">
-                    <h3 className="text-lg font-semibold mb-4">Productos en Compra</h3>
-                    <table className="w-full border-collapse border border-gray-300">
-                      <thead>
-                        <tr className="bg-gray-100">
-                          <th className="border p-2">Nombre</th>
-                          <th className="border p-2">Cantidad</th>
-                          <th className="border p-2">Costo Unit.</th>
-                          <th className="border p-2">Total</th>
-                          <th className="border p-2">Acciones</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {compra.productos.map(item => (
-                          <tr key={item.id}>
-                            <td className="border p-2">{item.nombre}</td>
-                            <td className="border p-2">{item.cantidad}</td>
-                            <td className="border p-2">${item.costoUnitario.toLocaleString()}</td>
-                            <td className="border p-2">${item.costoTotal.toLocaleString()}</td>
-                            <td className="border p-2"><button onClick={() => eliminarProductoDeCompra(item.id)} className="text-red-600 hover:underline">Eliminar</button></td>
-                          </tr>
-                        ))}
-                      </tbody>
+                {/* Products in Purchase Table */}
+                <div className="overflow-x-auto">
+                    <table className="min-w-full bg-white">
+                        <thead className="bg-gray-100">
+                            <tr>
+                                <th className="text-left py-3 px-4">Producto</th>
+                                <th className="text-left py-3 px-4">Código</th>
+                                <th className="text-right py-3 px-4">Cantidad</th>
+                                <th className="text-right py-3 px-4">Costo Unit.</th>
+                                <th className="text-right py-3 px-4">Costo Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {compra.productos.map((p, index) => (
+                                <tr key={index} className="border-b">
+                                    <td className="py-3 px-4">{p.nombre}</td>
+                                    <td className="py-3 px-4">{p.codigo}</td>
+                                    <td className="text-right py-3 px-4">{p.cantidad}</td>
+                                    <td className="text-right py-3 px-4">${p.costoUnitario.toFixed(2)}</td>
+                                    <td className="text-right py-3 px-4">${p.costoTotal.toFixed(2)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
                     </table>
-                    <div className="mt-4 text-right text-xl font-bold">Total: ${totalCompra.toLocaleString()}</div>
-                  </div>
-                )}
-
-                {/* Métodos Pago */}
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold mb-4">Métodos de Pago</h3>
-                  <div className="flex flex-wrap gap-4">
-                    {metodosPago.map(metodo => (
-                      <label key={metodo} className="flex items-center space-x-2">
-                        <input type="checkbox" checked={compra.metodoPago.includes(metodo)} onChange={() => toggleMetodoPago(metodo)} className="rounded" />
-                        <span>{metodo}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Anticipos */}
-                <div className="mb-6">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold">Anticipos (Total: ${totalAnticipos.toLocaleString()})</h3>
-                    <button onClick={() => setShowAnticipoForm(!showAnticipoForm)} className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">
-                      {showAnticipoForm ? 'Cancelar' : '+ Agregar'}
-                    </button>
-                  </div>
-                  {showAnticipoForm && (
-                    <div className="p-4 bg-purple-50 rounded-lg mb-4">
-                      <input type="number" step="0.01" placeholder="Monto" value={nuevoAnticipo.monto} onChange={(e) => setNuevoAnticipo({...nuevoAnticipo, monto: parseFloat(e.target.value) || 0})} className="px-4 py-2 border rounded mr-2" />
-                      <select value={nuevoAnticipo.metodoPago} onChange={(e) => setNuevoAnticipo({...nuevoAnticipo, metodoPago: e.target.value})} className="px-4 py-2 border rounded mr-2">
-                        <option>Transferencia</option>
-                        <option>Efectivo</option>
-                      </select>
-                      <select value={nuevoAnticipo.banco} onChange={(e) => setNuevoAnticipo({...nuevoAnticipo, banco: e.target.value})} className="px-4 py-2 border rounded mr-2">
-                        {bancos.map(b => <option key={b}>{b}</option>)}
-                      </select>
-                      <button onClick={agregarAnticipo} className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">Guardar</button>
-                    </div>
-                  )}
-                  {compra.anticipos.length > 0 && (
-                    <table className="w-full border-collapse border border-gray-300">
-                      <thead><tr className="bg-gray-100"><th className="border p-2">Monto</th><th className="border p-2">Método</th><th className="border p-2">Banco</th><th className="border p-2">Acciones</th></tr></thead>
-                      <tbody>
-                        {compra.anticipos.map(a => (
-                          <tr key={a._id || a.id}>
-                            <td className="border p-2">${a.monto.toLocaleString()}</td>
-                            <td className="border p-2">{a.metodoPago}</td>
-                            <td className="border p-2">{a.banco}</td>
-                            <td className="border p-2"><button onClick={() => eliminarAnticipo(a.id || a._id)} className="text-red-600 hover:underline">Eliminar</button></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                  {saldoPendiente > 0 && <div className="text-right text-lg font-bold text-red-600 mt-2">Saldo Pendiente: ${saldoPendiente.toLocaleString()}</div>}
-                </div>
-
-                <div className="flex justify-end">
-                  <button onClick={confirmarCompra} className="bg-purple-600 text-white px-8 py-3 rounded-lg hover:bg-purple-700 font-semibold transition">
-                    Confirmar Compra
-                  </button>
                 </div>
               </div>
-            </div>
-          )}
 
-          {/* Reportes - con datos de DB */}
-          {activeSection === 'reporteCompras' && (
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h2 className="text-2xl font-semibold mb-6">Reporte de Compras</h2>
-              {comprasFiltradas.length > 0 ? (
-                <ul className="space-y-2">
-                  {comprasFiltradas.map(c => (
-                    <li key={c._id} className="p-4 bg-gray-50 rounded">{c.numeroCompra} - {c.proveedor} - ${c.total} ({c.estado})</li>
-                  ))}
-                </ul>
-              ) : (
-                <p>No hay compras en DB.</p>
-              )}
+              {/* --- Payment Section --- */}
+              <div className="border-t pt-6 mt-6">
+                <h2 className="text-2xl font-semibold text-gray-800 mb-6">Pago</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 mb-4">
+                    {metodosPagoOptions.map(metodo => (
+                        <div key={metodo}>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">{metodo}</label>
+                            <input
+                                type="number"
+                                placeholder="0.00"
+                                value={pagos[metodo]}
+                                onChange={(e) => handlePagoChange(metodo, parseFloat(e.target.value) || 0)}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            />
+                            {metodo === 'Cheque' && pagos.Cheque > 0 && (
+                                <div className="mt-2">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Imagen del Cheque</label>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => setChequeImage(e.target.files[0])}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                                    />
+                                    {chequeImage && <p className="text-sm text-green-600 mt-1">Imagen seleccionada: {chequeImage.name}</p>}
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+                <div className="text-right mt-6">
+                    <div className="text-gray-600">Total Pagado: <span className="font-bold text-blue-600">${totalPagado.toFixed(2)}</span></div>
+                    <div className="text-2xl font-bold text-gray-800">Total de la Compra: ${totalCompra.toFixed(2)}</div>
+                    <div className="text-red-600 font-semibold">Saldo Pendiente: ${Math.max(0, totalCompra - totalPagado).toFixed(2)}</div>
+                </div>
+              </div>
+
+              {/* --- Finalize --- */}
+              <div className="border-t pt-6 mt-6 flex justify-end">
+                <button onClick={confirmarCompra} className="bg-purple-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-purple-700 transition shadow-lg">
+                  Confirmar y Registrar Compra
+                </button>
+              </div>
+
             </div>
-          )}
-          {activeSection === 'reporteProveedores' && (
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h2 className="text-2xl font-semibold mb-6">Reporte de Proveedores</h2>
-              {proveedoresFiltradosR.length > 0 ? (
-                <ul className="space-y-2">
-                  {proveedoresFiltradosR.map(p => (
-                    <li key={p._id} className="p-4 bg-gray-50 rounded">{p.nombre} - NIT: {p.nit} - {p.estado}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p>No hay proveedores en DB.</p>
-              )}
-            </div>
-          )}
-          {activeSection === 'registrarAnticipos' && (
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h2 className="text-2xl font-semibold mb-6">Registrar Anticipos</h2>
-              <p>Usa el formulario en compras o expande esta sección.</p>
-            </div>
-          )}
+          </div>
         </div>
       </div>
     </div>

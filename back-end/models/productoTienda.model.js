@@ -42,6 +42,26 @@ const productoTiendaSchema = new mongoose.Schema({
         enum: ["Silla", "Mesa", "Sofá", "Estantería", "Armario", "Otro"], // O ajusta las categorías
         required: true
     },
+    marca: {
+        type: String,
+        default: ""
+    },
+    cajas: {
+        type: Number,
+        default: 0
+    },
+    ubicacion: {
+        type: String,
+        default: ""
+    },
+    tamano: {
+        type: String,
+        default: ""
+    },
+    codigo: {
+        type: String,
+        default: ""
+    },
   proveedor: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Proveedor"

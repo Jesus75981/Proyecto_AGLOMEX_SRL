@@ -9,7 +9,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import finanzasRoutes from './routes/finanzas.routes.js';
-import comprasRoutes from './routes/compras.routes.js'; 
+import comprasRoutes from './routes/compras.routes.js';
 import clientesRoutes from './routes/clientes.routes.js';
 import logisticaRoutes from './routes/logistica.routes.js';
 import materialesRoutes from './routes/materiales.routes.js';
@@ -18,9 +18,11 @@ import pedidosRoutes from './routes/pedidos.routes.js';
 import produccionRoutes from './routes/produccion.routes.js';
 import proveedoresRoutes from './routes/proveedores.routes.js';
 import ventasRoutes from './routes/ventas.routes.js';
-import User from './models/user.model.js'; 
-import productosRoutes from './routes/productos.routes.js'; 
+import User from './models/user.model.js';
+import productosRoutes from './routes/productos.routes.js';
 import anticiposRoutes from './routes/anticipos.routes.js';
+import transportistasRoutes from './routes/transportistas.routes.js';
+import { actualizarProgresoAutomatico, verificarRetrasos } from './controllers/produccion.controller.js';
 
 // Inicialización del servidor
 const app = express();
@@ -116,6 +118,7 @@ app.use('/api/proveedores', authMiddleware, proveedoresRoutes);
 app.use('/api/ventas', authMiddleware, ventasRoutes);
 app.use('/api/finanzas', authMiddleware, finanzasRoutes);
 app.use('/api/anticipos', authMiddleware, anticiposRoutes);
+app.use('/api/transportistas', authMiddleware, transportistasRoutes);
 
 // Ruta de salud pública
 app.get('/api/health', (req, res) => {
@@ -141,10 +144,33 @@ app.use((err, req, res, next) => {
     res.status(500).json({ message: 'Error interno del servidor' });
 });
 
+// === SISTEMA DE PROGRESO AUTOMÁTICO ===
+// Ejecutar cada 5 minutos (300000 ms)
+setInterval(async () => {
+    try {
+        await actualizarProgresoAutomatico();
+        await verificarRetrasos();
+    } catch (error) {
+        console.error('❌ Error en el sistema automático:', error);
+    }
+}, 5 * 60 * 1000); // 5 minutos
+
+// Ejecutar inmediatamente al iniciar
+setTimeout(async () => {
+    try {
+        await actualizarProgresoAutomatico();
+        await verificarRetrasos();
+        console.log('✅ Sistema de progreso automático iniciado');
+    } catch (error) {
+        console.error('❌ Error al iniciar sistema automático:', error);
+    }
+}, 1000); // 1 segundo después del inicio
+
 // INICIO DEL SERVIDOR
 app.listen(PORT, () => {
     console.log(`🚀 Servidor escuchando en http://localhost:${PORT}`);
     console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
     console.log(`🔐 Login: http://localhost:${PORT}/api/login`);
     console.log(`💰 Anticipos: http://localhost:${PORT}/api/anticipos`);
+    console.log(`⚙️ Sistema de producción automática: ACTIVO`);
 });

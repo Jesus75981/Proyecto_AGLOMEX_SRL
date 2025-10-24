@@ -1,6 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+// --- API Helper ---
+const API_URL = 'http://localhost:5000/api';
+
+const getAuthToken = () => {
+  return localStorage.getItem('token');
+};
+
+const apiFetch = async (endpoint, options = {}) => {
+  const token = getAuthToken();
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.message || errorData.error || 'Error en la petición a la API');
+  }
+
+  return response.json();
+};
+
 const LogisticaPage = ({ userRole }) => {
   const navigate = useNavigate();
 
@@ -13,6 +41,10 @@ const LogisticaPage = ({ userRole }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('envios');
   const [showForm, setShowForm] = useState(false);
+  const [showRetrasoForm, setShowRetrasoForm] = useState(false);
+  const [selectedEnvio, setSelectedEnvio] = useState(null);
+  const [estadisticas, setEstadisticas] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   // Datos de ejemplo
   const [envios, setEnvios] = useState([
@@ -26,6 +58,7 @@ const LogisticaPage = ({ userRole }) => {
       transportista: 'Transportes XYZ',
       fechaEnvio: '2024-01-15',
       fechaEstimada: '2024-01-18',
+      tiempoEstimado: '3-5 días',
       costoEnvio: 45.00,
       tracking: 'TRK123456789',
       ubicacionActual: 'Centro de Distribución Norte'
@@ -40,6 +73,7 @@ const LogisticaPage = ({ userRole }) => {
       transportista: 'Logística Rápida',
       fechaEnvio: '2024-01-16',
       fechaEstimada: '2024-01-20',
+      tiempoEstimado: '4-7 días',
       costoEnvio: 75.00,
       tracking: 'TRK987654321',
       ubicacionActual: 'Almacén Principal'
@@ -54,6 +88,7 @@ const LogisticaPage = ({ userRole }) => {
       transportista: 'Envios Express',
       fechaEnvio: '2024-01-10',
       fechaEstimada: '2024-01-14',
+      tiempoEstimado: 'Entregado',
       costoEnvio: 60.00,
       tracking: 'TRK456123789',
       ubicacionActual: 'Entregado al cliente'
@@ -68,6 +103,7 @@ const LogisticaPage = ({ userRole }) => {
       transportista: 'Transportes Veloz',
       fechaEnvio: '2024-01-17',
       fechaEstimada: '2024-01-19',
+      tiempoEstimado: '1-2 días',
       costoEnvio: 85.00,
       tracking: 'TRK789456123',
       ubicacionActual: 'En ruta de reparto'
@@ -127,56 +163,21 @@ const LogisticaPage = ({ userRole }) => {
     }
   ]);
 
-  const [transportistas, setTransportistas] = useState([
-    {
-      id: 1,
-      nombre: 'Transportes XYZ',
-      contacto: 'Juan Rodríguez - contacto@transportesxyz.com',
-      telefono: '+1 234-567-8901',
-      tipo: 'Terrestre',
-      costoBase: 40.00,
-      rating: 4.5,
-      estado: 'Activo',
-      cobertura: ['Nacional', 'Regional'],
-      tiempoEntrega: '2-5 días'
-    },
-    {
-      id: 2,
-      nombre: 'Logística Rápida',
-      contacto: 'María González - info@logisticarapida.com',
-      telefono: '+1 234-567-8902',
-      tipo: 'Aéreo',
-      costoBase: 80.00,
-      rating: 4.2,
-      estado: 'Activo',
-      cobertura: ['Internacional', 'Urgente'],
-      tiempoEntrega: '1-3 días'
-    },
-    {
-      id: 3,
-      nombre: 'Envios Express',
-      contacto: 'Carlos Martínez - servicio@enviosexpress.com',
-      telefono: '+1 234-567-8903',
-      tipo: 'Terrestre',
-      costoBase: 35.00,
-      rating: 4.7,
-      estado: 'Activo',
-      cobertura: ['Local', 'Regional'],
-      tiempoEntrega: '1-2 días'
-    },
-    {
-      id: 4,
-      nombre: 'Transportes Veloz',
-      contacto: 'Ana López - contacto@transportesveloz.com',
-      telefono: '+1 234-567-8904',
-      tipo: 'Mixto',
-      costoBase: 55.00,
-      rating: 4.4,
-      estado: 'Inactivo',
-      cobertura: ['Nacional'],
-      tiempoEntrega: '3-6 días'
-    }
-  ]);
+  const [transportistas, setTransportistas] = useState([]);
+  const [nuevoTransportista, setNuevoTransportista] = useState({
+    nombre: '',
+    contacto: '',
+    telefono: '',
+    email: '',
+    tipo: 'Terrestre',
+    costoBase: 0,
+    cobertura: [],
+    tiempoEntrega: '',
+    observaciones: ''
+  });
+  const [showTransportistaForm, setShowTransportistaForm] = useState(false);
+  const [loadingTransportistas, setLoadingTransportistas] = useState(false);
+  const [estadisticasTransportistas, setEstadisticasTransportistas] = useState(null);
 
   const [rutas, setRutas] = useState([
     {
@@ -263,8 +264,8 @@ const LogisticaPage = ({ userRole }) => {
   // Funciones para envíos
   const cambiarEstadoEnvio = (id, nuevoEstado) => {
     setEnvios(envios.map(envio =>
-      envio.id === id ? { 
-        ...envio, 
+      envio.id === id ? {
+        ...envio,
         estado: nuevoEstado,
         ubicacionActual: nuevoEstado === 'Entregado' ? 'Entregado al cliente' :
                          nuevoEstado === 'En reparto' ? 'En ruta de reparto' :
@@ -272,6 +273,139 @@ const LogisticaPage = ({ userRole }) => {
       } : envio
     ));
   };
+
+  // Función para notificar retraso
+  const notificarRetraso = (envio) => {
+    setSelectedEnvio(envio);
+    setShowRetrasoForm(true);
+  };
+
+  // Función para actualizar tiempo estimado
+  const actualizarTiempoEstimado = (envio) => {
+    const nuevoTiempo = prompt('Nuevo tiempo estimado (ej: "5-7 días", "1 semana"):');
+    if (nuevoTiempo) {
+      setEnvios(envios.map(e =>
+        e.id === envio.id ? { ...e, tiempoEstimado: nuevoTiempo } : e
+      ));
+    }
+  };
+
+  // Función para cargar estadísticas
+  const cargarEstadisticas = async () => {
+    setLoading(true);
+    try {
+      // Simular carga de estadísticas
+      setTimeout(() => {
+        setEstadisticas({
+          periodo: 'mes',
+          totalPedidos: envios.length,
+          pedidosPorEstado: {
+            pendiente: envios.filter(e => e.estado === 'En almacén').length,
+            en_proceso: envios.filter(e => e.estado === 'En tránsito').length,
+            despachado: envios.filter(e => e.estado === 'En reparto').length,
+            entregado: envios.filter(e => e.estado === 'Entregado').length,
+            retrasado: envios.filter(e => e.estado === 'Retrasado').length
+          },
+          costoTotalEnvios: envios.reduce((sum, e) => sum + e.costoEnvio, 0),
+          tiempoPromedioEntrega: 4.2,
+          tasaEntregaExitosa: 87.5
+        });
+        setLoading(false);
+      }, 1000);
+    } catch (error) {
+      console.error('Error cargando estadísticas:', error);
+      setLoading(false);
+    }
+  };
+
+  // Funciones para transportistas
+  const cargarTransportistas = async () => {
+    setLoadingTransportistas(true);
+    try {
+      const data = await apiFetch('/transportistas/activos');
+      setTransportistas(data);
+    } catch (error) {
+      console.error('Error cargando transportistas:', error);
+      alert('Error al cargar transportistas: ' + error.message);
+    } finally {
+      setLoadingTransportistas(false);
+    }
+  };
+
+  const cargarEstadisticasTransportistas = async () => {
+    try {
+      const data = await apiFetch('/transportistas/estadisticas');
+      setEstadisticasTransportistas(data);
+    } catch (error) {
+      console.error('Error cargando estadísticas de transportistas:', error);
+    }
+  };
+
+  const agregarTransportista = async () => {
+    // Validaciones
+    if (!nuevoTransportista.nombre.trim()) {
+      alert('El nombre es requerido');
+      return;
+    }
+    if (!nuevoTransportista.contacto.trim()) {
+      alert('El contacto es requerido');
+      return;
+    }
+    if (!nuevoTransportista.telefono.trim()) {
+      alert('El teléfono es requerido');
+      return;
+    }
+    if (!nuevoTransportista.email.trim()) {
+      alert('El email es requerido');
+      return;
+    }
+    if (nuevoTransportista.costoBase <= 0) {
+      alert('El costo base debe ser mayor a 0');
+      return;
+    }
+    if (!nuevoTransportista.tiempoEntrega.trim()) {
+      alert('El tiempo de entrega es requerido');
+      return;
+    }
+
+    try {
+      const transportistaData = {
+        ...nuevoTransportista,
+        costoBase: parseFloat(nuevoTransportista.costoBase)
+      };
+
+      await apiFetch('/transportistas', {
+        method: 'POST',
+        body: JSON.stringify(transportistaData)
+      });
+
+      alert('✅ Transportista creado exitosamente');
+      setNuevoTransportista({
+        nombre: '',
+        contacto: '',
+        telefono: '',
+        email: '',
+        tipo: 'Terrestre',
+        costoBase: 0,
+        cobertura: [],
+        tiempoEntrega: '',
+        observaciones: ''
+      });
+      setShowTransportistaForm(false);
+      cargarTransportistas();
+      cargarEstadisticasTransportistas();
+    } catch (error) {
+      console.error('Error creando transportista:', error);
+      alert('Error al crear transportista: ' + error.message);
+    }
+  };
+
+  // Cargar estadísticas al montar el componente
+  useEffect(() => {
+    cargarEstadisticas();
+    cargarTransportistas();
+    cargarEstadisticasTransportistas();
+  }, []);
 
   const agregarEnvio = () => {
     if (!nuevoEnvio.pedidoId || !nuevoEnvio.cliente) return;
@@ -506,7 +640,7 @@ return (
                     >
                       <option value="">Seleccionar transportista</option>
                       {transportistas.filter(t => t.estado === 'Activo').map(trans => (
-                        <option key={trans.id} value={trans.nombre}>
+                        <option key={trans._id || trans.id} value={trans.nombre}>
                           {trans.nombre} - {trans.tipo}
                         </option>
                       ))}
@@ -538,6 +672,7 @@ return (
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tracking</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tiempo Estimado</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ubicación</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transportista</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo</th>
@@ -565,6 +700,9 @@ return (
                             }`}>
                               {envio.estado}
                             </span>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                            {envio.tiempoEstimado}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                             {envio.ubicacionActual}
@@ -698,33 +836,139 @@ return (
           )}
 
           {activeTab === 'transportistas' && (
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h2 className="text-2xl font-semibold text-gray-800 mb-6">Transportistas</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {transportistasFiltrados.map((trans) => (
-                  <div key={trans.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-semibold text-gray-800">{trans.nombre}</h3>
-                      <span className={`text-xs px-2 py-1 rounded-full ${
-                        trans.estado === 'Activo' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                      }`}>
-                        {trans.estado}
-                      </span>
-                    </div>
-                    <div className="space-y-2 text-sm text-gray-600">
-                      <p>📧 {trans.contacto}</p>
-                      <p>📞 {trans.telefono}</p>
-                      <p>🚛 {trans.tipo}</p>
-                      <p>💰 Costo base: ${trans.costoBase}</p>
-                      <p>🌍 Cobertura: {trans.cobertura.join(', ')}</p>
-                      <p>⏱️ Tiempo: {trans.tiempoEntrega}</p>
-                      <div className="flex items-center">
-                        <span className="text-yellow-500">⭐</span>
-                        <span className="ml-1">{trans.rating}/5.0</span>
-                      </div>
+            <div className="space-y-6">
+              {/* Formulario de Nuevo Transportista */}
+              <div className="bg-white rounded-xl shadow-md p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-semibold text-gray-800">Transportistas</h2>
+                  <button
+                    onClick={() => setShowTransportistaForm(!showTransportistaForm)}
+                    className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition duration-200"
+                  >
+                    {showTransportistaForm ? 'Cancelar' : '+ Agregar Transportista'}
+                  </button>
+                </div>
+
+                {showTransportistaForm && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+                    <input
+                      type="text"
+                      placeholder="Nombre del transportista"
+                      value={nuevoTransportista.nombre}
+                      onChange={(e) => setNuevoTransportista({...nuevoTransportista, nombre: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Contacto"
+                      value={nuevoTransportista.contacto}
+                      onChange={(e) => setNuevoTransportista({...nuevoTransportista, contacto: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Teléfono"
+                      value={nuevoTransportista.telefono}
+                      onChange={(e) => setNuevoTransportista({...nuevoTransportista, telefono: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <input
+                      type="email"
+                      placeholder="Email"
+                      value={nuevoTransportista.email}
+                      onChange={(e) => setNuevoTransportista({...nuevoTransportista, email: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <select
+                      value={nuevoTransportista.tipo}
+                      onChange={(e) => setNuevoTransportista({...nuevoTransportista, tipo: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="Terrestre">Terrestre</option>
+                      <option value="Aéreo">Aéreo</option>
+                      <option value="Marítimo">Marítimo</option>
+                      <option value="Mixto">Mixto</option>
+                    </select>
+                    <input
+                      type="number"
+                      placeholder="Costo base"
+                      value={nuevoTransportista.costoBase}
+                      onChange={(e) => setNuevoTransportista({...nuevoTransportista, costoBase: parseFloat(e.target.value) || 0})}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Tiempo de entrega (ej: 2-3 días)"
+                      value={nuevoTransportista.tiempoEntrega}
+                      onChange={(e) => setNuevoTransportista({...nuevoTransportista, tiempoEntrega: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <textarea
+                      placeholder="Observaciones"
+                      value={nuevoTransportista.observaciones}
+                      onChange={(e) => setNuevoTransportista({...nuevoTransportista, observaciones: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 md:col-span-2"
+                      rows="3"
+                    />
+                    <div className="md:col-span-2 flex space-x-4">
+                      <button
+                        onClick={agregarTransportista}
+                        className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition duration-200"
+                      >
+                        Crear Transportista
+                      </button>
+                      <button
+                        onClick={() => setShowTransportistaForm(false)}
+                        className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition duration-200"
+                      >
+                        Cancelar
+                      </button>
                     </div>
                   </div>
-                ))}
+                )}
+
+                {/* Lista de Transportistas */}
+                <h3 className="text-xl font-semibold text-gray-800 mb-4">Transportistas Registrados</h3>
+                {loadingTransportistas ? (
+                  <div className="text-center py-8">
+                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                    <p className="mt-2 text-gray-600">Cargando transportistas...</p>
+                  </div>
+                ) : transportistasFiltrados.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500">No hay transportistas registrados aún.</p>
+                    <p className="text-sm text-gray-400 mt-1">Haz clic en "Agregar Transportista" para comenzar.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {transportistasFiltrados.map((trans) => (
+                      <div key={trans._id || trans.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="font-semibold text-gray-800">{trans.nombre}</h3>
+                          <span className={`text-xs px-2 py-1 rounded-full ${
+                            trans.estado === 'Activo' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                          }`}>
+                            {trans.estado}
+                          </span>
+                        </div>
+                        <div className="space-y-2 text-sm text-gray-600">
+                          <p>📧 {trans.contacto}</p>
+                          <p>📞 {trans.telefono}</p>
+                          <p>🚛 {trans.tipo}</p>
+                          <p>💰 Costo base: ${trans.costoBase}</p>
+                          <p>🌍 Cobertura: {trans.cobertura?.join(', ') || 'No especificada'}</p>
+                          <p>⏱️ Tiempo: {trans.tiempoEntrega}</p>
+                          {trans.rating > 0 && (
+                            <div className="flex items-center">
+                              <span className="text-yellow-500">⭐</span>
+                              <span className="ml-1">{trans.rating}/5.0</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}

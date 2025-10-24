@@ -1,5 +1,14 @@
 // routes/finanzas.routes.js
 import express from 'express';
+import Finanzas from '../models/finanzas.model.js';
+import {
+    getTransactions,
+    createTransaction,
+    getTransactionById,
+    updateTransaction,
+    deleteTransaction
+} from '../controllers/finanzas.controller.js';
+
 const router = express.Router();
 
 // Middleware opcional para control de roles
@@ -10,29 +19,36 @@ const adminOnly = (req, res, next) => {
     next();
 };
 
-// Ejemplo de endpoint solo para admins
-router.get('/resumen', adminOnly, (req, res) => {
-    res.json({ 
-        mensaje: 'Resumen financiero para admins', 
-        data: { ingresos: 10000, egresos: 5000 } 
-    });
+// Rutas adicionales para reportes y resumenes (deben ir antes de las rutas con parámetros)
+router.get('/resumen', adminOnly, async (req, res) => {
+    try {
+        const transactions = await Finanzas.find();
+        const ingresos = transactions.filter(t => t.type === 'ingreso').reduce((sum, t) => sum + t.amount, 0);
+        const egresos = transactions.filter(t => t.type === 'egreso').reduce((sum, t) => sum + t.amount, 0);
+        const balance = ingresos - egresos;
+
+        res.json({
+            mensaje: 'Resumen financiero',
+            data: { ingresos, egresos, balance }
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Error al obtener resumen.' });
+    }
 });
 
-// Ejemplo de endpoint accesible para todos los roles
 router.get('/historial', (req, res) => {
-    res.json({ 
-        mensaje: 'Historial financiero accesible para todos los usuarios', 
-        data: [] 
+    res.json({
+        mensaje: 'Historial financiero accesible para todos los usuarios',
+        data: []
     });
 });
 
-// Agrega más rutas aquí...
-router.post('/gasto', (req, res) => {
-    res.json({ mensaje: 'Gasto registrado' });
-});
-
-router.get('/reportes', (req, res) => {
-    res.json({ mensaje: 'Reportes financieros' });
-});
+// Rutas para transacciones financieras
+router.get('/', getTransactions); // Obtener todas las transacciones
+router.post('/', createTransaction); // Crear nueva transacción
+router.get('/:id', getTransactionById); // Obtener transacción por ID
+router.put('/:id', updateTransaction); // Actualizar transacción
+router.delete('/:id', deleteTransaction); // Eliminar transacción
 
 export default router;

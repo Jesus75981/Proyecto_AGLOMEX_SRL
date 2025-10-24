@@ -1,5 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+
+// --- API Helper ---
+const API_URL = 'http://localhost:5000/api';
+
+const getAuthToken = () => {
+  return localStorage.getItem('token');
+};
+
+const apiFetch = async (endpoint, options = {}) => {
+  const token = getAuthToken();
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.message || errorData.error || 'Error en la petición a la API');
+  }
+
+  return response.json();
+};
 
 const VentasPage = ({ userRole }) => {
   const navigate = useNavigate();
@@ -11,55 +39,63 @@ const VentasPage = ({ userRole }) => {
 
   // Estados para el módulo de ventas
   const [searchTerm, setSearchTerm] = useState('');
-  const [ventas, setVentas] = useState([
-    { 
-      id: 1, 
-      cliente: 'Juan Pérez', 
-      producto: 'Silla Ejecutiva', 
-      cantidad: 2, 
-      precio: 150, 
-      total: 300, 
-      fecha: '2024-01-15', 
-      estado: 'Completada',
-      vendedor: 'admin' 
-    },
-    { 
-      id: 2, 
-      cliente: 'María García', 
-      producto: 'Mesa de Centro', 
-      cantidad: 1, 
-      precio: 200, 
-      total: 200, 
-      fecha: '2024-01-14', 
-      estado: 'Completada',
-      vendedor: 'vendedor' 
-    },
-    { 
-      id: 3, 
-      cliente: 'Carlos López', 
-      producto: 'Sofá 3 Plazas', 
-      cantidad: 1, 
-      precio: 500, 
-      total: 500, 
-      fecha: '2024-01-13', 
-      estado: 'Pendiente',
-      vendedor: 'admin' 
-    },
-  ]);
+  const [ventas, setVentas] = useState([]);
+  const [productos, setProductos] = useState([]);
+  const [clientes, setClientes] = useState([]);
+
+  // Cargar datos desde APIs al montar el componente
+  useEffect(() => {
+    const cargarDatos = async () => {
+      try {
+        setLoading(true);
+
+        // Cargar productos
+        const productosData = await apiFetch('/productos');
+        setProductos(productosData);
+
+        // Cargar clientes
+        const clientesData = await apiFetch('/clientes');
+        setClientes(clientesData);
+
+        // Cargar ventas
+        const ventasData = await apiFetch('/ventas');
+        setVentas(ventasData);
+
+      } catch (error) {
+        console.error('Error al cargar datos:', error);
+        alert('Error al cargar datos desde el servidor');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    cargarDatos();
+  }, []);
 
   const [nuevaVenta, setNuevaVenta] = useState({
     cliente: '',
     producto: '',
     cantidad: 1,
     precio: 0,
-    fecha: new Date().toISOString().split('T')[0]
+    fecha: new Date().toISOString().split('T')[0],
+    metodoPago: 'Efectivo',
+    numFactura: '',
+    observaciones: ''
   });
 
   const [errors, setErrors] = useState({});
   const [showForm, setShowForm] = useState(false);
+  const [productoSearchTerm, setProductoSearchTerm] = useState('');
+  const [showProductoDropdown, setShowProductoDropdown] = useState(false);
+  const [clienteSearchTerm, setClienteSearchTerm] = useState('');
+  const [showClienteDropdown, setShowClienteDropdown] = useState(false);
+  const [selectedProducto, setSelectedProducto] = useState(null);
+  const [selectedCliente, setSelectedCliente] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [keepClientData, setKeepClientData] = useState(false);
 
-  // Productos predefinidos con precios
-  const productos = [
+  // Productos predefinidos con precios (temporal hasta conectar con API)
+  const productosPredefinidos = [
     { nombre: 'Silla Ejecutiva', precio: 150 },
     { nombre: 'Mesa de Centro', precio: 200 },
     { nombre: 'Sofá 3 Plazas', precio: 500 },
@@ -75,6 +111,11 @@ const VentasPage = ({ userRole }) => {
     venta.cliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
     venta.producto.toLowerCase().includes(searchTerm.toLowerCase()) ||
     venta.estado.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Productos filtrados para el dropdown searchable (usando productos de API)
+  const productosFiltrados = productos.filter(producto =>
+    producto.nombre.toLowerCase().includes(productoSearchTerm.toLowerCase())
   );
 
   // ✅ VALIDACIONES COMPLETAS
@@ -128,30 +169,53 @@ const VentasPage = ({ userRole }) => {
   };
 
   // ✅ AGREGAR NUEVA VENTA
-  const agregarVenta = () => {
+  const agregarVenta = async () => {
     if (!validarVenta()) return;
 
-    const venta = {
-      id: ventas.length + 1,
-      ...nuevaVenta,
-      total: nuevaVenta.cantidad * nuevaVenta.precio,
-      estado: 'Pendiente',
-      vendedor: userRole || 'usuario'
-    };
+    try {
+      const ventaData = {
+        cliente: nuevaVenta.cliente,
+        producto: nuevaVenta.producto,
+        cantidad: nuevaVenta.cantidad,
+        precio: nuevaVenta.precio,
+        fecha: nuevaVenta.fecha,
+        metodoPago: nuevaVenta.metodoPago,
+        numFactura: nuevaVenta.numFactura,
+        observaciones: nuevaVenta.observaciones,
+        estado: 'Pendiente',
+        vendedor: userRole || 'usuario'
+      };
 
-    setVentas([...ventas, venta]);
-    setNuevaVenta({
-      cliente: '',
-      producto: '',
-      cantidad: 1,
-      precio: 0,
-      fecha: new Date().toISOString().split('T')[0]
-    });
-    setErrors({});
-    setShowForm(false);
-    
-    // Mostrar mensaje de éxito
-    alert('✅ Venta registrada exitosamente');
+      // Enviar venta al backend
+      const nuevaVentaGuardada = await apiFetch('/ventas', {
+        method: 'POST',
+        body: JSON.stringify(ventaData)
+      });
+
+      // Actualizar estado local
+      setVentas([...ventas, nuevaVentaGuardada]);
+
+      // Limpiar formulario
+      setNuevaVenta({
+        cliente: '',
+        producto: '',
+        cantidad: 1,
+        precio: 0,
+        fecha: new Date().toISOString().split('T')[0],
+        metodoPago: 'Efectivo',
+        numFactura: '',
+        observaciones: ''
+      });
+      setProductoSearchTerm('');
+      setErrors({});
+      setShowForm(false);
+
+      // Mostrar mensaje de éxito
+      alert('✅ Venta registrada exitosamente');
+    } catch (error) {
+      console.error('Error al registrar venta:', error);
+      alert('Error al registrar la venta. Inténtalo de nuevo.');
+    }
   };
 
   // Cambiar estado de venta
@@ -303,22 +367,42 @@ const VentasPage = ({ userRole }) => {
                   {errors.cliente && <p className="text-red-500 text-sm mt-1">{errors.cliente}</p>}
                 </div>
 
-                <div>
+                <div className="relative">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Producto *</label>
-                  <select
-                    value={nuevaVenta.producto}
-                    onChange={(e) => handleProductoChange(e.target.value)}
-                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
-                      errors.producto ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                  >
-                    <option value="">Seleccionar producto</option>
-                    {productos.map((producto, index) => (
-                      <option key={index} value={producto.nombre}>
-                        {producto.nombre} - ${producto.precio}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={productoSearchTerm}
+                      onChange={(e) => {
+                        setProductoSearchTerm(e.target.value);
+                        setShowProductoDropdown(true);
+                      }}
+                      onFocus={() => setShowProductoDropdown(true)}
+                      onBlur={() => setTimeout(() => setShowProductoDropdown(false), 200)}
+                      placeholder="Buscar producto..."
+                      className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
+                        errors.producto ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                    />
+                    {showProductoDropdown && productosFiltrados.length > 0 && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        {productosFiltrados.map((producto, index) => (
+                          <div
+                            key={index}
+                            onClick={() => {
+                              setProductoSearchTerm(producto.nombre);
+                              handleProductoChange(producto.nombre);
+                              setShowProductoDropdown(false);
+                            }}
+                            className="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                          >
+                            <div className="font-medium">{producto.nombre}</div>
+                            <div className="text-sm text-gray-500">${producto.precio}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   {errors.producto && <p className="text-red-500 text-sm mt-1">{errors.producto}</p>}
                 </div>
 

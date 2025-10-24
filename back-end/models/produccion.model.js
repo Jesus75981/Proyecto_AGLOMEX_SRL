@@ -42,6 +42,35 @@ const produccionSchema = new mongoose.Schema({
   productoFinal: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "ProductoTienda" // cuando la producción termina, se crea el producto en tienda
+  },
+  // Nuevos campos para progreso automático
+  tiempoEstimado: {
+    type: Number, // en horas
+    required: true,
+    default: 24 // 24 horas por defecto
+  },
+  fechaInicio: {
+    type: Date,
+    default: null
+  },
+  progreso: {
+    type: Number, // 0-100
+    default: 0,
+    min: 0,
+    max: 100
+  },
+  estado: {
+    type: String,
+    enum: ['Pendiente', 'En Progreso', 'Completado', 'Retrasado'],
+    default: 'Pendiente'
+  },
+  notificacionesEnviadas: {
+    type: Boolean,
+    default: false
+  },
+  tiempoTranscurrido: {
+    type: Number, // en horas
+    default: 0
   }
 }, { timestamps: true });
 

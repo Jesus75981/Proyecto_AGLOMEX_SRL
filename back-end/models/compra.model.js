@@ -21,7 +21,7 @@ const pagoSchema = new mongoose.Schema({
 }, { _id: false });
 const compraSchema = new mongoose.Schema({
   numCompra: {
-    type: Number,
+    type: String,
     required: true,
     unique: true
   },

@@ -1,27 +1,15 @@
 import express from 'express';
-import Venta from '../models/venta.model.js';
+import { registrarVenta, listarVentas, getVentasByDay } from '../controllers/ventas.controller.js';
 
 const router = express.Router();
 
 // Crear nueva venta
-router.post('/', async (req, res) => {
-    try {
-        const venta = new Venta(req.body);
-        await venta.save();
-        res.status(201).json(venta);
-    } catch (error) {
-        res.status(400).json({ error: error.message });
-    }
-});
+router.post('/', registrarVenta);
 
 // Obtener todas las ventas
-router.get('/', async (req, res) => {
-    try {
-        const ventas = await Venta.find().populate('cliente productos.producto');
-        res.json(ventas);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
+router.get('/', listarVentas);
+
+// Ruta para reporte diario de ventas
+router.post('/reporte-diario', getVentasByDay);
 
 export default router;

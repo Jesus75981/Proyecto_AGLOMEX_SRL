@@ -33,8 +33,16 @@ const logisticaSchema = new mongoose.Schema({
   },
   estado: {
     type: String,
-    enum: ["pendiente", "en_proceso", "despachado", "entregado", "cancelado"], // ✅ MINÚSCULAS
+    enum: ["pendiente", "en_proceso", "despachado", "entregado", "cancelado", "retrasado"], // ✅ MINÚSCULAS + retrasado
     default: "pendiente"
+  },
+  tiempoEstimado: {
+    type: String, // Ej: "2-3 días", "1 semana"
+    default: "3-5 días"
+  },
+  ultimaActualizacion: {
+    type: Date,
+    default: Date.now
   },
   direccionEnvio: {  // ✅ CAMBIAR: de direccionEntrega a direccionEnvio (OBJETO)
     calle: { type: String, required: true },

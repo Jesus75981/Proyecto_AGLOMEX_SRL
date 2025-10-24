@@ -1,6 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+// --- API Helper ---
+const API_URL = 'http://localhost:5000/api';
+
+const getAuthToken = () => {
+  return localStorage.getItem('token');
+};
+
+const apiFetch = async (endpoint, options = {}) => {
+  const token = getAuthToken();
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.message || errorData.error || 'Error en la petición a la API');
+  }
+
+  return response.json();
+};
+
 const InventarioPage = ({ userRole }) => {
   const navigate = useNavigate();
 
@@ -14,106 +42,20 @@ const InventarioPage = ({ userRole }) => {
   const [activeTab, setActiveTab] = useState('productos');
   const [showForm, setShowForm] = useState(false);
   const [showMovimientoForm, setShowMovimientoForm] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Datos de ejemplo - Inventario
-  const [inventario, setInventario] = useState([
-    {
-      id: 1,
-      producto: 'Silla Ejecutiva Ergonomica',
-      sku: 'SCH-EXEC-001',
-      categoria: 'Sillas',
-      proveedor: 'Muebles Premium SA',
-      cantidad: 150,
-      cantidadMinima: 20,
-      cantidadMaxima: 200,
-      ubicacion: 'Almacén A - Pasillo 1 - Estante 3',
-      estado: 'Disponible',
-      precioCosto: 120.00,
-      precioVenta: 199.99,
-      fechaIngreso: '2024-01-10',
-      ultimaActualizacion: '2024-01-15'
-    },
-    {
-      id: 2,
-      producto: 'Mesa de Centro Moderna',
-      sku: 'MES-CENT-002',
-      categoria: 'Mesas',
-      proveedor: 'Diseño Contemporáneo SL',
-      cantidad: 75,
-      cantidadMinima: 15,
-      cantidadMaxima: 100,
-      ubicacion: 'Almacén A - Pasillo 2 - Estante 1',
-      estado: 'Disponible',
-      precioCosto: 85.50,
-      precioVenta: 149.99,
-      fechaIngreso: '2024-01-12',
-      ultimaActualizacion: '2024-01-16'
-    },
-    {
-      id: 3,
-      producto: 'Sofá 3 Plazas Cuero',
-      sku: 'SOF-3PL-003',
-      categoria: 'Sofás',
-      proveedor: 'Confort Hogar SA',
-      cantidad: 8,
-      cantidadMinima: 5,
-      cantidadMaxima: 25,
-      ubicacion: 'Almacén B - Pasillo 1 - Estante 2',
-      estado: 'Stock Bajo',
-      precioCosto: 450.00,
-      precioVenta: 799.99,
-      fechaIngreso: '2024-01-05',
-      ultimaActualizacion: '2024-01-17'
-    },
-    {
-      id: 4,
-      producto: 'Estantería Moderna Roble',
-      sku: 'EST-MOD-004',
-      categoria: 'Estanterías',
-      proveedor: 'Maderas Nobles SL',
-      cantidad: 0,
-      cantidadMinima: 10,
-      cantidadMaxima: 50,
-      ubicacion: 'Almacén B - Pasillo 2 - Estante 4',
-      estado: 'Agotado',
-      precioCosto: 65.00,
-      precioVenta: 119.99,
-      fechaIngreso: '2024-01-08',
-      ultimaActualizacion: '2024-01-14'
-    },
-    {
-      id: 5,
-      producto: 'Escritorio Oficina Profesional',
-      sku: 'ESC-OFI-005',
-      categoria: 'Escritorios',
-      proveedor: 'Oficina Moderna SA',
-      cantidad: 25,
-      cantidadMinima: 8,
-      cantidadMaxima: 40,
-      ubicacion: 'Almacén C - Pasillo 1 - Estante 1',
-      estado: 'Disponible',
-      precioCosto: 95.00,
-      precioVenta: 169.99,
-      fechaIngreso: '2024-01-11',
-      ultimaActualizacion: '2024-01-15'
-    },
-    {
-      id: 6,
-      producto: 'Lámpara de Pie Diseño',
-      sku: 'LAM-PIE-006',
-      categoria: 'Iluminación',
-      proveedor: 'Iluminación Creativa SL',
-      cantidad: 45,
-      cantidadMinima: 10,
-      cantidadMaxima: 80,
-      ubicacion: 'Almacén C - Pasillo 3 - Estante 2',
-      estado: 'Disponible',
-      precioCosto: 35.00,
-      precioVenta: 69.99,
-      fechaIngreso: '2024-01-13',
-      ultimaActualizacion: '2024-01-16'
-    }
-  ]);
+  // Estados para búsqueda en formularios
+  const [categoriaSearch, setCategoriaSearch] = useState('');
+  const [proveedorSearch, setProveedorSearch] = useState('');
+  const [productoSearch, setProductoSearch] = useState('');
+  const [showCategoriaDropdown, setShowCategoriaDropdown] = useState(false);
+  const [showProveedorDropdown, setShowProveedorDropdown] = useState(false);
+  const [showProductoDropdown, setShowProductoDropdown] = useState(false);
+
+  // Datos de API - Inventario
+  const [inventario, setInventario] = useState([]);
+  const [productosAPI, setProductosAPI] = useState([]);
 
   // Movimientos de inventario
   const [movimientos, setMovimientos] = useState([
@@ -190,28 +132,34 @@ const InventarioPage = ({ userRole }) => {
     sku: '',
     categoria: '',
     proveedor: '',
-    cantidad: 0,
-    cantidadMinima: 0,
-    cantidadMaxima: 0,
+    cantidad: '',
+    cantidadMinima: '',
+    cantidadMaxima: '',
     ubicacion: '',
-    precioCosto: 0,
-    precioVenta: 0
+    precioCosto: '',
+    precioVenta: ''
   });
+
+  const [erroresProducto, setErroresProducto] = useState({});
 
   const [nuevoMovimiento, setNuevoMovimiento] = useState({
     productoId: '',
     tipo: 'Entrada',
-    cantidad: 0,
+    cantidad: '',
     motivo: '',
     referencia: '',
     usuario: ''
   });
+
+  const [erroresMovimiento, setErroresMovimiento] = useState({});
 
   // Filtrar datos
   const inventarioFiltrado = inventario.filter(item =>
     item.producto.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.categoria.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.proveedor.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.ubicacion.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.estado.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -222,15 +170,70 @@ const InventarioPage = ({ userRole }) => {
     mov.motivo.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Validaciones para productos
+  const validarProducto = () => {
+    const errores = {};
+
+    if (!nuevoProducto.producto.trim()) {
+      errores.producto = 'El nombre del producto es obligatorio';
+    }
+
+    if (!nuevoProducto.sku.trim()) {
+      errores.sku = 'El SKU es obligatorio';
+    }
+
+    if (!nuevoProducto.categoria) {
+      errores.categoria = 'Debe seleccionar una categoría';
+    }
+
+    if (!nuevoProducto.proveedor) {
+      errores.proveedor = 'Debe seleccionar un proveedor';
+    }
+
+    // Validaciones numéricas
+    if (nuevoProducto.cantidad === '' || isNaN(nuevoProducto.cantidad) || parseInt(nuevoProducto.cantidad) < 0) {
+      errores.cantidad = 'La cantidad debe ser un número entero positivo o cero';
+    }
+
+    if (nuevoProducto.cantidadMinima === '' || isNaN(nuevoProducto.cantidadMinima) || parseInt(nuevoProducto.cantidadMinima) < 0) {
+      errores.cantidadMinima = 'El stock mínimo debe ser un número entero positivo o cero';
+    }
+
+    if (nuevoProducto.cantidadMaxima === '' || isNaN(nuevoProducto.cantidadMaxima) || parseInt(nuevoProducto.cantidadMaxima) < 0) {
+      errores.cantidadMaxima = 'El stock máximo debe ser un número entero positivo';
+    }
+
+    if (nuevoProducto.precioCosto === '' || isNaN(nuevoProducto.precioCosto) || parseFloat(nuevoProducto.precioCosto) < 0) {
+      errores.precioCosto = 'El precio de costo debe ser un número positivo';
+    }
+
+    if (nuevoProducto.precioVenta === '' || isNaN(nuevoProducto.precioVenta) || parseFloat(nuevoProducto.precioVenta) < 0) {
+      errores.precioVenta = 'El precio de venta debe ser un número positivo';
+    }
+
+    // Validar que precio venta sea mayor que precio costo
+    if (!errores.precioCosto && !errores.precioVenta && parseFloat(nuevoProducto.precioVenta) < parseFloat(nuevoProducto.precioCosto)) {
+      errores.precioVenta = 'El precio de venta debe ser mayor o igual al precio de costo';
+    }
+
+    setErroresProducto(errores);
+    return Object.keys(errores).length === 0;
+  };
+
   // Funciones para productos
   const agregarProducto = () => {
-    if (!nuevoProducto.producto || !nuevoProducto.sku) return;
+    if (!validarProducto()) return;
 
     const producto = {
       id: inventario.length + 1,
       ...nuevoProducto,
-      estado: nuevoProducto.cantidad <= 0 ? 'Agotado' : 
-              nuevoProducto.cantidad <= nuevoProducto.cantidadMinima ? 'Stock Bajo' : 'Disponible',
+      cantidad: parseInt(nuevoProducto.cantidad),
+      cantidadMinima: parseInt(nuevoProducto.cantidadMinima),
+      cantidadMaxima: parseInt(nuevoProducto.cantidadMaxima),
+      precioCosto: parseFloat(nuevoProducto.precioCosto),
+      precioVenta: parseFloat(nuevoProducto.precioVenta),
+      estado: parseInt(nuevoProducto.cantidad) <= 0 ? 'Agotado' :
+              parseInt(nuevoProducto.cantidad) <= parseInt(nuevoProducto.cantidadMinima) ? 'Stock Bajo' : 'Disponible',
       fechaIngreso: new Date().toISOString().split('T')[0],
       ultimaActualizacion: new Date().toISOString().split('T')[0]
     };
@@ -241,13 +244,14 @@ const InventarioPage = ({ userRole }) => {
       sku: '',
       categoria: '',
       proveedor: '',
-      cantidad: 0,
-      cantidadMinima: 0,
-      cantidadMaxima: 0,
+      cantidad: '',
+      cantidadMinima: '',
+      cantidadMaxima: '',
       ubicacion: '',
-      precioCosto: 0,
-      precioVenta: 0
+      precioCosto: '',
+      precioVenta: ''
     });
+    setErroresProducto({});
     setShowForm(false);
   };
 
@@ -255,9 +259,37 @@ const InventarioPage = ({ userRole }) => {
     setInventario(inventario.filter(item => item.id !== id));
   };
 
+  // Validaciones para movimientos
+  const validarMovimiento = () => {
+    const errores = {};
+
+    if (!nuevoMovimiento.productoId) {
+      errores.productoId = 'Debe seleccionar un producto';
+    }
+
+    if (nuevoMovimiento.cantidad === '' || isNaN(nuevoMovimiento.cantidad) || parseInt(nuevoMovimiento.cantidad) <= 0) {
+      errores.cantidad = 'La cantidad debe ser un número entero positivo';
+    }
+
+    if (!nuevoMovimiento.motivo.trim()) {
+      errores.motivo = 'El motivo es obligatorio';
+    }
+
+    // Validación adicional para salidas: verificar stock disponible
+    if (nuevoMovimiento.tipo === 'Salida' && nuevoMovimiento.productoId && nuevoMovimiento.cantidad) {
+      const producto = inventario.find(p => p.id === parseInt(nuevoMovimiento.productoId));
+      if (producto && parseInt(nuevoMovimiento.cantidad) > producto.cantidad) {
+        errores.cantidad = `No hay suficiente stock. Disponible: ${producto.cantidad}`;
+      }
+    }
+
+    setErroresMovimiento(errores);
+    return Object.keys(errores).length === 0;
+  };
+
   // Funciones para movimientos
   const agregarMovimiento = () => {
-    if (!nuevoMovimiento.productoId || !nuevoMovimiento.cantidad) return;
+    if (!validarMovimiento()) return;
 
     const producto = inventario.find(p => p.id === parseInt(nuevoMovimiento.productoId));
     if (!producto) return;
@@ -266,11 +298,11 @@ const InventarioPage = ({ userRole }) => {
     let stockActual = stockAnterior;
 
     if (nuevoMovimiento.tipo === 'Entrada') {
-      stockActual = stockAnterior + nuevoMovimiento.cantidad;
+      stockActual = stockAnterior + parseInt(nuevoMovimiento.cantidad);
     } else if (nuevoMovimiento.tipo === 'Salida') {
-      stockActual = stockAnterior - nuevoMovimiento.cantidad;
+      stockActual = stockAnterior - parseInt(nuevoMovimiento.cantidad);
     } else {
-      stockActual = nuevoMovimiento.cantidad;
+      stockActual = parseInt(nuevoMovimiento.cantidad);
     }
 
     // Actualizar inventario
@@ -279,7 +311,7 @@ const InventarioPage = ({ userRole }) => {
         ? {
             ...item,
             cantidad: stockActual,
-            estado: stockActual <= 0 ? 'Agotado' : 
+            estado: stockActual <= 0 ? 'Agotado' :
                     stockActual <= item.cantidadMinima ? 'Stock Bajo' : 'Disponible',
             ultimaActualizacion: new Date().toISOString().split('T')[0]
           }
@@ -292,7 +324,7 @@ const InventarioPage = ({ userRole }) => {
       producto: producto.producto,
       sku: producto.sku,
       tipo: nuevoMovimiento.tipo,
-      cantidad: nuevoMovimiento.cantidad,
+      cantidad: parseInt(nuevoMovimiento.cantidad),
       motivo: nuevoMovimiento.motivo,
       referencia: nuevoMovimiento.referencia,
       usuario: nuevoMovimiento.usuario || 'Usuario Actual',
@@ -305,13 +337,52 @@ const InventarioPage = ({ userRole }) => {
     setNuevoMovimiento({
       productoId: '',
       tipo: 'Entrada',
-      cantidad: 0,
+      cantidad: '',
       motivo: '',
       referencia: '',
       usuario: ''
     });
+    setErroresMovimiento({});
     setShowMovimientoForm(false);
   };
+
+  // Cargar productos desde API
+  useEffect(() => {
+    const cargarProductos = async () => {
+      try {
+        const productos = await apiFetch('/productos');
+        setProductosAPI(productos);
+
+        // Mapear productos de API al formato del inventario
+        const inventarioMapeado = productos.map((prod, index) => ({
+          id: prod._id,
+          producto: prod.nombre,
+          sku: prod.idProductoTienda,
+          categoria: prod.categoria,
+          proveedor: prod.proveedor?.nombre || 'Sin proveedor',
+          cantidad: prod.cantidad || 0,
+          cantidadMinima: 5, // Valor por defecto, podría venir de la API
+          cantidadMaxima: 100, // Valor por defecto
+          ubicacion: prod.ubicacion || '',
+          precioCosto: prod.precioCompra || 0,
+          precioVenta: prod.precioVenta || 0,
+          estado: (prod.cantidad || 0) <= 0 ? 'Agotado' :
+                  (prod.cantidad || 0) <= 5 ? 'Stock Bajo' : 'Disponible',
+          fechaIngreso: prod.createdAt ? new Date(prod.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          ultimaActualizacion: prod.updatedAt ? new Date(prod.updatedAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+        }));
+
+        setInventario(inventarioMapeado);
+        setLoading(false);
+      } catch (err) {
+        console.error('Error cargando productos:', err);
+        setError('Error al cargar los productos');
+        setLoading(false);
+      }
+    };
+
+    cargarProductos();
+  }, []);
 
   // Cálculos de métricas
   const totalProductos = inventario.length;
@@ -319,15 +390,15 @@ const InventarioPage = ({ userRole }) => {
   const productosStockBajo = inventario.filter(p => p.estado === 'Stock Bajo').length;
   const productosAgotados = inventario.filter(p => p.estado === 'Agotado').length;
 
-  const valorTotalInventario = inventario.reduce((sum, item) => 
+  const valorTotalInventario = inventario.reduce((sum, item) =>
     sum + (item.cantidad * item.precioCosto), 0
   );
 
-  const movimientosHoy = movimientos.filter(mov => 
+  const movimientosHoy = movimientos.filter(mov =>
     mov.fecha.startsWith(new Date().toISOString().split('T')[0])
   ).length;
 
-  const productosReorden = inventario.filter(item => 
+  const productosReorden = inventario.filter(item =>
     item.cantidad <= item.cantidadMinima
   ).length;
 
@@ -421,7 +492,7 @@ const InventarioPage = ({ userRole }) => {
           <div className="bg-white rounded-xl shadow-md mb-6">
             <div className="border-b border-gray-200">
               <nav className="flex -mb-px">
-                {['productos', 'movimientos', 'categorias', 'reportes'].map((tab) => (
+                {['productos', 'movimientos'].map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
@@ -433,8 +504,6 @@ const InventarioPage = ({ userRole }) => {
                   >
                     {tab === 'productos' && '📦 Gestión de Productos'}
                     {tab === 'movimientos' && '🔄 Movimientos'}
-                    {tab === 'categorias' && '📊 Categorías'}
-                    {tab === 'reportes' && '📈 Reportes'}
                   </button>
                 ))}
               </nav>
@@ -497,26 +566,66 @@ const InventarioPage = ({ userRole }) => {
                       onChange={(e) => setNuevoProducto({...nuevoProducto, sku: e.target.value})}
                       className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
-                    <select
-                      value={nuevoProducto.categoria}
-                      onChange={(e) => setNuevoProducto({...nuevoProducto, categoria: e.target.value})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    >
-                      <option value="">Seleccionar categoría</option>
-                      {categorias.map(cat => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))}
-                    </select>
-                    <select
-                      value={nuevoProducto.proveedor}
-                      onChange={(e) => setNuevoProducto({...nuevoProducto, proveedor: e.target.value})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    >
-                      <option value="">Seleccionar proveedor</option>
-                      {proveedores.map(prov => (
-                        <option key={prov} value={prov}>{prov}</option>
-                      ))}
-                    </select>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Buscar categoría"
+                        value={nuevoProducto.categoria}
+                        onChange={(e) => {
+                          setNuevoProducto({...nuevoProducto, categoria: e.target.value});
+                          setShowCategoriaDropdown(true);
+                        }}
+                        onFocus={() => setShowCategoriaDropdown(true)}
+                        onBlur={() => setTimeout(() => setShowCategoriaDropdown(false), 200)}
+                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 w-full"
+                      />
+                      {showCategoriaDropdown && (
+                        <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                          {categorias.filter(cat => cat.toLowerCase().includes(nuevoProducto.categoria.toLowerCase())).map(cat => (
+                            <div
+                              key={cat}
+                              onClick={() => {
+                                setNuevoProducto({...nuevoProducto, categoria: cat});
+                                setShowCategoriaDropdown(false);
+                              }}
+                              className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                            >
+                              {cat}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Buscar proveedor"
+                        value={nuevoProducto.proveedor}
+                        onChange={(e) => {
+                          setNuevoProducto({...nuevoProducto, proveedor: e.target.value});
+                          setShowProveedorDropdown(true);
+                        }}
+                        onFocus={() => setShowProveedorDropdown(true)}
+                        onBlur={() => setTimeout(() => setShowProveedorDropdown(false), 200)}
+                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 w-full"
+                      />
+                      {showProveedorDropdown && (
+                        <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                          {proveedores.filter(prov => prov.toLowerCase().includes(nuevoProducto.proveedor.toLowerCase())).map(prov => (
+                            <div
+                              key={prov}
+                              onClick={() => {
+                                setNuevoProducto({...nuevoProducto, proveedor: prov});
+                                setShowProveedorDropdown(false);
+                              }}
+                              className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                            >
+                              {prov}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     <input
                       type="number"
                       placeholder="Cantidad inicial"
@@ -581,18 +690,38 @@ const InventarioPage = ({ userRole }) => {
                 {/* Formulario Movimiento */}
                 {showMovimientoForm && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-blue-50 rounded-lg">
-                    <select
-                      value={nuevoMovimiento.productoId}
-                      onChange={(e) => setNuevoMovimiento({...nuevoMovimiento, productoId: e.target.value})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Seleccionar producto</option>
-                      {inventario.map(producto => (
-                        <option key={producto.id} value={producto.id}>
-                          {producto.producto} - Stock: {producto.cantidad}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Buscar producto"
+                        value={nuevoMovimiento.productoId ? inventario.find(p => p.id === parseInt(nuevoMovimiento.productoId))?.producto || '' : ''}
+                        onChange={(e) => {
+                          setNuevoMovimiento({...nuevoMovimiento, productoId: ''});
+                          setProductoSearch(e.target.value);
+                          setShowProductoDropdown(true);
+                        }}
+                        onFocus={() => setShowProductoDropdown(true)}
+                        onBlur={() => setTimeout(() => setShowProductoDropdown(false), 200)}
+                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
+                      />
+                      {showProductoDropdown && (
+                        <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                          {inventario.filter(prod => prod.producto.toLowerCase().includes(productoSearch.toLowerCase())).map(prod => (
+                            <div
+                              key={prod.id}
+                              onClick={() => {
+                                setNuevoMovimiento({...nuevoMovimiento, productoId: prod.id.toString()});
+                                setProductoSearch(prod.producto);
+                                setShowProductoDropdown(false);
+                              }}
+                              className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                            >
+                              {prod.producto} - Stock: {prod.cantidad}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     <select
                       value={nuevoMovimiento.tipo}
                       onChange={(e) => setNuevoMovimiento({...nuevoMovimiento, tipo: e.target.value})}
@@ -656,6 +785,7 @@ const InventarioPage = ({ userRole }) => {
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKU</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proveedor</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ubicación</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
@@ -674,6 +804,9 @@ const InventarioPage = ({ userRole }) => {
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                             {item.categoria}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                            {item.proveedor}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                             <div>
@@ -822,102 +955,7 @@ const InventarioPage = ({ userRole }) => {
             </div>
           )}
 
-          {activeTab === 'categorias' && (
-            <div className="space-y-6">
-              <div className="bg-white rounded-xl shadow-md p-6">
-                <h2 className="text-2xl font-semibold text-gray-800 mb-6">Gestión de Categorías</h2>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {categorias.map((categoria, index) => {
-                    const productosCategoria = inventario.filter(item => item.categoria === categoria);
-                    const valorTotal = productosCategoria.reduce((sum, item) => 
-                      sum + (item.cantidad * item.precioCosto), 0
-                    );
-                    
-                    return (
-                      <div key={index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">
-                        <div className="flex items-center justify-between mb-3">
-                          <h3 className="font-semibold text-gray-800">{categoria}</h3>
-                          <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded-full">
-                            {productosCategoria.length} productos
-                          </span>
-                        </div>
-                        <div className="space-y-2 text-sm text-gray-600">
-                          <p>📦 Stock total: {productosCategoria.reduce((sum, item) => sum + item.cantidad, 0)}</p>
-                          <p>💰 Valor: ${valorTotal.toFixed(2)}</p>
-                          <p>⚠️ Stock bajo: {productosCategoria.filter(item => item.estado === 'Stock Bajo').length}</p>
-                          <p>❌ Agotados: {productosCategoria.filter(item => item.estado === 'Agotado').length}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
 
-          {activeTab === 'reportes' && (
-            <div className="space-y-6">
-              <div className="bg-white rounded-xl shadow-md p-6">
-                <h2 className="text-2xl font-semibold text-gray-800 mb-6">Reportes de Inventario</h2>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Reporte de Stock Bajo */}
-                  <div className="border border-yellow-200 rounded-lg p-4 bg-yellow-50">
-                    <h3 className="text-lg font-semibold text-yellow-800 mb-3">Productos con Stock Bajo</h3>
-                    <div className="space-y-2">
-                      {inventario
-                        .filter(item => item.estado === 'Stock Bajo')
-                        .map(item => (
-                          <div key={item.id} className="flex justify-between items-center p-2 bg-white rounded border">
-                            <span className="text-sm font-medium">{item.producto}</span>
-                            <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-                              Stock: {item.cantidad}
-                            </span>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-
-                  {/* Reporte de Productos Agotados */}
-                  <div className="border border-red-200 rounded-lg p-4 bg-red-50">
-                    <h3 className="text-lg font-semibold text-red-800 mb-3">Productos Agotados</h3>
-                    <div className="space-y-2">
-                      {inventario
-                        .filter(item => item.estado === 'Agotado')
-                        .map(item => (
-                          <div key={item.id} className="flex justify-between items-center p-2 bg-white rounded border">
-                            <span className="text-sm font-medium">{item.producto}</span>
-                            <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">
-                              Agotado
-                            </span>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-
-                  {/* Reporte de Valor por Categoría */}
-                  <div className="border border-green-200 rounded-lg p-4 bg-green-50 md:col-span-2">
-                    <h3 className="text-lg font-semibold text-green-800 mb-3">Valor de Inventario por Categoría</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {categorias.map(categoria => {
-                        const productos = inventario.filter(item => item.categoria === categoria);
-                        const valor = productos.reduce((sum, item) => sum + (item.cantidad * item.precioCosto), 0);
-                        
-                        return (
-                          <div key={categoria} className="bg-white p-3 rounded border">
-                            <div className="font-medium text-gray-800">{categoria}</div>
-                            <div className="text-sm text-gray-600">${valor.toFixed(2)}</div>
-                            <div className="text-xs text-gray-500">{productos.length} productos</div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>

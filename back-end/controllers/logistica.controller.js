@@ -86,3 +86,129 @@ export const eliminarPedido = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// Actualizar tiempo estimado de entrega
+export const actualizarTiempoEstimado = async (req, res) => {
+  try {
+    const { tiempoEstimado, razon } = req.body;
+    const pedido = await Logistica.findByIdAndUpdate(
+      req.params.id,
+      {
+        tiempoEstimado,
+        ultimaActualizacion: new Date(),
+        observaciones: razon ? `Tiempo actualizado: ${razon}` : undefined
+      },
+      { new: true }
+    ).populate("cliente")
+     .populate("productos.producto");
+
+    if (!pedido) {
+      return res.status(404).json({ message: "Pedido no encontrado" });
+    }
+    res.json(pedido);
+  } catch (error) {
+    console.error('Error actualizando tiempo estimado:', error);
+    res.status(400).json({ error: error.message });
+  }
+};
+
+// Notificar retraso en envío
+export const notificarRetraso = async (req, res) => {
+  try {
+    const { nuevoTiempoEstimado, razonRetraso } = req.body;
+    const pedido = await Logistica.findByIdAndUpdate(
+      req.params.id,
+      {
+        tiempoEstimado: nuevoTiempoEstimado,
+        estado: 'retrasado',
+        observaciones: `RETRASO: ${razonRetraso}`,
+        ultimaActualizacion: new Date()
+      },
+      { new: true }
+    ).populate("cliente")
+     .populate("productos.producto");
+
+    if (!pedido) {
+      return res.status(404).json({ message: "Pedido no encontrado" });
+    }
+
+    // TODO: Implementar notificación al cliente (email/SMS)
+    console.log(`Notificación de retraso enviada para pedido ${pedido.pedidoNumero}`);
+
+    res.json({
+      message: "Retraso notificado exitosamente",
+      pedido
+    });
+  } catch (error) {
+    console.error('Error notificando retraso:', error);
+    res.status(400).json({ error: error.message });
+  }
+};
+
+// Obtener estadísticas de logística
+export const obtenerEstadisticas = async (req, res) => {
+  try {
+    const { periodo = 'mes' } = req.query;
+
+    // Calcular fechas según período
+    const ahora = new Date();
+    let fechaInicio;
+    switch (periodo) {
+      case 'semana':
+        fechaInicio = new Date(ahora.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case 'mes':
+        fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+        break;
+      case 'trimestre':
+        fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth() - 2, 1);
+        break;
+      default:
+        fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+    }
+
+    const pedidos = await Logistica.find({
+      fechaPedido: { $gte: fechaInicio }
+    });
+
+    const estadisticas = {
+      periodo,
+      fechaInicio,
+      fechaFin: ahora,
+      totalPedidos: pedidos.length,
+      pedidosPorEstado: {
+        pendiente: pedidos.filter(p => p.estado === 'pendiente').length,
+        en_proceso: pedidos.filter(p => p.estado === 'en_proceso').length,
+        despachado: pedidos.filter(p => p.estado === 'despachado').length,
+        entregado: pedidos.filter(p => p.estado === 'entregado').length,
+        cancelado: pedidos.filter(p => p.estado === 'cancelado').length,
+        retrasado: pedidos.filter(p => p.estado === 'retrasado').length
+      },
+      costoTotalEnvios: pedidos.reduce((sum, p) => sum + (p.costoAdicional || 0), 0),
+      tiempoPromedioEntrega: calcularTiempoPromedio(pedidos),
+      tasaEntregaExitosa: pedidos.length > 0 ?
+        (pedidos.filter(p => p.estado === 'entregado').length / pedidos.length) * 100 : 0
+    };
+
+    res.json(estadisticas);
+  } catch (error) {
+    console.error('Error obteniendo estadísticas:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Función auxiliar para calcular tiempo promedio de entrega
+const calcularTiempoPromedio = (pedidos) => {
+  const pedidosEntregados = pedidos.filter(p =>
+    p.estado === 'entregado' && p.fechaEntrega && p.fechaPedido
+  );
+
+  if (pedidosEntregados.length === 0) return 0;
+
+  const tiempos = pedidosEntregados.map(p => {
+    const tiempoEntrega = new Date(p.fechaEntrega) - new Date(p.fechaPedido);
+    return tiempoEntrega / (1000 * 60 * 60 * 24); // días
+  });
+
+  return tiempos.reduce((sum, tiempo) => sum + tiempo, 0) / tiempos.length;
+};

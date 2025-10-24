@@ -8,13 +8,13 @@ import ProductoTienda from "../models/productoTienda.model.js"; // Asegúrate de
  * @returns {Promise<string>} El ID de MongoDB (_id) del producto encontrado o creado.
  */
 const encontrarOCrearProducto = async (itemData) => {
-    const { 
-        productoId, 
-        nombreProducto, 
-        colorProducto,      
-        categoriaProducto,  
-        dimensiones, 
-        imagenProducto 
+    const {
+        productoId,
+        nombreProducto,
+        colorProducto,
+        categoriaProducto,
+        dimensiones,
+        imagenProducto
     } = itemData;
 
     let producto = null;
@@ -23,7 +23,7 @@ const encontrarOCrearProducto = async (itemData) => {
     if (productoId) {
         producto = await ProductoTienda.findById(productoId);
     }
-    
+
     // 2. Si no se encontró por ID, intentar buscar por Nombre
     if (!producto && nombreProducto) {
         // Asumiendo que el nombre es suficiente para buscar si ya existe
@@ -32,21 +32,28 @@ const encontrarOCrearProducto = async (itemData) => {
 
     // 3. Si AÚN no se encuentra, crearlo automáticamente con los datos mínimos.
     if (!producto) {
-        // Validamos que los datos mínimos estén presentes 
-        if (!nombreProducto || !colorProducto || !categoriaProducto || !dimensiones || !imagenProducto) {
-             throw new Error("Datos insuficientes para crear un nuevo producto. Se requiere nombre, color, categoría, dimensiones e imagen.");
+        // Validamos que los datos mínimos estén presentes
+        if (!nombreProducto || !colorProducto || !categoriaProducto) {
+             throw new Error("Datos insuficientes para crear un nuevo producto. Se requiere nombre, color y categoría.");
         }
 
+        // Generar código automático usando la función del productoTienda.controller.js
+        const generarCodigoInterno = (nombre) => {
+            const prefix = nombre ? nombre.substring(0, 3).toUpperCase() : 'PRO';
+            const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+            return `${prefix}-${randomSuffix}`;
+        };
+
         const idProductoTienda = generarCodigoInterno(nombreProducto);
-        
-        // Creamos la nueva REFERENCIA en ProductoTienda. 
+
+        // Creamos la nueva REFERENCIA en ProductoTienda.
         const nuevoProducto = new ProductoTienda({
             nombre: nombreProducto,
             idProductoTienda: idProductoTienda,
-            color: colorProducto,      
-            categoria: categoriaProducto, 
-            dimensiones: dimensiones,
-            imagen: imagenProducto,
+            color: colorProducto,
+            categoria: categoriaProducto,
+            dimensiones: dimensiones || {},
+            imagen: imagenProducto || "",
         });
 
         producto = await nuevoProducto.save();
