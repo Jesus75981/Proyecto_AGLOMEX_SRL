@@ -3,6 +3,8 @@ import { Routes, Route, useNavigate, BrowserRouter, Navigate } from 'react-route
 import axios from 'axios'; // AGREGADO: Para headers de auth en API calls
 
 // ✅ IMPORTACIONES DIRECTAS
+import LandingPage from "./assets/pages/LandingPage.jsx";
+import RecepcionPedidosPage from "./assets/pages/RecepcionPedidosPage.jsx";
 import HomePage from "./assets/pages/HomePage.jsx";
 import LoginPage from "./assets/pages/LoginPage.jsx";
 import VentasPage from "./assets/pages/VentasPage.jsx";
@@ -81,8 +83,9 @@ function AppContent() {
     <div className="App">
       <Routes>
         {/* ✅ RUTAS PÚBLICAS */}
-        <Route path="/" element={<CatalogPage />} />
+        <Route path="/" element={<LandingPage />} />
         <Route path="/catalogo" element={<CatalogPage />} />
+        <Route path="/recepcion-pedidos" element={<RecepcionPedidosPage />} />
         <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
         
         {/* ✅ RUTAS PRIVADAS */}

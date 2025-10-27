@@ -84,11 +84,18 @@ const Navbar = () => {
           </span>
         </div>
         
-        <div className="flex space-x-4 items-center"> 
+        <div className="flex space-x-4 items-center">
           <span className="text-orange-400 font-semibold text-sm sm:text-base">
             Catálogo Público
           </span>
-          
+
+          <button
+            onClick={() => navigate('/recepcion-pedidos')}
+            className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300 shadow-md text-sm sm:text-base"
+          >
+            Confirmar Recepción
+          </button>
+
           <button
             onClick={() => navigate('/login')}
             className="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300 shadow-md text-sm sm:text-base"

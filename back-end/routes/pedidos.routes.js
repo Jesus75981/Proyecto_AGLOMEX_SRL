@@ -3,6 +3,7 @@ import { crearPedido, listarPedidos, actualizarEstadoPedido } from "../controlle
 
 const router = express.Router();
 
+// Rutas protegidas
 router.post("/", crearPedido);
 router.get("/", listarPedidos);
 router.patch("/:id", actualizarEstadoPedido);

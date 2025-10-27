@@ -17,7 +17,7 @@ export const crearPedido = async (req, res) => {
   try {
     const pedidoNumero = await getNextSequenceValue('pedidoNumero');
     
-    // ✅ AGREGAR: Transformar datos para que coincidan con el modelo
+    //  AGREGAR: Transformar datos para que coincidan con el modelo
     const pedidoData = {
       ...req.body,
       pedidoNumero,
@@ -27,7 +27,7 @@ export const crearPedido = async (req, res) => {
     const pedido = new Logistica(pedidoData);
     await pedido.save();
     
-    // ✅ POPULAR: Devolver datos poblados para el frontend
+    //  POPULAR: Devolver datos poblados para el frontend
     const pedidoGuardado = await Logistica.findById(pedido._id)
       .populate("cliente")
       .populate("productos.producto");

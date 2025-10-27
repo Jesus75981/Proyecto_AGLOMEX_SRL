@@ -106,14 +106,16 @@ app.post('/api/login', async (req, res) => {
 });
 
 // === RUTAS PROTEGIDAS (con autenticación) ===
-app.use('/api/compras', authMiddleware, comprasRoutes); 
+app.use('/api/compras', authMiddleware, comprasRoutes);
 app.use('/api/clientes', authMiddleware, clientesRoutes);
 app.use('/api/logistica', authMiddleware, logisticaRoutes);
 app.use('/api/materiales', authMiddleware, materialesRoutes);
 app.use('/api/objetos3d', authMiddleware, objetos3dRoutes);
+// Rutas públicas para recepción de pedidos (sin autenticación)
+app.use('/api/pedidos-publico', pedidosPublicRoutes);
 app.use('/api/pedidos', authMiddleware, pedidosRoutes);
 app.use('/api/produccion', authMiddleware, produccionRoutes);
-app.use('/api/productos', authMiddleware, productosRoutes); 
+app.use('/api/productos', authMiddleware, productosRoutes);
 app.use('/api/proveedores', authMiddleware, proveedoresRoutes);
 app.use('/api/ventas', authMiddleware, ventasRoutes);
 app.use('/api/finanzas', authMiddleware, finanzasRoutes);
