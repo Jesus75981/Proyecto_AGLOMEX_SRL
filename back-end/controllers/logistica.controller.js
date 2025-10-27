@@ -1,6 +1,7 @@
 // controllers/logistica.controller.js
 import Logistica from "../models/logistica.model.js";  // ✅ Usar Logistica (no Pedido)
 import Contador from "../models/contador.model.js";
+import ProductoTienda from "../models/productoTienda.model.js";
 
 // Función auxiliar para obtener el siguiente valor de la secuencia del contador
 const getNextSequenceValue = async (nombreSecuencia) => {
@@ -15,23 +16,54 @@ const getNextSequenceValue = async (nombreSecuencia) => {
 // Crear un nuevo pedido de logística
 export const crearPedido = async (req, res) => {
   try {
+    const pedidoData = req.body;
+
+    // 1. VALIDACIÓN DE STOCK: Verificar que hay suficiente stock para todos los productos del pedido
+    const productosInsuficientes = [];
+    for (const item of pedidoData.productos) {
+      const producto = await ProductoTienda.findById(item.producto);
+
+      if (!producto) {
+        return res.status(404).json({
+          error: `Producto con ID ${item.producto} no encontrado.`
+        });
+      }
+
+      if (producto.cantidad < item.cantidad) {
+        productosInsuficientes.push({
+          nombre: producto.nombre,
+          stockActual: producto.cantidad,
+          solicitado: item.cantidad
+        });
+      }
+    }
+
+    // Si hay productos con stock insuficiente, rechazar el pedido
+    if (productosInsuficientes.length > 0) {
+      return res.status(400).json({
+        error: "Stock insuficiente para crear el pedido de logística:",
+        productosInsuficientes,
+        sugerencia: "Reduzca las cantidades o espere a que llegue más inventario antes de crear el pedido."
+      });
+    }
+
     const pedidoNumero = await getNextSequenceValue('pedidoNumero');
-    
-    //  AGREGAR: Transformar datos para que coincidan con el modelo
-    const pedidoData = {
-      ...req.body,
+
+    // 2. Transformar datos para que coincidan con el modelo
+    const pedidoFinal = {
+      ...pedidoData,
       pedidoNumero,
-      fechaEntrega: new Date(req.body.fechaEntrega) // Convertir string a Date
+      fechaEntrega: new Date(pedidoData.fechaEntrega) // Convertir string a Date
     };
-    
-    const pedido = new Logistica(pedidoData);
+
+    const pedido = new Logistica(pedidoFinal);
     await pedido.save();
-    
-    //  POPULAR: Devolver datos poblados para el frontend
+
+    // 3. Devolver datos poblados para el frontend
     const pedidoGuardado = await Logistica.findById(pedido._id)
       .populate("cliente")
       .populate("productos.producto");
-      
+
     res.status(201).json(pedidoGuardado);
   } catch (error) {
     console.error('Error creando pedido:', error);

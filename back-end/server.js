@@ -22,6 +22,8 @@ import User from './models/user.model.js';
 import productosRoutes from './routes/productos.routes.js';
 import anticiposRoutes from './routes/anticipos.routes.js';
 import transportistasRoutes from './routes/transportistas.routes.js';
+import pedidosPublicRoutes from './routes/pedidos.public.routes.js';
+import alertasRoutes from './routes/alertas.routes.js';
 import { actualizarProgresoAutomatico, verificarRetrasos } from './controllers/produccion.controller.js';
 
 // Inicialización del servidor
@@ -121,6 +123,7 @@ app.use('/api/ventas', authMiddleware, ventasRoutes);
 app.use('/api/finanzas', authMiddleware, finanzasRoutes);
 app.use('/api/anticipos', authMiddleware, anticiposRoutes);
 app.use('/api/transportistas', authMiddleware, transportistasRoutes);
+app.use('/api/alertas', authMiddleware, alertasRoutes);
 
 // Ruta de salud pública
 app.get('/api/health', (req, res) => {

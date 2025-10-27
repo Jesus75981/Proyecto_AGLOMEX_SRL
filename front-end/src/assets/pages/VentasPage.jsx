@@ -279,7 +279,7 @@ const VentasPage = ({ userRole }) => {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-600">Total Ventas</h3>
-                  <p className="text-2xl font-bold text-gray-800">${totalVentas.toLocaleString()}</p>
+                  <p className="text-2xl font-bold text-gray-800">Bs. {totalVentas.toLocaleString()}</p>
                 </div>
                 <div className="bg-green-100 p-3 rounded-lg">
                   <span className="text-green-600 text-xl">💰</span>
@@ -397,7 +397,7 @@ const VentasPage = ({ userRole }) => {
                             className="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
                           >
                             <div className="font-medium">{producto.nombre}</div>
-                            <div className="text-sm text-gray-500">${producto.precio}</div>
+                            <div className="text-sm text-gray-500">Bs. {producto.precio}</div>
                           </div>
                         ))}
                       </div>
@@ -454,8 +454,8 @@ const VentasPage = ({ userRole }) => {
                 <div className="flex items-end">
                   <div className="bg-gray-100 p-4 rounded-lg w-full">
                     <p className="text-sm text-gray-600">Total a pagar:</p>
-                    <p className="text-2xl font-bold text-green-600">
-                      ${(nuevaVenta.cantidad * nuevaVenta.precio).toLocaleString()}
+                      <p className="text-2xl font-bold text-green-600">
+                      Bs. {(nuevaVenta.cantidad * nuevaVenta.precio).toLocaleString()}
                     </p>
                   </div>
                 </div>
@@ -516,10 +516,10 @@ const VentasPage = ({ userRole }) => {
                         {venta.cantidad}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                        ${venta.precio}
+                        Bs. {venta.precio}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-green-600">
-                        ${venta.total}
+                        Bs. {venta.total}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                         {venta.fecha}

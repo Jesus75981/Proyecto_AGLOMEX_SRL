@@ -365,7 +365,7 @@ const ComprasPage = ({ userRole }) => {
               method: 'POST',
               body: JSON.stringify(compraData)
           });
-          alert(`Compra registrada exitosamente. Total: $${totalCompra.toFixed(2)}. Redirigiendo al módulo de inventario para verificar.`);
+          alert(`Compra registrada exitosamente. Total: Bs. ${totalCompra.toFixed(2)}. Redirigiendo al módulo de inventario para verificar.`);
           // Reset form
           setCompra({
               fecha: new Date().toISOString().split('T')[0],
@@ -598,8 +598,8 @@ const ComprasPage = ({ userRole }) => {
                                     <td className="py-3 px-4">{p.nombre}</td>
                                     <td className="py-3 px-4">{p.codigo}</td>
                                     <td className="text-right py-3 px-4">{p.cantidad}</td>
-                                    <td className="text-right py-3 px-4">${p.costoUnitario.toFixed(2)}</td>
-                                    <td className="text-right py-3 px-4">${p.costoTotal.toFixed(2)}</td>
+                                    <td className="text-right py-3 px-4">Bs. {p.costoUnitario.toFixed(2)}</td>
+                                    <td className="text-right py-3 px-4">Bs. {p.costoTotal.toFixed(2)}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -637,9 +637,9 @@ const ComprasPage = ({ userRole }) => {
                     ))}
                 </div>
                 <div className="text-right mt-6">
-                    <div className="text-gray-600">Total Pagado: <span className="font-bold text-blue-600">${totalPagado.toFixed(2)}</span></div>
-                    <div className="text-2xl font-bold text-gray-800">Total de la Compra: ${totalCompra.toFixed(2)}</div>
-                    <div className="text-red-600 font-semibold">Saldo Pendiente: ${Math.max(0, totalCompra - totalPagado).toFixed(2)}</div>
+                    <div className="text-gray-600">Total Pagado: <span className="font-bold text-blue-600">Bs. {totalPagado.toFixed(2)}</span></div>
+                    <div className="text-2xl font-bold text-gray-800">Total de la Compra: Bs. {totalCompra.toFixed(2)}</div>
+                    <div className="text-red-600 font-semibold">Saldo Pendiente: Bs. {Math.max(0, totalCompra - totalPagado).toFixed(2)}</div>
                 </div>
               </div>
 

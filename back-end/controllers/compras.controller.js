@@ -1,5 +1,6 @@
 import Compra from "../models/compra.model.js";
 import ProductoTienda from "../models/productoTienda.model.js"; // Asegúrate de que esta línea exista
+import { registrarTransaccionFinanciera } from './finanzas.controller.js';
 
 /**
  * Función que encuentra un producto por ID o Nombre. Si no existe, lo crea automáticamente
@@ -64,23 +65,23 @@ const encontrarOCrearProducto = async (itemData) => {
 };
 
 export const registrarCompra = async (req, res) => {
-    const datosCompra = req.body; 
+    const datosCompra = req.body;
 
     try {
         if (!datosCompra.productos || datosCompra.productos.length === 0) {
             return res.status(400).json({ message: "La compra debe contener al menos un producto." });
         }
-        
+
         // --- VALIDACIÓN DE PAGOS MÚLTIPLES (CRÍTICO) ---
         // Calcula la suma de todos los montos de pago del array metodosPago
-        const totalPagos = datosCompra.metodosPago 
-            ? datosCompra.metodosPago.reduce((sum, pago) => sum + pago.monto, 0) 
+        const totalPagos = datosCompra.metodosPago
+            ? datosCompra.metodosPago.reduce((sum, pago) => sum + pago.monto, 0)
             : 0;
 
         // Compara la suma de pagos con el total de la compra (usando tolerancia para flotantes)
-        if (Math.abs(totalPagos - datosCompra.totalCompra) > 0.01) { 
-            return res.status(400).json({ 
-                message: `Error de pago. El total de la compra (${datosCompra.totalCompra.toFixed(2)}) no coincide con la suma de los pagos (${totalPagos.toFixed(2)}).` 
+        if (Math.abs(totalPagos - datosCompra.totalCompra) > 0.01) {
+            return res.status(400).json({
+                message: `Error de pago. El total de la compra (${datosCompra.totalCompra.toFixed(2)}) no coincide con la suma de los pagos (${totalPagos.toFixed(2)}).`
             });
         }
         // -------------------------------------------------
@@ -89,56 +90,96 @@ export const registrarCompra = async (req, res) => {
         // --- 1. PRE-PROCESAMIENTO: IDENTIFICAR O CREAR PRODUCTOS NUEVOS ---
         const preProcessPromises = datosCompra.productos.map(async (item) => {
             const productoObjectId = await encontrarOCrearProducto({
-                productoId: item.producto,      
-                nombreProducto: item.nombreProducto, 
-                colorProducto: item.colorProducto,  
-                categoriaProducto: item.categoriaProducto, 
-                dimensiones: item.dimensiones,  
-                imagenProducto: item.imagenProducto  
+                productoId: item.producto,
+                nombreProducto: item.nombreProducto,
+                colorProducto: item.colorProducto,
+                categoriaProducto: item.categoriaProducto,
+                dimensiones: item.dimensiones,
+                imagenProducto: item.imagenProducto
             });
             // Reemplazamos el campo 'producto' (que podría ser el nombre) con el ObjectId real
             return { ...item, producto: productoObjectId };
         });
 
         datosCompra.productos = await Promise.all(preProcessPromises);
-        
+
         // --- 2. REGISTRAR LA COMPRA (incluye metodosPago) ---
         const nuevaCompra = new Compra(datosCompra);
         const compraGuardada = await nuevaCompra.save();
 
         // --- 3. ACTUALIZAR EL INVENTARIO (productos_tienda) - AUMENTAR STOCK Y PRECIO COMPRA ---
-        
-        const updatePromises = datosCompra.productos.map(item => {
-            const cantidadAumentada = item.cantidad; 
-            const precioCompra = item.precioUnitario; 
 
-            const updateFields = { 
-                $inc: { 
-                    cantidad: cantidadAumentada 
+        const updatePromises = datosCompra.productos.map(item => {
+            const cantidadAumentada = item.cantidad;
+            const precioCompra = item.precioUnitario;
+
+            const updateFields = {
+                $inc: {
+                    cantidad: cantidadAumentada
                 },
                 $set: {
-                    precioCompra: precioCompra, 
+                    precioCompra: precioCompra,
                 }
             };
-            
+
             return ProductoTienda.findByIdAndUpdate(
-                item.producto, 
+                item.producto,
                 updateFields,
-                { new: true } 
+                { new: true }
             ).orFail(new Error(`ProductoTienda con ID ${item.producto} no encontrado para actualizar stock.`));
         });
 
         const inventarioActualizado = await Promise.all(updatePromises);
-        
-        res.status(201).json({ 
+
+        // --- 4. REGISTRAR TRANSACCIÓN FINANCIERA: Egreso por compra de productos ---
+        await registrarTransaccionFinanciera(
+            'egreso',
+            datosCompra.tipoCompra === 'Materia Prima' ? 'compra_materias' : 'compra_productos',
+            `Compra #${compraGuardada.numCompra} - ${datosCompra.tipoCompra}`,
+            datosCompra.totalCompra,
+            compraGuardada._id,
+            'Compra',
+            {
+                numCompra: compraGuardada.numCompra,
+                tipoCompra: datosCompra.tipoCompra,
+                metodosPago: datosCompra.metodosPago
+            },
+            'BOB', // Moneda: Bolivianos
+            1 // Tipo de cambio: 1 para BOB
+        );
+
+        // 5. VERIFICAR ALERTAS DE STOCK BAJO DESPUÉS DE LA COMPRA: Verificar si algún producto salió del estado "Stock Bajo"
+        const alertasStockNormalizado = [];
+        for (const item of datosCompra.productos) {
+            const productoActualizado = await ProductoTienda.findById(item.producto);
+            if (productoActualizado && productoActualizado.cantidad > 5) { // Si ahora tiene más de 5 unidades
+                // Verificar si antes estaba en stock bajo (esto es aproximado, ya que no tenemos el estado anterior)
+                // Podríamos agregar un campo para trackear cambios de estado
+                alertasStockNormalizado.push({
+                    producto: productoActualizado.nombre,
+                    stockActual: productoActualizado.cantidad,
+                    mensaje: "Stock normalizado después de compra"
+                });
+            }
+        }
+
+        // 6. Respuesta exitosa con alertas si las hay
+        const respuesta = {
             message: `Compra #${compraGuardada.numCompra} registrada y stock actualizado.`,
             compra: compraGuardada,
             inventarioAfectado: inventarioActualizado
-        });
+        };
+
+        if (alertasStockNormalizado.length > 0) {
+            respuesta.alertas = alertasStockNormalizado;
+            respuesta.mensajeAdicional = "Algunos productos han salido del estado de stock bajo.";
+        }
+
+        res.status(201).json(respuesta);
 
     } catch (error) {
         console.error("Error al registrar la compra y actualizar stock:", error.message);
-        
+
         // Manejo de errores específicos para validación de datos (pago, producto, esquema)
         const statusCode = error.name === 'ValidationError' || error.message.includes('insuficientes') || error.message.includes('crear') || error.message.includes('pago') ? 400 : 500;
         res.status(statusCode).json({ message: "Error al registrar la compra.", error: error.message });

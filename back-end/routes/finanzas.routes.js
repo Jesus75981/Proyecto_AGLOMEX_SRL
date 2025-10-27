@@ -6,7 +6,10 @@ import {
     createTransaction,
     getTransactionById,
     updateTransaction,
-    deleteTransaction
+    deleteTransaction,
+    getFinancialMetrics,
+    getCashFlow,
+    getExchangeRate
 } from '../controllers/finanzas.controller.js';
 
 const router = express.Router();
@@ -23,8 +26,8 @@ const adminOnly = (req, res, next) => {
 router.get('/resumen', adminOnly, async (req, res) => {
     try {
         const transactions = await Finanzas.find();
-        const ingresos = transactions.filter(t => t.type === 'ingreso').reduce((sum, t) => sum + t.amount, 0);
-        const egresos = transactions.filter(t => t.type === 'egreso').reduce((sum, t) => sum + t.amount, 0);
+        const ingresos = transactions.filter(t => t.type === 'ingreso').reduce((sum, t) => sum + t.amountBOB, 0);
+        const egresos = transactions.filter(t => t.type === 'egreso').reduce((sum, t) => sum + t.amountBOB, 0);
         const balance = ingresos - egresos;
 
         res.json({
@@ -43,6 +46,13 @@ router.get('/historial', (req, res) => {
         data: []
     });
 });
+
+// Nueva ruta para obtener el tipo de cambio
+router.get('/exchange-rate', getExchangeRate);
+
+// Nuevas rutas para métricas y análisis financiero
+router.get('/metrics', getFinancialMetrics);
+router.get('/cashflow', getCashFlow);
 
 // Rutas para transacciones financieras
 router.get('/', getTransactions); // Obtener todas las transacciones

@@ -1,4 +1,5 @@
 import Anticipo from '../models/anticipo.model.js';
+import { registrarTransaccionFinanciera } from './finanzas.controller.js';
 
 export const listarAnticipos = async (req, res) => {
   try {
@@ -13,6 +14,23 @@ export const crearAnticipo = async (req, res) => {
   try {
     const anticipo = new Anticipo(req.body);
     await anticipo.save();
+
+    // REGISTRAR TRANSACCIÓN FINANCIERA: Egreso por anticipo pagado
+    await registrarTransaccionFinanciera(
+      'egreso',
+      'anticipo_pagado',
+      `Anticipo pagado - ${anticipo.monto}`,
+      anticipo.monto,
+      anticipo._id,
+      'Anticipo',
+      {
+        metodoPago: anticipo.metodoPago,
+        banco: anticipo.banco
+      },
+      'BOB', // Moneda: Bolivianos
+      1 // Tipo de cambio: 1 para BOB
+    );
+
     res.status(201).json(anticipo);
   } catch (err) {
     res.status(400).json({ error: err.message });
