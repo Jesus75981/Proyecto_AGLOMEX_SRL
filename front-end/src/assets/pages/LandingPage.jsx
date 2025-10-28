@@ -4,9 +4,9 @@ import { useNavigate } from 'react-router-dom';
 // Componente de Carrusel de Imágenes
 const ImageCarousel = () => {
   const images = [
-    '/aglomex1.jpg',
-    '/aglomex2.jpg',
-    '/aglomex3.jpg',
+    '/Aglomex1.jpg',
+    '/Aglomex2.jpg',
+    '/Aglomex3.jpg',
     '/aglomex4.jpg',
     '/aglomex5.jpg',
     '/aglomex6.jpg',

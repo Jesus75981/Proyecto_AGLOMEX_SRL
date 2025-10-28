@@ -187,3 +187,129 @@ export const confirmarProduccion = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// Nueva función para obtener estadísticas de producción
+export const getEstadisticasProduccion = async (req, res) => {
+  try {
+    const { year, month } = req.query;
+
+    let matchCondition = {};
+
+    if (year) {
+      matchCondition.createdAt = {
+        $gte: new Date(`${year}-01-01`),
+        $lt: new Date(`${parseInt(year) + 1}-01-01`)
+      };
+    }
+
+    if (month && year) {
+      const startDate = new Date(`${year}-${month.padStart(2, '0')}-01`);
+      const endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 1);
+      matchCondition.createdAt = {
+        $gte: startDate,
+        $lt: endDate
+      };
+    }
+
+    // Estadísticas generales de producción
+    const estadisticasGenerales = await Produccion.aggregate([
+      { $match: matchCondition },
+      {
+        $group: {
+          _id: null,
+          totalProducciones: { $sum: 1 },
+          produccionesCompletadas: {
+            $sum: { $cond: [{ $eq: ["$estado", "Completado"] }, 1, 0] }
+          },
+          produccionesEnProgreso: {
+            $sum: { $cond: [{ $eq: ["$estado", "En Progreso"] }, 1, 0] }
+          },
+          produccionesPendientes: {
+            $sum: { $cond: [{ $eq: ["$estado", "Pendiente"] }, 1, 0] }
+          },
+          produccionesRetrasadas: {
+            $sum: { $cond: [{ $eq: ["$estado", "Retrasado"] }, 1, 0] }
+          },
+          totalUnidadesProducidas: { $sum: "$cantidad" },
+          tiempoPromedioEstimado: { $avg: "$tiempoEstimado" },
+          tiempoPromedioReal: { $avg: "$tiempoTranscurrido" }
+        }
+      }
+    ]);
+
+    // Producción por mes
+    const produccionMensual = await Produccion.aggregate([
+      { $match: matchCondition },
+      {
+        $group: {
+          _id: {
+            year: { $year: "$createdAt" },
+            month: { $month: "$createdAt" }
+          },
+          totalProducciones: { $sum: 1 },
+          unidadesProducidas: { $sum: "$cantidad" },
+          tiempoTotalEstimado: { $sum: "$tiempoEstimado" },
+          tiempoTotalReal: { $sum: "$tiempoTranscurrido" }
+        }
+      },
+      {
+        $sort: { "_id.year": 1, "_id.month": 1 }
+      }
+    ]);
+
+    // Producción por estado
+    const produccionPorEstado = await Produccion.aggregate([
+      { $match: matchCondition },
+      {
+        $group: {
+          _id: "$estado",
+          count: { $sum: 1 },
+          unidadesTotales: { $sum: "$cantidad" }
+        }
+      }
+    ]);
+
+    // Eficiencia por producción (completadas)
+    const eficienciaProduccion = await Produccion.aggregate([
+      {
+        $match: {
+          ...matchCondition,
+          estado: "Completado",
+          tiempoTranscurrido: { $gt: 0 }
+        }
+      },
+      {
+        $project: {
+          nombre: 1,
+          eficiencia: {
+            $multiply: [
+              { $divide: ["$tiempoEstimado", "$tiempoTranscurrido"] },
+              100
+            ]
+          },
+          tiempoEstimado: 1,
+          tiempoTranscurrido: 1
+        }
+      },
+      { $sort: { eficiencia: -1 } },
+      { $limit: 10 }
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        estadisticasGenerales: estadisticasGenerales[0] || {},
+        produccionMensual,
+        produccionPorEstado,
+        eficienciaProduccion
+      }
+    });
+  } catch (error) {
+    console.error("Error al obtener estadísticas de producción:", error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener estadísticas de producción',
+      error: error.message
+    });
+  }
+};

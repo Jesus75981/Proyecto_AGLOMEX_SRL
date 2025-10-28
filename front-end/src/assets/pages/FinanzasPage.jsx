@@ -34,6 +34,7 @@ const FinanzasPage = ({ userRole }) => {
   });
   const [editingId, setEditingId] = useState(null);
   const [summary, setSummary] = useState({ ingresos: 0, egresos: 0, balance: 0 });
+  const [errors, setErrors] = useState({});
 
   // Cargar transacciones al montar el componente
   useEffect(() => {
@@ -65,8 +66,39 @@ const FinanzasPage = ({ userRole }) => {
     }
   };
 
+  const validarTransaccion = () => {
+    const nuevosErrores = {};
+
+    if (!formData.description.trim()) {
+      nuevosErrores.description = 'La descripción es requerida';
+    } else if (formData.description.trim().length < 3) {
+      nuevosErrores.description = 'La descripción debe tener al menos 3 caracteres';
+    }
+
+    if (!formData.amount || formData.amount <= 0) {
+      nuevosErrores.amount = 'El monto debe ser mayor a 0';
+    } else if (formData.amount > 1000000) {
+      nuevosErrores.amount = 'El monto no puede ser mayor a $1,000,000';
+    }
+
+    if (!formData.date) {
+      nuevosErrores.date = 'La fecha es requerida';
+    } else {
+      const fechaSeleccionada = new Date(formData.date);
+      const hoy = new Date();
+      if (fechaSeleccionada > hoy) {
+        nuevosErrores.date = 'La fecha no puede ser futura';
+      }
+    }
+
+    setErrors(nuevosErrores);
+    return Object.keys(nuevosErrores).length === 0;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!validarTransaccion()) return;
+
     try {
       if (editingId) {
         await apiFetch(`/${editingId}`, {
@@ -86,6 +118,7 @@ const FinanzasPage = ({ userRole }) => {
         amount: '',
         date: new Date().toISOString().split('T')[0]
       });
+      setErrors({});
       setShowForm(false);
       loadTransactions();
       if (userRole === 'admin') loadSummary();
@@ -119,9 +152,9 @@ const FinanzasPage = ({ userRole }) => {
   };
 
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('es-MX', {
+    return new Intl.NumberFormat('es-BO', {
       style: 'currency',
-      currency: 'MXN'
+      currency: 'BOB'
     }).format(amount);
   };
 
@@ -208,10 +241,13 @@ const FinanzasPage = ({ userRole }) => {
                     step="0.01"
                     value={formData.amount}
                     onChange={(e) => setFormData({...formData, amount: parseFloat(e.target.value)})}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent ${
+                      errors.amount ? 'border-red-500' : 'border-gray-300'
+                    }`}
                     placeholder="0.00"
                     required
                   />
+                  {errors.amount && <p className="text-red-500 text-sm mt-1">{errors.amount}</p>}
                 </div>
               </div>
               <div>
@@ -220,10 +256,13 @@ const FinanzasPage = ({ userRole }) => {
                   type="text"
                   value={formData.description}
                   onChange={(e) => setFormData({...formData, description: e.target.value})}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent ${
+                    errors.description ? 'border-red-500' : 'border-gray-300'
+                  }`}
                   placeholder="Descripción de la transacción"
                   required
                 />
+                {errors.description && <p className="text-red-500 text-sm mt-1">{errors.description}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
@@ -231,9 +270,12 @@ const FinanzasPage = ({ userRole }) => {
                   type="date"
                   value={formData.date}
                   onChange={(e) => setFormData({...formData, date: e.target.value})}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent ${
+                    errors.date ? 'border-red-500' : 'border-gray-300'
+                  }`}
                   required
                 />
+                {errors.date && <p className="text-red-500 text-sm mt-1">{errors.date}</p>}
               </div>
               <div className="flex gap-4">
                 <button

@@ -455,7 +455,7 @@ const InventarioPage = ({ userRole }) => {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-600">Valor Inventario</h3>
-                  <p className="text-2xl font-bold text-gray-800">${valorTotalInventario.toFixed(2)}</p>
+                  <p className="text-2xl font-bold text-gray-800">Bs {valorTotalInventario.toFixed(2)}</p>
                 </div>
                 <div className="bg-blue-100 p-3 rounded-lg">
                   <span className="text-blue-600 text-xl">💰</span>
@@ -833,9 +833,9 @@ const InventarioPage = ({ userRole }) => {
                             </span>
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                            <div className="font-semibold">${(item.cantidad * item.precioCosto).toFixed(2)}</div>
+                            <div className="font-semibold">Bs {(item.cantidad * item.precioCosto).toFixed(2)}</div>
                             <div className="text-xs text-gray-500">
-                              Costo: ${item.precioCosto}
+                              Costo: Bs {item.precioCosto}
                             </div>
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">

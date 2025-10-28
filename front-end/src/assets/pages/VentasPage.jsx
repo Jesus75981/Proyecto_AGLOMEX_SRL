@@ -72,6 +72,16 @@ const VentasPage = ({ userRole }) => {
     cargarDatos();
   }, []);
 
+  // Función para generar numFactura único
+  const generarNumFactura = () => {
+    const fecha = new Date();
+    const year = fecha.getFullYear();
+    const month = String(fecha.getMonth() + 1).padStart(2, '0');
+    const day = String(fecha.getDate()).padStart(2, '0');
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    return `FACT-${year}${month}${day}-${random}`;
+  };
+
   const [nuevaVenta, setNuevaVenta] = useState({
     cliente: '',
     producto: '',
@@ -79,11 +89,12 @@ const VentasPage = ({ userRole }) => {
     precio: 0,
     fecha: new Date().toISOString().split('T')[0],
     metodoPago: 'Efectivo',
-    numFactura: '',
+    numFactura: generarNumFactura(),
     observaciones: ''
   });
 
   const [errors, setErrors] = useState({});
+  const [clienteErrors, setClienteErrors] = useState({});
   const [showForm, setShowForm] = useState(false);
   const [productoSearchTerm, setProductoSearchTerm] = useState('');
   const [showProductoDropdown, setShowProductoDropdown] = useState(false);
@@ -93,6 +104,16 @@ const VentasPage = ({ userRole }) => {
   const [selectedCliente, setSelectedCliente] = useState(null);
   const [loading, setLoading] = useState(false);
   const [keepClientData, setKeepClientData] = useState(false);
+  const [showCreateClientForm, setShowCreateClientForm] = useState(false);
+  const [nuevoCliente, setNuevoCliente] = useState({
+    nombre: '',
+    empresa: '',
+    direccion: '',
+    telefono: '',
+    email: '',
+    nit: '',
+    ci: ''
+  });
 
   // Productos predefinidos con precios (temporal hasta conectar con API)
   const productosPredefinidos = [
@@ -108,9 +129,9 @@ const VentasPage = ({ userRole }) => {
 
   // Función de búsqueda
   const ventasFiltradas = ventas.filter(venta =>
-    venta.cliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    venta.producto.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    venta.estado.toLowerCase().includes(searchTerm.toLowerCase())
+    (venta.cliente?.nombre || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (venta.productos && venta.productos.length > 0 ? (venta.productos[0].producto?.nombre || '') : '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (venta.estado || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Productos filtrados para el dropdown searchable (usando productos de API)
@@ -122,9 +143,8 @@ const VentasPage = ({ userRole }) => {
   const validarVenta = () => {
     const nuevosErrores = {};
 
-    if (!nuevaVenta.cliente.trim()) {
-      nuevosErrores.cliente = 'El cliente es requerido';
-    } else if (nuevaVenta.cliente.trim().length < 3) {
+    // Cliente es opcional ahora
+    if (nuevaVenta.cliente.trim() && nuevaVenta.cliente.trim().length < 3) {
       nuevosErrores.cliente = 'El nombre debe tener al menos 3 caracteres';
     }
 
@@ -158,6 +178,46 @@ const VentasPage = ({ userRole }) => {
     return Object.keys(nuevosErrores).length === 0;
   };
 
+  // ✅ VALIDACIONES PARA FORMULARIO DE CLIENTE
+  const validarCliente = () => {
+    const nuevosErrores = {};
+
+    if (!nuevoCliente.nombre.trim()) {
+      nuevosErrores.nombre = 'El nombre es requerido';
+    } else if (nuevoCliente.nombre.trim().length < 3) {
+      nuevosErrores.nombre = 'El nombre debe tener al menos 3 caracteres';
+    } else if (nuevoCliente.nombre.trim().length > 100) {
+      nuevosErrores.nombre = 'El nombre no puede tener más de 100 caracteres';
+    }
+
+    if (!nuevoCliente.direccion.trim()) {
+      nuevosErrores.direccion = 'La dirección es requerida';
+    } else if (nuevoCliente.direccion.trim().length < 10) {
+      nuevosErrores.direccion = 'La dirección debe tener al menos 10 caracteres';
+    }
+
+    if (!nuevoCliente.telefono.trim()) {
+      nuevosErrores.telefono = 'El teléfono es requerido';
+    } else if (!/^[0-9+\-\s()]{7,15}$/.test(nuevoCliente.telefono.trim())) {
+      nuevosErrores.telefono = 'El teléfono debe tener entre 7 y 15 caracteres numéricos';
+    }
+
+    if (nuevoCliente.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nuevoCliente.email)) {
+      nuevosErrores.email = 'El email debe tener un formato válido';
+    }
+
+    if (nuevoCliente.nit && !/^[0-9]{7,15}$/.test(nuevoCliente.nit)) {
+      nuevosErrores.nit = 'El NIT debe contener solo números (7-15 dígitos)';
+    }
+
+    if (nuevoCliente.ci && !/^[0-9]{7,15}$/.test(nuevoCliente.ci)) {
+      nuevosErrores.ci = 'El CI debe contener solo números (7-15 dígitos)';
+    }
+
+    setClienteErrors(nuevosErrores);
+    return Object.keys(nuevosErrores).length === 0;
+  };
+
   // Actualizar precio cuando se selecciona producto
   const handleProductoChange = (productoNombre) => {
     const producto = productos.find(p => p.nombre === productoNombre);
@@ -168,16 +228,115 @@ const VentasPage = ({ userRole }) => {
     });
   };
 
+  // Función para crear un nuevo cliente
+  const crearCliente = async () => {
+    if (!validarCliente()) return;
+
+    try {
+      const clienteData = {
+        nombre: nuevoCliente.nombre.trim(),
+        empresa: nuevoCliente.empresa.trim() || '',
+        direccion: nuevoCliente.direccion.trim(),
+        telefono: nuevoCliente.telefono.trim(),
+        email: nuevoCliente.email.trim() || '',
+        nit: nuevoCliente.nit.trim() || '',
+        ci: nuevoCliente.ci.trim() || ''
+      };
+
+      const clienteCreado = await apiFetch('/clientes', {
+        method: 'POST',
+        body: JSON.stringify(clienteData)
+      });
+
+      // Actualizar lista de clientes localmente
+      setClientes([...clientes, clienteCreado]);
+
+      // Limpiar formulario de cliente
+      setNuevoCliente({
+        nombre: '',
+        empresa: '',
+        direccion: '',
+        telefono: '',
+        email: '',
+        nit: '',
+        ci: ''
+      });
+      setClienteErrors({});
+      setShowCreateClientForm(false);
+
+      // Mostrar mensaje de éxito
+      alert('✅ Cliente creado exitosamente');
+
+      return clienteCreado;
+    } catch (error) {
+      console.error('Error al crear cliente:', error);
+      alert(`Error al crear cliente: ${error.message}`);
+      throw error;
+    }
+  };
+
   // ✅ AGREGAR NUEVA VENTA
   const agregarVenta = async () => {
     if (!validarVenta()) return;
 
     try {
+      // Buscar el producto seleccionado para obtener su ID
+      const productoSeleccionado = productos.find(p => p.nombre === nuevaVenta.producto);
+
+      if (!productoSeleccionado) {
+        alert('Producto no encontrado. Por favor, selecciona un producto válido.');
+        return;
+      }
+
+      let clienteSeleccionado = null;
+
+      // Solo buscar o crear cliente si se proporcionó un nombre de cliente
+      if (nuevaVenta.cliente.trim()) {
+        clienteSeleccionado = clientes.find(c => c.nombre === nuevaVenta.cliente);
+
+        // Si no se encuentra el cliente, crearlo automáticamente
+        if (!clienteSeleccionado) {
+          try {
+            // Crear cliente automáticamente con datos básicos
+            const clienteData = {
+              nombre: nuevaVenta.cliente.trim(),
+              empresa: '',
+              direccion: 'Dirección por definir',
+              telefono: 'Teléfono por definir',
+              email: '',
+              nit: '',
+              ci: ''
+            };
+
+            const clienteCreado = await apiFetch('/clientes', {
+              method: 'POST',
+              body: JSON.stringify(clienteData)
+            });
+
+            // Actualizar lista de clientes localmente
+            setClientes([...clientes, clienteCreado]);
+            clienteSeleccionado = clienteCreado;
+
+            // Mostrar mensaje informativo
+            alert(`✅ Cliente "${nuevaVenta.cliente}" creado automáticamente con datos básicos. Puedes actualizar su información más tarde.`);
+
+          } catch (error) {
+            console.error('Error al crear cliente automáticamente:', error);
+            alert(`Error al crear cliente automáticamente: ${error.message}`);
+            return;
+          }
+        }
+      }
+
       const ventaData = {
-        cliente: nuevaVenta.cliente,
-        producto: nuevaVenta.producto,
-        cantidad: nuevaVenta.cantidad,
-        precio: nuevaVenta.precio,
+        numVenta: Date.now(), // Generar número único de venta
+        cliente: clienteSeleccionado ? clienteSeleccionado._id : null, // ID del cliente o null si no hay cliente
+        productos: [{
+          producto: productoSeleccionado._id, // ID del producto
+          cantidad: nuevaVenta.cantidad,
+          precioUnitario: nuevaVenta.precio,
+          precioTotal: nuevaVenta.cantidad * nuevaVenta.precio
+        }],
         fecha: nuevaVenta.fecha,
         metodoPago: nuevaVenta.metodoPago,
         numFactura: nuevaVenta.numFactura,
@@ -203,7 +362,7 @@ const VentasPage = ({ userRole }) => {
         precio: 0,
         fecha: new Date().toISOString().split('T')[0],
         metodoPago: 'Efectivo',
-        numFactura: '',
+        numFactura: generarNumFactura(),
         observaciones: ''
       });
       setProductoSearchTerm('');
@@ -214,15 +373,23 @@ const VentasPage = ({ userRole }) => {
       alert('✅ Venta registrada exitosamente');
     } catch (error) {
       console.error('Error al registrar venta:', error);
-      alert('Error al registrar la venta. Inténtalo de nuevo.');
+      alert(`Error al registrar la venta: ${error.message}`);
     }
   };
 
   // Cambiar estado de venta
-  const cambiarEstadoVenta = (id, nuevoEstado) => {
-    setVentas(ventas.map(venta => 
-      venta.id === id ? { ...venta, estado: nuevoEstado } : venta
-    ));
+  const cambiarEstadoVenta = async (id, nuevoEstado) => {
+    try {
+      // Aquí podrías hacer una llamada a la API para actualizar el estado en el backend
+      // Por ahora, solo actualizamos localmente
+      setVentas(ventas.map(venta =>
+        venta._id === id ? { ...venta, estado: nuevoEstado } : venta
+      ));
+      alert(`Estado de venta actualizado a ${nuevoEstado}`);
+    } catch (error) {
+      console.error('Error al cambiar estado de venta:', error);
+      alert('Error al actualizar el estado de la venta');
+    }
   };
 
   // Eliminar venta (solo admin)
@@ -234,7 +401,12 @@ const VentasPage = ({ userRole }) => {
   };
 
   // Calcular totales
-  const totalVentas = ventas.reduce((sum, venta) => sum + venta.total, 0);
+  const totalVentas = ventas.reduce((sum, venta) => {
+    if (venta.productos && venta.productos.length > 0) {
+      return sum + venta.productos.reduce((subSum, producto) => subSum + (producto.precioTotal || 0), 0);
+    }
+    return sum;
+  }, 0);
   const ventasCompletadas = ventas.filter(v => v.estado === 'Completada').length;
   const ventasPendientes = ventas.filter(v => v.estado === 'Pendiente').length;
 
@@ -330,7 +502,7 @@ const VentasPage = ({ userRole }) => {
               <input
                 type="text"
                 placeholder="Buscar por cliente, producto o estado..."
-                value={searchTerm}
+                value={searchTerm ?? ''}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 w-80"
               />
@@ -339,22 +511,157 @@ const VentasPage = ({ userRole }) => {
               </div>
             </div>
 
-            <button
-              onClick={() => setShowForm(!showForm)}
-              className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition duration-200 font-semibold"
-            >
-              {showForm ? 'Cancelar' : '+ Nueva Venta'}
-            </button>
+            <div className="flex space-x-4">
+              <button
+                onClick={() => setShowCreateClientForm(!showCreateClientForm)}
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition duration-200 font-semibold"
+              >
+                {showCreateClientForm ? 'Cancelar Cliente' : '+ Nuevo Cliente'}
+              </button>
+              <button
+                onClick={() => setShowForm(!showForm)}
+                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition duration-200 font-semibold"
+              >
+                {showForm ? 'Cancelar Venta' : '+ Nueva Venta'}
+              </button>
+            </div>
           </div>
+
+          {/* Formulario de Crear Cliente */}
+          {showCreateClientForm && (
+            <div className="bg-white rounded-xl shadow-md p-6 mb-8">
+              <h2 className="text-2xl font-semibold text-gray-800 mb-6">Crear Nuevo Cliente</h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Nombre *</label>
+                  <input
+                    type="text"
+                    value={nuevoCliente.nombre}
+                    onChange={(e) => setNuevoCliente({...nuevoCliente, nombre: e.target.value})}
+                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
+                      clienteErrors.nombre ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="Nombre completo del cliente"
+                  />
+                  {clienteErrors.nombre && <p className="text-red-500 text-sm mt-1">{clienteErrors.nombre}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Empresa / Institución</label>
+                  <input
+                    type="text"
+                    value={nuevoCliente.empresa}
+                    onChange={(e) => setNuevoCliente({...nuevoCliente, empresa: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="Nombre de la empresa (opcional)"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Dirección *</label>
+                  <input
+                    type="text"
+                    value={nuevoCliente.direccion}
+                    onChange={(e) => setNuevoCliente({...nuevoCliente, direccion: e.target.value})}
+                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
+                      clienteErrors.direccion ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="Dirección completa"
+                  />
+                  {clienteErrors.direccion && <p className="text-red-500 text-sm mt-1">{clienteErrors.direccion}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Teléfono *</label>
+                  <input
+                    type="text"
+                    value={nuevoCliente.telefono}
+                    onChange={(e) => setNuevoCliente({...nuevoCliente, telefono: e.target.value})}
+                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
+                      clienteErrors.telefono ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="Número de teléfono"
+                  />
+                  {clienteErrors.telefono && <p className="text-red-500 text-sm mt-1">{clienteErrors.telefono}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                  <input
+                    type="email"
+                    value={nuevoCliente.email}
+                    onChange={(e) => setNuevoCliente({...nuevoCliente, email: e.target.value})}
+                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
+                      clienteErrors.email ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="correo@ejemplo.com"
+                  />
+                  {clienteErrors.email && <p className="text-red-500 text-sm mt-1">{clienteErrors.email}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">NIT</label>
+                  <input
+                    type="text"
+                    value={nuevoCliente.nit}
+                    onChange={(e) => setNuevoCliente({...nuevoCliente, nit: e.target.value})}
+                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
+                      clienteErrors.nit ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="Número de NIT"
+                  />
+                  {clienteErrors.nit && <p className="text-red-500 text-sm mt-1">{clienteErrors.nit}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Carnet de Identidad</label>
+                  <input
+                    type="text"
+                    value={nuevoCliente.ci}
+                    onChange={(e) => setNuevoCliente({...nuevoCliente, ci: e.target.value})}
+                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
+                      clienteErrors.ci ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="Número de CI"
+                  />
+                  {clienteErrors.ci && <p className="text-red-500 text-sm mt-1">{clienteErrors.ci}</p>}
+                </div>
+              </div>
+
+              <div className="flex space-x-4 mt-6">
+                <button
+                  onClick={async () => {
+                    try {
+                      const clienteCreado = await crearCliente();
+                      // Después de crear el cliente, intentar registrar la venta nuevamente
+                      await agregarVenta();
+                    } catch (error) {
+                      // Error ya manejado en crearCliente
+                    }
+                  }}
+                  className="bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 transition duration-200 font-semibold shadow-md"
+                >
+                  Crear Cliente y Registrar Venta
+                </button>
+                <button
+                  onClick={() => setShowCreateClientForm(false)}
+                  className="bg-gray-500 text-white py-3 px-6 rounded-lg hover:bg-gray-600 transition duration-200 font-semibold"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Formulario de Nueva Venta */}
           {showForm && (
             <div className="bg-white rounded-xl shadow-md p-6 mb-8">
               <h2 className="text-2xl font-semibold text-gray-800 mb-6">Registrar Nueva Venta</h2>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Cliente *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Cliente (Opcional)</label>
                   <input
                     type="text"
                     value={nuevaVenta.cliente}
@@ -362,7 +669,7 @@ const VentasPage = ({ userRole }) => {
                     className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
                       errors.cliente ? 'border-red-500' : 'border-gray-300'
                     }`}
-                    placeholder="Nombre completo del cliente"
+                    placeholder="Nombre completo del cliente (opcional)"
                   />
                   {errors.cliente && <p className="text-red-500 text-sm mt-1">{errors.cliente}</p>}
                 </div>
@@ -501,32 +808,32 @@ const VentasPage = ({ userRole }) => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {ventasFiltradas.map((venta) => (
-                    <tr key={venta.id} className="hover:bg-gray-50">
+                  {ventasFiltradas.map((venta, index) => (
+                    <tr key={venta._id || index} className="hover:bg-gray-50">
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                        #{venta.id}
+                        #{venta.numVenta || venta._id}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {venta.cliente}
+                        {venta.cliente?.nombre || 'Sin cliente'}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                        {venta.producto}
+                        {venta.productos?.[0]?.producto?.nombre || 'Sin producto'}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                        {venta.cantidad}
+                        {venta.productos?.[0]?.cantidad || 0}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                        Bs. {venta.precio}
+                        Bs. {venta.productos?.[0]?.precioUnitario || 0}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-green-600">
-                        Bs. {venta.total}
+                        Bs. {venta.productos?.[0]?.precioTotal || 0}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                        {venta.fecha}
+                        {new Date(venta.fecha).toLocaleDateString('es-ES')}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          venta.estado === 'Completada' 
+                          venta.estado === 'Completada'
                             ? 'bg-green-100 text-green-800'
                             : 'bg-yellow-100 text-yellow-800'
                         }`}>
@@ -537,7 +844,7 @@ const VentasPage = ({ userRole }) => {
                         <div className="flex space-x-2">
                           {venta.estado === 'Pendiente' && (
                             <button
-                              onClick={() => cambiarEstadoVenta(venta.id, 'Completada')}
+                              onClick={() => cambiarEstadoVenta(venta._id, 'Completada')}
                               className="text-green-600 hover:text-green-900 text-xs"
                             >
                               Completar
@@ -545,7 +852,7 @@ const VentasPage = ({ userRole }) => {
                           )}
                           {userRole === 'admin' && (
                             <button
-                              onClick={() => eliminarVenta(venta.id)}
+                              onClick={() => eliminarVenta(venta._id)}
                               className="text-red-600 hover:text-red-900 text-xs"
                             >
                               Eliminar

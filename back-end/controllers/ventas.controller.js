@@ -42,6 +42,9 @@ export const registrarVenta = async (req, res) => {
         const nuevaVenta = new Venta(ventaData);
         await nuevaVenta.save();
 
+        // Poblar los datos del cliente y productos para la respuesta
+        await nuevaVenta.populate("cliente productos.producto");
+
         // 3. Actualizar el inventario y ventasAcumuladas (operaciones atómicas)
         const operacionesActualizacion = productosVendidos.map(item => {
             const { producto: productoId, cantidad } = item;
@@ -115,8 +118,25 @@ export const registrarVenta = async (req, res) => {
 };
 
 export const listarVentas = async (req, res) => {
-  const ventas = await Venta.find().populate("cliente productos.producto");
-  res.json(ventas);
+  try {
+    const ventas = await Venta.find()
+      .populate("cliente productos.producto")
+      .sort({ fecha: -1 }); // Ordenar por fecha descendente (más recientes primero)
+
+    // Agregar campo 'estado' basado en la lógica de negocio
+    const ventasConEstado = ventas.map(venta => ({
+      ...venta.toObject(),
+      estado: 'Completada' // Todas las ventas registradas se consideran completadas
+    }));
+
+    res.json(ventasConEstado);
+  } catch (error) {
+    console.error("Error al listar ventas:", error);
+    res.status(500).json({
+      msg: "Error interno del servidor al obtener las ventas.",
+      error: error.message
+    });
+  }
 };
 
 // Nueva función para obtener ventas por día
@@ -147,6 +167,145 @@ export const getVentasByDay = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error al obtener las ventas del día',
+      error: error.message
+    });
+  }
+};
+
+// Nueva función para obtener estadísticas de ventas mensuales y anuales
+export const getEstadisticasVentas = async (req, res) => {
+  try {
+    const { year, month } = req.query;
+
+    let matchCondition = {};
+
+    if (year) {
+      matchCondition.fecha = {
+        $gte: new Date(`${year}-01-01`),
+        $lt: new Date(`${parseInt(year) + 1}-01-01`)
+      };
+    }
+
+    if (month && year) {
+      const startDate = new Date(`${year}-${month.padStart(2, '0')}-01`);
+      const endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 1);
+      matchCondition.fecha = {
+        $gte: startDate,
+        $lt: endDate
+      };
+    }
+
+    // Agregación para obtener estadísticas mensuales
+    const ventasMensuales = await Venta.aggregate([
+      { $match: matchCondition },
+      {
+        $group: {
+          _id: {
+            year: { $year: "$fecha" },
+            month: { $month: "$fecha" }
+          },
+          totalVentas: { $sum: 1 },
+          totalIngresos: {
+            $sum: {
+              $reduce: {
+                input: "$productos",
+                initialValue: 0,
+                in: { $add: ["$$value", { $multiply: ["$$this.cantidad", "$$this.precioUnitario"] }] }
+              }
+            }
+          },
+          productosVendidos: {
+            $sum: {
+              $reduce: {
+                input: "$productos",
+                initialValue: 0,
+                in: { $add: ["$$value", "$$this.cantidad"] }
+              }
+            }
+          }
+        }
+      },
+      {
+        $sort: { "_id.year": 1, "_id.month": 1 }
+      }
+    ]);
+
+    // Agregación para obtener estadísticas anuales
+    const ventasAnuales = await Venta.aggregate([
+      { $match: matchCondition },
+      {
+        $group: {
+          _id: { year: { $year: "$fecha" } },
+          totalVentas: { $sum: 1 },
+          totalIngresos: {
+            $sum: {
+              $reduce: {
+                input: "$productos",
+                initialValue: 0,
+                in: { $add: ["$$value", { $multiply: ["$$this.cantidad", "$$this.precioUnitario"] }] }
+              }
+            }
+          },
+          productosVendidos: {
+            $sum: {
+              $reduce: {
+                input: "$productos",
+                initialValue: 0,
+                in: { $add: ["$$value", "$$this.cantidad"] }
+              }
+            }
+          }
+        }
+      },
+      {
+        $sort: { "_id.year": 1 }
+      }
+    ]);
+
+    // Estadísticas por producto más vendido
+    const productosMasVendidos = await Venta.aggregate([
+      { $match: matchCondition },
+      { $unwind: "$productos" },
+      {
+        $group: {
+          _id: "$productos.producto",
+          totalVendido: { $sum: "$productos.cantidad" },
+          totalIngresos: { $sum: { $multiply: ["$productos.cantidad", "$productos.precioUnitario"] } }
+        }
+      },
+      {
+        $lookup: {
+          from: "productotiendas",
+          localField: "_id",
+          foreignField: "_id",
+          as: "productoInfo"
+        }
+      },
+      { $unwind: "$productoInfo" },
+      {
+        $project: {
+          nombre: "$productoInfo.nombre",
+          totalVendido: 1,
+          totalIngresos: 1
+        }
+      },
+      { $sort: { totalVendido: -1 } },
+      { $limit: 10 }
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        ventasMensuales,
+        ventasAnuales,
+        productosMasVendidos
+      }
+    });
+  } catch (error) {
+    console.error("Error al obtener estadísticas de ventas:", error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener estadísticas de ventas',
       error: error.message
     });
   }

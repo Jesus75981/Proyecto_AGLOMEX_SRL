@@ -111,6 +111,19 @@ const HomePage = ({ userRole, onLogout }) => {
             </div>
           </Link>
 
+          {/* Dashboard Ejecutivo Card */}
+          <Link to="/dashboard" className="group transform transition-all duration-300 hover:scale-105">
+            <div className="flex flex-col items-center p-8 bg-white rounded-2xl shadow-xl border-t-4 border-blue-500">
+              <span className="text-4xl text-blue-500 mb-4 transition-transform duration-300 group-hover:rotate-6">
+                📈
+              </span>
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">Dashboard Ejecutivo</h2>
+              <p className="text-sm text-gray-500 text-center">
+                Visualiza gráficas de ventas y producción.
+              </p>
+            </div>
+          </Link>
+
           {/* Inventory Card */}
           <Link to="/inventario" className="group transform transition-all duration-300 hover:scale-105">
             <div className="flex flex-col items-center p-8 bg-white rounded-2xl shadow-xl border-t-4 border-black">

@@ -12,8 +12,8 @@ const ventaSchema = new mongoose.Schema({
   },
   cliente: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "User", // relación con user.model.js
-    required: true
+    ref: "Cliente", // relación con cliente.model.js
+    required: false // Opcional para ventas sin cliente registrado
   },
   productos: [
     {
