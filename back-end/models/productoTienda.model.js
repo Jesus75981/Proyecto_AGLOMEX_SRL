@@ -5,14 +5,12 @@ import crypto from 'crypto';
 const productoTiendaSchema = new mongoose.Schema({
  idProductoTienda: {
     type: String,
-    required: true,
-    unique: true
+    required: true
   },
   nombre: {
     type: String,
     required: true,
-    trim: true,
-    unique: true // Es buena práctica que el nombre también sea único
+    trim: true
   },
   descripcion: {
     type: String,

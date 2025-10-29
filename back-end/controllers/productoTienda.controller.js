@@ -14,36 +14,44 @@ export const crearProducto = async (req, res) => {
     // Los datos que se esperan en req.body son:
     // { nombre: String, imagen: String, dimensiones: { alto: N, ancho: N, profundidad: N } }
     try {
-        // 1. Generar el código interno usando el nombre (requerido)
-        if (!req.body.nombre) {
-            return res.status(400).json({ error: 'El campo "nombre" es obligatorio para generar el código interno.' });
+        // 1. Validación adicional en el controlador
+        const { nombre, color, categoria } = req.body;
+
+        if (!nombre || nombre.trim().length === 0) {
+            return res.status(400).json({ error: 'El campo "nombre" es obligatorio y no puede estar vacío.' });
         }
-        
+
+        if (!color || color.trim().length === 0) {
+            return res.status(400).json({ error: 'El campo "color" es obligatorio y no puede estar vacío.' });
+        }
+
+        if (!categoria || categoria.trim().length === 0) {
+            return res.status(400).json({ error: 'El campo "categoria" es obligatorio y no puede estar vacío.' });
+        }
+
+        // 2. Generar el código interno usando el nombre (requerido)
         const idProductoTienda = generarCodigoInterno(req.body.nombre);
-        
-        // 2. Combinar los datos del body con el código generado
-        const productoData = { 
-            ...req.body, 
+
+        // 3. Combinar los datos del body con el código generado
+        const productoData = {
+            ...req.body,
             idProductoTienda: idProductoTienda,
             // Los campos 'precioVenta', 'cantidad' y 'descripcion'
             // se omiten si no se envían, y se permiten vacíos por el esquema.
         };
-        
-        // 3. Crear y guardar el producto
+
+        // 4. Crear y guardar el producto
         const producto = new ProductoTienda(productoData);
         await producto.save();
 
-        // 4. Respuesta exitosa
+        // 5. Respuesta exitosa
         res.status(201).json(producto);
     } catch (err) {
+        console.log('Error al crear producto:', err); // Agregar logging para depurar
         // Mongoose Validation Errors (por ejemplo, si falta 'imagen' o 'dimensiones')
         if (err.name === 'ValidationError') {
             const errors = Object.values(err.errors).map(val => val.message);
             return res.status(400).json({ error: errors.join(', ') });
-        }
-        // Duplicate key error (si el nombre o idProductoTienda ya existen)
-        if (err.code === 11000) {
-            return res.status(400).json({ error: 'El nombre o código interno de este producto ya existe.' });
         }
         // Otros errores del servidor
         res.status(500).json({ error: 'Error interno del servidor al crear producto.' });

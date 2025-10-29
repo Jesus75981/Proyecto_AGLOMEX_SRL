@@ -246,6 +246,10 @@ const ComprasPage = ({ userRole }) => {
         alert('Nombre, Categoría y Color son requeridos para el nuevo producto.');
         return;
     }
+    if (nuevoProducto.categoria === 'Mesas') {
+        alert('La categoría "Mesas" no es válida. Selecciona "Mesa" en su lugar.');
+        return;
+    }
     try {
         // Filtrar campos vacíos para evitar errores de ObjectId
         const productoData = { ...nuevoProducto };
@@ -556,10 +560,16 @@ const ComprasPage = ({ userRole }) => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <input type="text" placeholder="Nombre del producto" value={nuevoProducto.nombre} onChange={(e) => setNuevoProducto({...nuevoProducto, nombre: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
 
-                      <input list="categorias-list" type="text" placeholder="Categoría" value={nuevoProducto.categoria} onChange={(e) => setNuevoProducto({...nuevoProducto, categoria: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
-                      <datalist id="categorias-list">
-                        {categorias.map(cat => <option key={cat} value={cat} />)}
-                      </datalist>
+                      <select value={nuevoProducto.categoria} onChange={(e) => setNuevoProducto({...nuevoProducto, categoria: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg">
+                        <option value="">-- Seleccionar Categoría --</option>
+                        <option value="Silla">Silla</option>
+                        <option value="Mesa">Mesa</option>
+                        <option value="Sofá">Sofá</option>
+                        <option value="Estantería">Estantería</option>
+                        <option value="Armario">Armario</option>
+                        <option value="Otro">Otro</option>
+                      </select>
+                      {nuevoProducto.categoria === 'Mesas' && <p className="text-red-500 text-sm">Nota: La categoría 'Mesas' no es válida. Selecciona 'Mesa' en su lugar.</p>}
 
                       <input type="text" placeholder="Color" value={nuevoProducto.color} onChange={(e) => setNuevoProducto({...nuevoProducto, color: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
                       <input type="text" placeholder="Marca" value={nuevoProducto.marca} onChange={(e) => setNuevoProducto({...nuevoProducto, marca: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />

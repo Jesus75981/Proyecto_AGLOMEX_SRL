@@ -2,6 +2,21 @@ import Cliente from "../models/cliente.model.js";
 
 export const crearCliente = async (req, res) => {
   try {
+    // Validación adicional en el controlador
+    const { nombre, direccion, telefono } = req.body;
+
+    if (!nombre || nombre.trim().length === 0) {
+      return res.status(400).json({ error: "Cliente validation failed: nombre: Path `nombre` is required." });
+    }
+
+    if (!direccion || direccion.trim().length === 0) {
+      return res.status(400).json({ error: "Cliente validation failed: direccion: Path `direccion` is required." });
+    }
+
+    if (!telefono || telefono.trim().length === 0) {
+      return res.status(400).json({ error: "Cliente validation failed: telefono: Path `telefono` is required." });
+    }
+
     const cliente = new Cliente(req.body);
     await cliente.save();
     res.status(201).json(cliente);

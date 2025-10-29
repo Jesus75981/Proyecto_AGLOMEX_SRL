@@ -3,7 +3,15 @@ import mongoose from "mongoose";
 const clienteSchema = new mongoose.Schema({
   nombre: {
     type: String,
-    required: true
+    required: true,
+    trim: true,
+    minlength: 1,
+    validate: {
+      validator: function(v) {
+        return v && v.trim().length > 0;
+      },
+      message: 'El nombre no puede estar vacío'
+    }
   },
   empresa: {
     type: String,
@@ -11,11 +19,27 @@ const clienteSchema = new mongoose.Schema({
   },
   direccion: {
     type: String,
-    required: true
+    required: true,
+    trim: true,
+    minlength: 1,
+    validate: {
+      validator: function(v) {
+        return v && v.trim().length > 0;
+      },
+      message: 'La dirección no puede estar vacía'
+    }
   },
   telefono: {
     type: String,
-    required: true
+    required: true,
+    trim: true,
+    minlength: 1,
+    validate: {
+      validator: function(v) {
+        return v && v.trim().length > 0;
+      },
+      message: 'El teléfono no puede estar vacío'
+    }
   },
   email: {
     type: String,
