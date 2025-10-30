@@ -49,7 +49,10 @@ const productosIniciales = [
     descripcion: 'Tablero de fibra de densidad media de 15mm',
     cantidad: 50,
     precioCompra: 300,
-    precioVenta: 350
+    precioVenta: 350,
+    color: 'Natural',
+    categoria: 'Otro',
+    codigo: 'MDF001'
   },
   {
     idProductoTienda: 'BIS-PRES',
@@ -57,7 +60,10 @@ const productosIniciales = [
     descripcion: 'Bisagras metálicas para muebles',
     cantidad: 200,
     precioCompra: 35,
-    precioVenta: 45
+    precioVenta: 45,
+    color: 'Plateado',
+    categoria: 'Otro',
+    codigo: 'BIS001'
   }
 ];
 

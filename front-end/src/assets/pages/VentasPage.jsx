@@ -42,6 +42,24 @@ const VentasPage = ({ userRole }) => {
   const [ventas, setVentas] = useState([]);
   const [productos, setProductos] = useState([]);
   const [clientes, setClientes] = useState([]);
+  const [expandedVentas, setExpandedVentas] = useState(new Set());
+
+  // Estados para búsqueda de productos
+  const [productoSearchTerm, setProductoSearchTerm] = useState('');
+  const [productosFiltrados, setProductosFiltrados] = useState([]);
+  const [showProductoDropdown, setShowProductoDropdown] = useState(false);
+
+  // Filtrar productos basado en el término de búsqueda
+  useEffect(() => {
+    if (productoSearchTerm.trim() === '') {
+      setProductosFiltrados([]);
+    } else {
+      const filtrados = productos.filter(producto =>
+        producto.nombre.toLowerCase().includes(productoSearchTerm.toLowerCase())
+      );
+      setProductosFiltrados(filtrados);
+    }
+  }, [productoSearchTerm, productos]);
 
   // Cargar datos desde APIs al montar el componente
   useEffect(() => {
@@ -84,26 +102,25 @@ const VentasPage = ({ userRole }) => {
 
   const [nuevaVenta, setNuevaVenta] = useState({
     cliente: '',
-    producto: '',
-    cantidad: 1,
-    precio: 0,
+    productos: [], // Array de productos en la venta (carrito)
     fecha: new Date().toISOString().split('T')[0],
     metodoPago: 'Efectivo',
     numFactura: generarNumFactura(),
     observaciones: ''
   });
 
+  // Estados temporales para agregar productos al carrito
+  const [productoTemporal, setProductoTemporal] = useState({
+    productoId: '',
+    productoNombre: '',
+    cantidad: 1,
+    precioUnitario: 0
+  });
+
   const [errors, setErrors] = useState({});
   const [clienteErrors, setClienteErrors] = useState({});
   const [showForm, setShowForm] = useState(false);
-  const [productoSearchTerm, setProductoSearchTerm] = useState('');
-  const [showProductoDropdown, setShowProductoDropdown] = useState(false);
-  const [clienteSearchTerm, setClienteSearchTerm] = useState('');
-  const [showClienteDropdown, setShowClienteDropdown] = useState(false);
-  const [selectedProducto, setSelectedProducto] = useState(null);
-  const [selectedCliente, setSelectedCliente] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [keepClientData, setKeepClientData] = useState(false);
   const [showCreateClientForm, setShowCreateClientForm] = useState(false);
   const [nuevoCliente, setNuevoCliente] = useState({
     nombre: '',
@@ -115,29 +132,14 @@ const VentasPage = ({ userRole }) => {
     ci: ''
   });
 
-  // Productos predefinidos con precios (temporal hasta conectar con API)
-  const productosPredefinidos = [
-    { nombre: 'Silla Ejecutiva', precio: 150 },
-    { nombre: 'Mesa de Centro', precio: 200 },
-    { nombre: 'Sofá 3 Plazas', precio: 500 },
-    { nombre: 'Estantería Moderna', precio: 300 },
-    { nombre: 'Escritorio Oficina', precio: 250 },
-    { nombre: 'Cama Queen Size', precio: 800 },
-    { nombre: 'Ropero 3 Puertas', precio: 450 },
-    { nombre: 'Mesa de Comedor', precio: 600 }
-  ];
-
   // Función de búsqueda
   const ventasFiltradas = ventas.filter(venta =>
     (venta.cliente?.nombre || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (venta.productos && venta.productos.length > 0 ? (venta.productos[0].producto?.nombre || '') : '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (venta.productos && venta.productos.some(p => (p.producto?.nombre || '').toLowerCase().includes(searchTerm.toLowerCase()))) ||
     (venta.estado || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Productos filtrados para el dropdown searchable (usando productos de API)
-  const productosFiltrados = productos.filter(producto =>
-    producto.nombre.toLowerCase().includes(productoSearchTerm.toLowerCase())
-  );
+
 
   // ✅ VALIDACIONES COMPLETAS
   const validarVenta = () => {
@@ -148,20 +150,9 @@ const VentasPage = ({ userRole }) => {
       nuevosErrores.cliente = 'El nombre debe tener al menos 3 caracteres';
     }
 
-    if (!nuevaVenta.producto.trim()) {
-      nuevosErrores.producto = 'El producto es requerido';
-    }
-
-    if (nuevaVenta.cantidad <= 0) {
-      nuevosErrores.cantidad = 'La cantidad debe ser mayor a 0';
-    } else if (nuevaVenta.cantidad > 100) {
-      nuevosErrores.cantidad = 'La cantidad no puede ser mayor a 100';
-    }
-
-    if (nuevaVenta.precio <= 0) {
-      nuevosErrores.precio = 'El precio debe ser mayor a 0';
-    } else if (nuevaVenta.precio > 10000) {
-      nuevosErrores.precio = 'El precio no puede ser mayor a $10,000';
+    // Validar que haya al menos un producto
+    if (!nuevaVenta.productos || nuevaVenta.productos.length === 0) {
+      nuevosErrores.productos = 'Debe agregar al menos un producto';
     }
 
     if (!nuevaVenta.fecha) {
@@ -176,6 +167,74 @@ const VentasPage = ({ userRole }) => {
 
     setErrors(nuevosErrores);
     return Object.keys(nuevosErrores).length === 0;
+  };
+
+  // Función para añadir producto al carrito
+  const añadirProductoAlCarrito = () => {
+    const productoSeleccionado = productos.find(p => p.nombre === productoSearchTerm);
+
+    if (!productoSeleccionado) {
+      alert('Producto no encontrado. Por favor, selecciona un producto válido.');
+      return;
+    }
+
+    if (productoTemporal.cantidad <= 0) {
+      alert('La cantidad debe ser mayor a 0');
+      return;
+    }
+
+    if (productoTemporal.precioUnitario <= 0) {
+      alert('El precio debe ser mayor a 0');
+      return;
+    }
+
+    // Verificar si el producto ya está en el carrito
+    const productoExistente = nuevaVenta.productos.find(p => p.producto === productoSeleccionado._id);
+
+    if (productoExistente) {
+      // Actualizar cantidad y precio si ya existe
+      const productosActualizados = nuevaVenta.productos.map(p =>
+        p.producto === productoSeleccionado._id
+          ? {
+              ...p,
+              cantidad: p.cantidad + productoTemporal.cantidad,
+              precioUnitario: productoTemporal.precioUnitario,
+              precioTotal: (p.cantidad + productoTemporal.cantidad) * productoTemporal.precioUnitario
+            }
+          : p
+      );
+      setNuevaVenta({...nuevaVenta, productos: productosActualizados});
+    } else {
+      // Añadir nuevo producto al carrito
+      const nuevoProducto = {
+        producto: productoSeleccionado._id,
+        productoNombre: productoSeleccionado.nombre,
+        cantidad: productoTemporal.cantidad,
+        precioUnitario: productoTemporal.precioUnitario,
+        precioTotal: productoTemporal.cantidad * productoTemporal.precioUnitario
+      };
+      setNuevaVenta({...nuevaVenta, productos: [...nuevaVenta.productos, nuevoProducto]});
+    }
+
+    // Limpiar formulario de producto
+    setProductoSearchTerm('');
+    setProductoTemporal({
+      productoId: '',
+      productoNombre: '',
+      cantidad: 1,
+      precioUnitario: 0
+    });
+  };
+
+  // Función para quitar producto de la venta
+  const quitarProducto = (index) => {
+    const productosActualizados = nuevaVenta.productos.filter((_, i) => i !== index);
+    setNuevaVenta({...nuevaVenta, productos: productosActualizados});
+  };
+
+  // Calcular total de la venta
+  const calcularTotal = () => {
+    return nuevaVenta.productos.reduce((total, producto) => total + producto.precioTotal, 0);
   };
 
   // ✅ VALIDACIONES PARA FORMULARIO DE CLIENTE
@@ -280,14 +339,6 @@ const VentasPage = ({ userRole }) => {
     if (!validarVenta()) return;
 
     try {
-      // Buscar el producto seleccionado para obtener su ID
-      const productoSeleccionado = productos.find(p => p.nombre === nuevaVenta.producto);
-
-      if (!productoSeleccionado) {
-        alert('Producto no encontrado. Por favor, selecciona un producto válido.');
-        return;
-      }
-
       let clienteSeleccionado = null;
 
       // Solo buscar o crear cliente si se proporcionó un nombre de cliente
@@ -331,12 +382,7 @@ const VentasPage = ({ userRole }) => {
       const ventaData = {
         numVenta: Date.now(), // Generar número único de venta
         cliente: clienteSeleccionado ? clienteSeleccionado._id : null, // ID del cliente o null si no hay cliente
-        productos: [{
-          producto: productoSeleccionado._id, // ID del producto
-          cantidad: nuevaVenta.cantidad,
-          precioUnitario: nuevaVenta.precio,
-          precioTotal: nuevaVenta.cantidad * nuevaVenta.precio
-        }],
+        productos: nuevaVenta.productos, // Usar el array de productos
         fecha: nuevaVenta.fecha,
         metodoPago: nuevaVenta.metodoPago,
         numFactura: nuevaVenta.numFactura,
@@ -357,9 +403,7 @@ const VentasPage = ({ userRole }) => {
       // Limpiar formulario
       setNuevaVenta({
         cliente: '',
-        producto: '',
-        cantidad: 1,
-        precio: 0,
+        productos: [], // Limpiar productos
         fecha: new Date().toISOString().split('T')[0],
         metodoPago: 'Efectivo',
         numFactura: generarNumFactura(),
@@ -654,12 +698,12 @@ const VentasPage = ({ userRole }) => {
             </div>
           )}
 
-          {/* Formulario de Nueva Venta */}
+          {/* Formulario de Nueva Venta con Carrito */}
           {showForm && (
             <div className="bg-white rounded-xl shadow-md p-6 mb-8">
               <h2 className="text-2xl font-semibold text-gray-800 mb-6">Registrar Nueva Venta</h2>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Cliente (Opcional)</label>
                   <input
@@ -672,76 +716,6 @@ const VentasPage = ({ userRole }) => {
                     placeholder="Nombre completo del cliente (opcional)"
                   />
                   {errors.cliente && <p className="text-red-500 text-sm mt-1">{errors.cliente}</p>}
-                </div>
-
-                <div className="relative">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Producto *</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={productoSearchTerm}
-                      onChange={(e) => {
-                        setProductoSearchTerm(e.target.value);
-                        setShowProductoDropdown(true);
-                      }}
-                      onFocus={() => setShowProductoDropdown(true)}
-                      onBlur={() => setTimeout(() => setShowProductoDropdown(false), 200)}
-                      placeholder="Buscar producto..."
-                      className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
-                        errors.producto ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                    />
-                    {showProductoDropdown && productosFiltrados.length > 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                        {productosFiltrados.map((producto, index) => (
-                          <div
-                            key={index}
-                            onClick={() => {
-                              setProductoSearchTerm(producto.nombre);
-                              handleProductoChange(producto.nombre);
-                              setShowProductoDropdown(false);
-                            }}
-                            className="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
-                          >
-                            <div className="font-medium">{producto.nombre}</div>
-                            <div className="text-sm text-gray-500">Bs. {producto.precio}</div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  {errors.producto && <p className="text-red-500 text-sm mt-1">{errors.producto}</p>}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Cantidad *</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={nuevaVenta.cantidad}
-                    onChange={(e) => setNuevaVenta({...nuevaVenta, cantidad: parseInt(e.target.value) || 1})}
-                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
-                      errors.cantidad ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                  />
-                  {errors.cantidad && <p className="text-red-500 text-sm mt-1">{errors.cantidad}</p>}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Precio Unitario *</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    max="10000"
-                    value={nuevaVenta.precio}
-                    onChange={(e) => setNuevaVenta({...nuevaVenta, precio: parseFloat(e.target.value) || 0})}
-                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
-                      errors.precio ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                  />
-                  {errors.precio && <p className="text-red-500 text-sm mt-1">{errors.precio}</p>}
                 </div>
 
                 <div>
@@ -757,27 +731,207 @@ const VentasPage = ({ userRole }) => {
                   />
                   {errors.fecha && <p className="text-red-500 text-sm mt-1">{errors.fecha}</p>}
                 </div>
+              </div>
 
-                <div className="flex items-end">
-                  <div className="bg-gray-100 p-4 rounded-lg w-full">
-                    <p className="text-sm text-gray-600">Total a pagar:</p>
-                      <p className="text-2xl font-bold text-green-600">
-                      Bs. {(nuevaVenta.cantidad * nuevaVenta.precio).toLocaleString()}
-                    </p>
+              {/* Selector de Productos para Carrito */}
+              <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Añadir Productos al Carrito</h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="relative">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Producto *</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={productoSearchTerm}
+                        onChange={(e) => {
+                          setProductoSearchTerm(e.target.value);
+                          setShowProductoDropdown(true);
+                        }}
+                        onFocus={() => setShowProductoDropdown(true)}
+                        onBlur={() => setTimeout(() => setShowProductoDropdown(false), 200)}
+                        placeholder="Buscar producto..."
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                      />
+                      {showProductoDropdown && productosFiltrados.length > 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                          {productosFiltrados.map((producto, index) => (
+                            <div
+                              key={index}
+                              onClick={() => {
+                                setProductoSearchTerm(producto.nombre);
+                                setProductoTemporal({
+                                  ...productoTemporal,
+                                  productoId: producto._id,
+                                  productoNombre: producto.nombre,
+                                  precioUnitario: producto.precioVenta || producto.precio
+                                });
+                                setShowProductoDropdown(false);
+                              }}
+                              className="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                            >
+                              <div className="font-medium">{producto.nombre}</div>
+                              <div className="text-sm text-gray-500">Bs. {producto.precioVenta || producto.precio}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Cantidad *</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={productoTemporal.cantidad}
+                      onChange={(e) => setProductoTemporal({...productoTemporal, cantidad: parseInt(e.target.value) || 1})}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Precio Unitario *</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={productoTemporal.precioUnitario}
+                      onChange={(e) => setProductoTemporal({...productoTemporal, precioUnitario: parseFloat(e.target.value) || 0})}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+
+                  <div className="flex items-end">
+                    <button
+                      onClick={añadirProductoAlCarrito}
+                      className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-200 font-semibold"
+                    >
+                      + Añadir al Carrito
+                    </button>
                   </div>
                 </div>
               </div>
 
-              <div className="flex space-x-4 mt-6">
+              {/* Carrito de Compras */}
+              {nuevaVenta.productos.length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Carrito de Compras</h3>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-gray-50">
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cantidad</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Precio Unit.</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {nuevaVenta.productos.map((item, index) => (
+                          <tr key={index} className="border-t border-gray-200">
+                            <td className="px-4 py-2 text-sm font-medium text-gray-900">
+                              {item.productoNombre}
+                            </td>
+                            <td className="px-4 py-2 text-sm text-gray-500">
+                              {item.cantidad}
+                            </td>
+                            <td className="px-4 py-2 text-sm text-gray-500">
+                              Bs. {item.precioUnitario.toFixed(2)}
+                            </td>
+                            <td className="px-4 py-2 text-sm font-semibold text-green-600">
+                              Bs. {(item.cantidad * item.precioUnitario).toFixed(2)}
+                            </td>
+                            <td className="px-4 py-2 text-sm">
+                              <button
+                                onClick={() => quitarProducto(index)}
+                                className="text-red-600 hover:text-red-900 text-sm font-medium"
+                              >
+                                🗑️ Quitar
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t-2 border-gray-300">
+                          <td colSpan="3" className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
+                            Total de la Venta:
+                          </td>
+                          <td className="px-4 py-3 text-lg font-bold text-green-600">
+                            Bs. {calcularTotal().toFixed(2)}
+                          </td>
+                          <td></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Detalles Adicionales de la Venta */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Método de Pago</label>
+                  <select
+                    value={nuevaVenta.metodoPago}
+                    onChange={(e) => setNuevaVenta({...nuevaVenta, metodoPago: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="Efectivo">Efectivo</option>
+                    <option value="Tarjeta">Tarjeta</option>
+                    <option value="Transferencia">Transferencia</option>
+                    <option value="Cheque">Cheque</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Observaciones</label>
+                  <textarea
+                    value={nuevaVenta.observaciones}
+                    onChange={(e) => setNuevaVenta({...nuevaVenta, observaciones: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    rows="2"
+                    placeholder="Observaciones adicionales (opcional)"
+                  />
+                </div>
+              </div>
+
+              {errors.productos && <p className="text-red-500 text-sm mb-4">{errors.productos}</p>}
+
+              <div className="flex space-x-4">
                 <button
                   onClick={agregarVenta}
-                  className="bg-green-600 text-white py-3 px-6 rounded-lg hover:bg-green-700 transition duration-200 font-semibold shadow-md"
+                  disabled={nuevaVenta.productos.length === 0}
+                  className={`py-3 px-6 rounded-lg transition duration-200 font-semibold shadow-md ${
+                    nuevaVenta.productos.length === 0
+                      ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                      : 'bg-green-600 text-white hover:bg-green-700'
+                  }`}
                 >
-                  Registrar Venta
+                  Registrar Venta ({nuevaVenta.productos.length} productos)
                 </button>
                 <button
                   onClick={() => {
                     setShowForm(false);
+                    setNuevaVenta({
+                      cliente: '',
+                      productos: [],
+                      fecha: new Date().toISOString().split('T')[0],
+                      metodoPago: 'Efectivo',
+                      numFactura: generarNumFactura(),
+                      observaciones: ''
+                    });
+                    setProductoSearchTerm('');
+                    setProductoTemporal({
+                      productoId: '',
+                      productoNombre: '',
+                      cantidad: 1,
+                      precioUnitario: 0
+                    });
                     setErrors({});
                   }}
                   className="bg-gray-500 text-white py-3 px-6 rounded-lg hover:bg-gray-600 transition duration-200 font-semibold"
@@ -798,9 +952,7 @@ const VentasPage = ({ userRole }) => {
                   <tr className="bg-gray-50">
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio Unit.</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Productos</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
@@ -816,17 +968,11 @@ const VentasPage = ({ userRole }) => {
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                         {venta.cliente?.nombre || 'Sin cliente'}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                        {venta.productos?.[0]?.producto?.nombre || 'Sin producto'}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                        {venta.productos?.[0]?.cantidad || 0}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                        Bs. {venta.productos?.[0]?.precioUnitario || 0}
+                      <td className="px-4 py-3 text-sm text-gray-500">
+                        {venta.productos?.map(p => `${p.producto?.nombre} (${p.cantidad})`).join(', ') || 'Sin producto'}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-green-600">
-                        Bs. {venta.productos?.[0]?.precioTotal || 0}
+                        Bs. {(venta.productos?.reduce((sum, p) => sum + (p.precioTotal || 0), 0) || 0).toFixed(2)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                         {new Date(venta.fecha).toLocaleDateString('es-ES')}

@@ -1,25 +1,48 @@
-# TODO: Cambiar sistema de compras y ventas a Bolivianos (BOB)
+# TODO: Implementar Carrito de Ventas Similar a Compras
 
 ## Información Recopilada
-- El backend ya está configurado para usar 'BOB' con tasa de cambio 1 en los controladores de compras, ventas y anticipos.
-- El frontend aún muestra símbolos $ en lugar de Bs. para Bolivianos.
-- Las páginas afectadas incluyen ComprasPage, VentasPage, FinanzasPage, ReporteVentasDiario y InventarioPage.
-- FinanzasPage usa formato de moneda MXN, necesita cambiarse a BOB.
+- Analizado ComprasPage.jsx: Tiene carrito con array de productos, formulario de búsqueda, tabla de productos agregados, cálculo de total.
+- VentasPage.jsx actual: Maneja solo un producto por venta, necesita conversión a carrito múltiple.
 
-## Plan de Actualización
-1. **ComprasPage.jsx**: Reemplazar todos los símbolos $ con Bs. en textos de totales y precios.
-2. **VentasPage.jsx**: Reemplazar todos los símbolos $ con Bs. en métricas, precios y totales.
-3. **FinanzasPage.jsx**: Cambiar formatCurrency de 'MXN'/'es-MX' a 'BOB'/'es-BO'.
-4. **ReporteVentasDiario.jsx**: Reemplazar $ con Bs. en el total de ventas.
-5. **InventarioPage.jsx**: Reemplazar $ con Bs. en costos y valores totales.
+## Plan de Implementación
+1. **Agregar Estados para Carrito**
+   - Agregar `productoTemporal` para formulario temporal de producto
+   - Agregar `busquedaProducto` para búsqueda de productos
+   - Agregar `productosFiltrados` y `mostrarResultadosProducto` para dropdown
 
-## Archivos Dependientes
-- front-end/src/assets/pages/ComprasPage.jsx
-- front-end/src/assets/pages/VentasPage.jsx
-- front-end/src/assets/pages/FinanzasPage.jsx
-- front-end/src/assets/pages/ReporteVentasDiario.jsx
-- front-end/src/assets/pages/InventarioPage.jsx
+2. **Modificar Formulario de Nueva Venta**
+   - Agregar sección de búsqueda y agregar productos (similar a compras)
+   - Agregar tabla de productos agregados al carrito
+   - Mostrar total calculado de todos los productos
 
-## Pasos de Seguimiento
-- Ejecutar el frontend después de cambios para verificar que muestre Bs. en lugar de $.
-- Probar módulos de compras y ventas para confirmar visualización correcta de monedas.
+3. **Funciones Nuevas**
+   - `agregarProductoAVenta()`: Agregar producto al array `nuevaVenta.productos`
+   - `quitarProductoDeVenta(index)`: Remover producto del carrito
+   - Actualizar `calcularTotal()` para usar array de productos
+
+4. **Actualizar Tabla de Historial**
+   - Cambiar tabla para mostrar resumen de venta (ID, cliente, total, fecha, estado)
+   - Agregar funcionalidad para expandir y ver detalles de productos
+
+5. **Modificar `agregarVenta`**
+   - Usar `nuevaVenta.productos` directamente
+   - Validar que haya al menos un producto
+   - Limpiar carrito después de registrar
+
+6. **Limpiar Código Antiguo**
+   - Remover lógica de un solo producto (producto, cantidad, precio individuales)
+   - Actualizar validaciones
+
+## Dependencias
+- Archivo: front-end/src/assets/pages/VentasPage.jsx
+- No se requieren cambios en backend (ya soporta array de productos)
+
+## Seguimiento de Progreso
+- [x] Agregar estados para carrito
+- [x] Implementar formulario de búsqueda y agregar productos
+- [x] Agregar tabla de productos en carrito
+- [x] Actualizar cálculo de total
+- [ ] Modificar tabla de historial (cambiar a vista resumen con expansión para detalles)
+- [x] Actualizar función agregarVenta
+- [x] Limpiar código antiguo
+- [ ] Probar funcionalidad completa
