@@ -1,48 +1,35 @@
-# TODO: Implementar Carrito de Ventas Similar a Compras
+# Automatizaciones del Sistema Aglomex
 
-## Información Recopilada
-- Analizado ComprasPage.jsx: Tiene carrito con array de productos, formulario de búsqueda, tabla de productos agregados, cálculo de total.
-- VentasPage.jsx actual: Maneja solo un producto por venta, necesita conversión a carrito múltiple.
+## 1. Envío automático de recordatorios a clientes con pagos pendientes
+- [x] Instalar dependencias: node-cron, nodemailer (para email) y twilio (para WhatsApp)
+- [x] Crear módulo de notificaciones (back-end/services/notifications.service.js)
+- [x] Implementar función para identificar ventas con pagos pendientes
+- [x] Configurar cron job diario para envío de recordatorios
+- [x] Integrar con server.js
 
-## Plan de Implementación
-1. **Agregar Estados para Carrito**
-   - Agregar `productoTemporal` para formulario temporal de producto
-   - Agregar `busquedaProducto` para búsqueda de productos
-   - Agregar `productosFiltrados` y `mostrarResultadosProducto` para dropdown
+## 2. Generación y envío diario/semanal de reportes ejecutivos por WhatsApp
+- [ ] Crear módulo de reportes (back-end/services/reports.service.js)
+- [ ] Implementar funciones para generar reportes resumidos (ventas, producción, finanzas)
+- [ ] Configurar conversión de reportes a formato WhatsApp (texto/imagen)
+- [ ] Configurar cron jobs diario/semanal para envío automático
+- [ ] Integrar con server.js
 
-2. **Modificar Formulario de Nueva Venta**
-   - Agregar sección de búsqueda y agregar productos (similar a compras)
-   - Agregar tabla de productos agregados al carrito
-   - Mostrar total calculado de todos los productos
+## 3. Asignación automática de transportistas basada en ubicación, capacidad y disponibilidad
+- [ ] Actualizar modelo de transportista para incluir ubicación y capacidad
+- [ ] Crear algoritmo de asignación automática en logistica.controller.js
+- [ ] Implementar lógica de optimización (distancia, capacidad, disponibilidad)
+- [ ] Integrar asignación automática en creación de pedidos
 
-3. **Funciones Nuevas**
-   - `agregarProductoAVenta()`: Agregar producto al array `nuevaVenta.productos`
-   - `quitarProductoDeVenta(index)`: Remover producto del carrito
-   - Actualizar `calcularTotal()` para usar array de productos
+## 4. Respaldos diarios automáticos con notificaciones de estado
+- [ ] Instalar mongodb-tools o usar mongoose para backups
+- [ ] Crear script de backup (back-end/scripts/backup.js)
+- [ ] Configurar cron job diario para backups
+- [ ] Implementar notificaciones de éxito/error
+- [ ] Integrar con server.js
 
-4. **Actualizar Tabla de Historial**
-   - Cambiar tabla para mostrar resumen de venta (ID, cliente, total, fecha, estado)
-   - Agregar funcionalidad para expandir y ver detalles de productos
-
-5. **Modificar `agregarVenta`**
-   - Usar `nuevaVenta.productos` directamente
-   - Validar que haya al menos un producto
-   - Limpiar carrito después de registrar
-
-6. **Limpiar Código Antiguo**
-   - Remover lógica de un solo producto (producto, cantidad, precio individuales)
-   - Actualizar validaciones
-
-## Dependencias
-- Archivo: front-end/src/assets/pages/VentasPage.jsx
-- No se requieren cambios en backend (ya soporta array de productos)
-
-## Seguimiento de Progreso
-- [x] Agregar estados para carrito
-- [x] Implementar formulario de búsqueda y agregar productos
-- [x] Agregar tabla de productos en carrito
-- [x] Actualizar cálculo de total
-- [ ] Modificar tabla de historial (cambiar a vista resumen con expansión para detalles)
-- [x] Actualizar función agregarVenta
-- [x] Limpiar código antiguo
-- [ ] Probar funcionalidad completa
+## Dependencias a instalar
+- node-cron: Para tareas programadas
+- nodemailer: Para envío de emails
+- twilio: Para WhatsApp Business API
+- whatsapp-web.js: Alternativa gratuita para WhatsApp
+- moment: Para manejo de fechas

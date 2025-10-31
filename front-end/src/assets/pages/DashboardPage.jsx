@@ -77,6 +77,18 @@ const DashboardPage = ({ userRole }) => {
     produccionPorEstado: [],
     eficienciaProduccion: []
   });
+  const [finanzasData, setFinanzasData] = useState({
+    metrics: {},
+    cashflow: []
+  });
+  const [inventarioData, setInventarioData] = useState({
+    metricas: {},
+    alertas: []
+  });
+  const [logisticaData, setLogisticaData] = useState({
+    estadisticas: {},
+    pedidosRecientes: []
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -113,9 +125,14 @@ const DashboardPage = ({ userRole }) => {
   const cargarDatosFinanzas = async () => {
     try {
       setLoading(true);
-      const response = await apiFetch(`/finanzas/metrics`);
-      // Aquí puedes agregar lógica para procesar datos financieros si es necesario
-      console.log('Datos financieros:', response);
+      const [metricsResponse, cashflowResponse] = await Promise.all([
+        apiFetch(`/finanzas/metrics`),
+        apiFetch(`/finanzas/cashflow?period=month`)
+      ]);
+      setFinanzasData({
+        metrics: metricsResponse,
+        cashflow: cashflowResponse
+      });
     } catch (err) {
       setError('Error al cargar datos de finanzas');
       console.error(err);
@@ -128,11 +145,36 @@ const DashboardPage = ({ userRole }) => {
   const cargarDatosInventario = async () => {
     try {
       setLoading(true);
-      const response = await apiFetch(`/alertas/metricas`);
-      // Aquí puedes agregar lógica para procesar datos de inventario si es necesario
-      console.log('Datos de inventario:', response);
+      const [metricasResponse, alertasResponse] = await Promise.all([
+        apiFetch(`/alertas/metricas`),
+        apiFetch(`/alertas/stock`)
+      ]);
+      setInventarioData({
+        metricas: metricasResponse,
+        alertas: alertasResponse.alertas || []
+      });
     } catch (err) {
       setError('Error al cargar datos de inventario');
+      console.error(err);
+  } finally {
+    setLoading(false);
+  }
+};
+
+  // Cargar datos de logistica
+  const cargarDatosLogistica = async () => {
+    try {
+      setLoading(true);
+      const [estadisticasResponse, pedidosResponse] = await Promise.all([
+        apiFetch(`/logistica/estadisticas`),
+        apiFetch(`/logistica`).then(pedidos => pedidos.slice(0, 5)) // últimos 5 pedidos
+      ]);
+      setLogisticaData({
+        estadisticas: estadisticasResponse,
+        pedidosRecientes: pedidosResponse
+      });
+    } catch (err) {
+      setError('Error al cargar datos de logística');
       console.error(err);
     } finally {
       setLoading(false);
@@ -149,6 +191,8 @@ const DashboardPage = ({ userRole }) => {
       cargarDatosFinanzas();
     } else if (activeTab === 'inventario') {
       cargarDatosInventario();
+    } else if (activeTab === 'logistica') {
+      cargarDatosLogistica();
     }
   }, [activeTab, selectedYear]);
 
@@ -188,6 +232,21 @@ const DashboardPage = ({ userRole }) => {
     estimado: item.tiempoEstimado,
     real: item.tiempoTranscurrido
   }));
+
+  // Preparar datos para gráficos de finanzas
+  const cashflowChart = finanzasData.cashflow.map(item => ({
+    mes: `${item.period.year}-${item.period.month.toString().padStart(2, '0')}`,
+    ingresos: item.ingresos,
+    egresos: item.egresos,
+    flujoNeto: item.flujoNeto
+  }));
+
+  // Preparar datos para gráficos de inventario
+  const inventarioChart = [
+    { name: 'Disponibles', value: inventarioData.metricas.productosDisponibles || 0, color: '#00C49F' },
+    { name: 'Stock Bajo', value: inventarioData.metricas.productosStockBajo || 0, color: '#FFBB28' },
+    { name: 'Agotados', value: inventarioData.metricas.productosAgotados || 0, color: '#FF8042' }
+  ];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -243,7 +302,7 @@ const DashboardPage = ({ userRole }) => {
           <div className="bg-white rounded-xl shadow-md mb-6">
             <div className="border-b border-gray-200">
               <nav className="flex -mb-px">
-                {['ventas', 'produccion', 'finanzas', 'inventario'].map((tab) => (
+                {['ventas', 'produccion', 'finanzas', 'inventario', 'logistica'].map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
@@ -256,7 +315,8 @@ const DashboardPage = ({ userRole }) => {
                     📊 {tab === 'ventas' ? 'Análisis de Ventas' :
                         tab === 'produccion' ? 'Análisis de Producción' :
                         tab === 'finanzas' ? 'Análisis Financiero' :
-                        'Análisis de Inventario'}
+                        tab === 'inventario' ? 'Análisis de Inventario' :
+                        'Análisis de Logística'}
                   </button>
                 ))}
               </nav>
@@ -528,9 +588,113 @@ const DashboardPage = ({ userRole }) => {
           {/* Contenido de Finanzas */}
           {activeTab === 'finanzas' && (
             <div className="space-y-6">
-              <div className="bg-white p-6 rounded-xl shadow-md">
-                <h3 className="text-xl font-semibold text-gray-800 mb-4">Análisis Financiero</h3>
-                <p className="text-gray-600">Funcionalidad de análisis financiero próximamente disponible.</p>
+              {/* Métricas Financieras */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-green-500">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-600">Ingresos Totales</h3>
+                      <p className="text-2xl font-bold text-gray-800">
+                        Bs. {finanzasData.metrics.ingresosTotales?.toLocaleString() || '0'}
+                      </p>
+                    </div>
+                    <div className="bg-green-100 p-3 rounded-lg">
+                      <span className="text-green-600 text-xl">💰</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-red-500">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-600">Egresos Totales</h3>
+                      <p className="text-2xl font-bold text-gray-800">
+                        Bs. {finanzasData.metrics.egresosTotales?.toLocaleString() || '0'}
+                      </p>
+                    </div>
+                    <div className="bg-red-100 p-3 rounded-lg">
+                      <span className="text-red-600 text-xl">💸</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-blue-500">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-600">Flujo Neto</h3>
+                      <p className="text-2xl font-bold text-gray-800">
+                        Bs. {finanzasData.metrics.flujoNeto?.toLocaleString() || '0'}
+                      </p>
+                    </div>
+                    <div className="bg-blue-100 p-3 rounded-lg">
+                      <span className="text-blue-600 text-xl">📊</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-purple-500">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-600">Margen de Ganancia</h3>
+                      <p className="text-2xl font-bold text-gray-800">
+                        {finanzasData.metrics.margenGanancia ? `${finanzasData.metrics.margenGanancia.toFixed(1)}%` : '0%'}
+                      </p>
+                    </div>
+                    <div className="bg-purple-100 p-3 rounded-lg">
+                      <span className="text-purple-600 text-xl">📈</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Gráficos Financieros */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Flujo de Caja */}
+                <div className="bg-white p-6 rounded-xl shadow-md">
+                  <h3 className="text-xl font-semibold text-gray-800 mb-4">Flujo de Caja Mensual</h3>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <AreaChart data={cashflowChart}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="mes" />
+                      <YAxis />
+                      <Tooltip formatter={(value) => [`Bs. ${value.toLocaleString()}`, '']} />
+                      <Legend />
+                      <Area type="monotone" dataKey="ingresos" stackId="1" stroke="#00C49F" fill="#00C49F" />
+                      <Area type="monotone" dataKey="egresos" stackId="2" stroke="#FF8042" fill="#FF8042" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Resumen Ejecutivo Financiero */}
+                <div className="bg-white p-6 rounded-xl shadow-md">
+                  <h3 className="text-xl font-semibold text-gray-800 mb-4">Resumen Ejecutivo Financiero</h3>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                      <span className="text-gray-600">Ingresos Promedio Mensual:</span>
+                      <span className="font-semibold text-green-600">
+                        Bs. {finanzasData.metrics.ingresosPromedioMensual?.toLocaleString() || '0'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                      <span className="text-gray-600">Egresos Promedio Mensual:</span>
+                      <span className="font-semibold text-red-600">
+                        Bs. {finanzasData.metrics.egresosPromedioMensual?.toLocaleString() || '0'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                      <span className="text-gray-600">ROI Anual:</span>
+                      <span className="font-semibold text-blue-600">
+                        {finanzasData.metrics.roiAnual ? `${finanzasData.metrics.roiAnual.toFixed(1)}%` : '0%'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                      <span className="text-gray-600">Estado Financiero:</span>
+                      <span className={`font-semibold ${finanzasData.metrics.flujoNeto >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {finanzasData.metrics.flujoNeto >= 0 ? 'Positivo' : 'Negativo'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -538,9 +702,251 @@ const DashboardPage = ({ userRole }) => {
           {/* Contenido de Inventario */}
           {activeTab === 'inventario' && (
             <div className="space-y-6">
-              <div className="bg-white p-6 rounded-xl shadow-md">
-                <h3 className="text-xl font-semibold text-gray-800 mb-4">Análisis de Inventario</h3>
-                <p className="text-gray-600">Funcionalidad de análisis de inventario próximamente disponible.</p>
+              {/* Métricas de Inventario */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-green-500">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-600">Productos Disponibles</h3>
+                      <p className="text-2xl font-bold text-gray-800">
+                        {inventarioData.metricas.productosDisponibles || 0}
+                      </p>
+                    </div>
+                    <div className="bg-green-100 p-3 rounded-lg">
+                      <span className="text-green-600 text-xl">📦</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-yellow-500">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-600">Stock Bajo</h3>
+                      <p className="text-2xl font-bold text-gray-800">
+                        {inventarioData.metricas.productosStockBajo || 0}
+                      </p>
+                    </div>
+                    <div className="bg-yellow-100 p-3 rounded-lg">
+                      <span className="text-yellow-600 text-xl">⚠️</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-red-500">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-600">Productos Agotados</h3>
+                      <p className="text-2xl font-bold text-gray-800">
+                        {inventarioData.metricas.productosAgotados || 0}
+                      </p>
+                    </div>
+                    <div className="bg-red-100 p-3 rounded-lg">
+                      <span className="text-red-600 text-xl">🚫</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-blue-500">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-600">Alertas Activas</h3>
+                      <p className="text-2xl font-bold text-gray-800">
+                        {inventarioData.alertas.length}
+                      </p>
+                    </div>
+                    <div className="bg-blue-100 p-3 rounded-lg">
+                      <span className="text-blue-600 text-xl">🔔</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Gráficos de Inventario */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Distribución de Inventario */}
+                <div className="bg-white p-6 rounded-xl shadow-md">
+                  <h3 className="text-xl font-semibold text-gray-800 mb-4">Distribución de Inventario</h3>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={inventarioChart}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {inventarioChart.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Alertas de Inventario */}
+                <div className="bg-white p-6 rounded-xl shadow-md">
+                  <h3 className="text-xl font-semibold text-gray-800 mb-4">Alertas de Inventario</h3>
+                  <div className="space-y-4 max-h-80 overflow-y-auto">
+                    {inventarioData.alertas.length > 0 ? (
+                      inventarioData.alertas.map((alerta, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-800">{alerta.producto}</p>
+                            <p className="text-sm text-gray-600">{alerta.mensaje}</p>
+                          </div>
+                          <span className={`px-2 py-1 text-xs rounded-full ${
+                            alerta.tipo === 'agotado' ? 'bg-red-100 text-red-800' :
+                            alerta.tipo === 'stock_bajo' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-blue-100 text-blue-800'
+                          }`}>
+                            {alerta.tipo === 'agotado' ? 'Agotado' :
+                             alerta.tipo === 'stock_bajo' ? 'Stock Bajo' :
+                             'Alerta'}
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        <span className="text-4xl">📦</span>
+                        <p className="mt-2">No hay alertas activas</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Contenido de Logística */}
+          {activeTab === 'logistica' && (
+            <div className="space-y-6">
+              {/* Métricas de Logística */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-blue-500">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-600">Total Pedidos</h3>
+                      <p className="text-2xl font-bold text-gray-800">
+                        {logisticaData.estadisticas.totalPedidos || 0}
+                      </p>
+                    </div>
+                    <div className="bg-blue-100 p-3 rounded-lg">
+                      <span className="text-blue-600 text-xl">📦</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-green-500">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-600">Pedidos Entregados</h3>
+                      <p className="text-2xl font-bold text-gray-800">
+                        {logisticaData.estadisticas?.pedidosPorEstado?.entregado || 0}
+                      </p>
+                    </div>
+                    <div className="bg-green-100 p-3 rounded-lg">
+                      <span className="text-green-600 text-xl">✅</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-yellow-500">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-600">Pedidos en Tránsito</h3>
+                      <p className="text-2xl font-bold text-gray-800">
+                        {(logisticaData.estadisticas?.pedidosPorEstado?.en_proceso || 0) + (logisticaData.estadisticas?.pedidosPorEstado?.despachado || 0)}
+                      </p>
+                    </div>
+                    <div className="bg-yellow-100 p-3 rounded-lg">
+                      <span className="text-yellow-600 text-xl">🚚</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-purple-500">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-600">Costo Promedio de Envío</h3>
+                      <p className="text-2xl font-bold text-gray-800">
+                        Bs. {logisticaData.estadisticas?.totalPedidos > 0 ? (logisticaData.estadisticas.costoTotalEnvios / logisticaData.estadisticas.totalPedidos).toLocaleString() : '0'}
+                      </p>
+                    </div>
+                    <div className="bg-purple-100 p-3 rounded-lg">
+                      <span className="text-purple-600 text-xl">💰</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Gráficos de Logística */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Estado de Pedidos */}
+                <div className="bg-white p-6 rounded-xl shadow-md">
+                  <h3 className="text-xl font-semibold text-gray-800 mb-4">Distribución de Pedidos</h3>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: 'Entregados', value: logisticaData.estadisticas.pedidosEntregados || 0, color: '#00C49F' },
+                          { name: 'En Tránsito', value: logisticaData.estadisticas.pedidosEnTransito || 0, color: '#FFBB28' },
+                          { name: 'Pendientes', value: logisticaData.estadisticas.pedidosPendientes || 0, color: '#FF8042' }
+                        ]}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {[
+                          { name: 'Entregados', value: logisticaData.estadisticas.pedidosEntregados || 0, color: '#00C49F' },
+                          { name: 'En Tránsito', value: logisticaData.estadisticas.pedidosEnTransito || 0, color: '#FFBB28' },
+                          { name: 'Pendientes', value: logisticaData.estadisticas.pedidosPendientes || 0, color: '#FF8042' }
+                        ].map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Pedidos Recientes */}
+                <div className="bg-white p-6 rounded-xl shadow-md">
+                  <h3 className="text-xl font-semibold text-gray-800 mb-4">Pedidos Recientes</h3>
+                  <div className="space-y-4 max-h-80 overflow-y-auto">
+                    {logisticaData.pedidosRecientes && logisticaData.pedidosRecientes.length > 0 ? (
+                      logisticaData.pedidosRecientes.map((pedido, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-800">Pedido #{pedido.numeroPedido}</p>
+                            <p className="text-sm text-gray-600">{pedido.destino}</p>
+                          </div>
+                          <span className={`px-2 py-1 text-xs rounded-full ${
+                            pedido.estado === 'entregado' ? 'bg-green-100 text-green-800' :
+                            pedido.estado === 'en_transito' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-blue-100 text-blue-800'
+                          }`}>
+                            {pedido.estado === 'entregado' ? 'Entregado' :
+                             pedido.estado === 'en_transito' ? 'En Tránsito' :
+                             'Pendiente'}
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        <span className="text-4xl">📦</span>
+                        <p className="mt-2">No hay pedidos recientes</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           )}

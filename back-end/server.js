@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import jwt from 'jsonwebtoken';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import cron from 'node-cron';
 
 // Configuración de variables de entorno
 dotenv.config();
@@ -25,6 +26,7 @@ import transportistasRoutes from './routes/transportistas.routes.js';
 import pedidosPublicRoutes from './routes/pedidos.public.routes.js';
 import alertasRoutes from './routes/alertas.routes.js';
 import { actualizarProgresoAutomatico, verificarRetrasos } from './controllers/produccion.controller.js';
+import { enviarRecordatoriosPagosPendientes } from './services/notifications.service.js';
 
 // Inicialización del servidor
 const app = express();
@@ -171,6 +173,18 @@ setTimeout(async () => {
     }
 }, 1000); // 1 segundo después del inicio
 
+// === SISTEMA DE RECORDATORIOS AUTOMÁTICOS ===
+// Ejecutar diariamente a las 9:00 AM
+cron.schedule('0 9 * * *', async () => {
+    console.log('⏰ Ejecutando recordatorios de pagos pendientes...');
+    try {
+        await enviarRecordatoriosPagosPendientes();
+        console.log('✅ Recordatorios enviados exitosamente');
+    } catch (error) {
+        console.error('❌ Error en recordatorios automáticos:', error);
+    }
+});
+
 // INICIO DEL SERVIDOR
 app.listen(PORT, () => {
     console.log(`🚀 Servidor escuchando en http://localhost:${PORT}`);
@@ -178,4 +192,5 @@ app.listen(PORT, () => {
     console.log(`🔐 Login: http://localhost:${PORT}/api/login`);
     console.log(`💰 Anticipos: http://localhost:${PORT}/api/anticipos`);
     console.log(`⚙️ Sistema de producción automática: ACTIVO`);
+    console.log(`📧 Recordatorios automáticos: ACTIVO (9:00 AM diario)`);
 });
