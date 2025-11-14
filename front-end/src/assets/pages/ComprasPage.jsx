@@ -1,4 +1,4 @@
-  
+// front-end/src/assets/pages/ComprasPage.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -53,7 +53,7 @@ const ComprasPage = ({ userRole }) => {
   // --- Estados ---
   const [activeSection, setActiveSection] = useState('realizarCompra');
   const [searchTerm, setSearchTerm] = useState('');
-  
+
   // Data from API
   const [proveedores, setProveedores] = useState([]);
   const [productos, setProductos] = useState([]);
@@ -111,17 +111,47 @@ const ComprasPage = ({ userRole }) => {
   // New item forms
   const [nuevoProveedor, setNuevoProveedor] = useState({
     nombre: '',
+    nombreComercial: '',
     contacto: { telefono: '', email: '' },
     direccion: '',
-    nit: ''
+    ubicacion: '',
+    nit: '',
+    bancos: [{ nombre: '', numeroCuenta: '' }]
   });
+
+  // Funciones para manejar bancos
+  const agregarBanco = () => {
+    setNuevoProveedor(prev => ({
+      ...prev,
+      bancos: [...prev.bancos, { nombre: '', numeroCuenta: '' }]
+    }));
+  };
+
+  const actualizarBanco = (index, campo, valor) => {
+    setNuevoProveedor(prev => ({
+      ...prev,
+      bancos: prev.bancos.map((banco, i) =>
+        i === index ? { ...banco, [campo]: valor } : banco
+      )
+    }));
+  };
+
+  const eliminarBanco = (index) => {
+    setNuevoProveedor(prev => ({
+      ...prev,
+      bancos: prev.bancos.filter((_, i) => i !== index)
+    }));
+  };
+
   const [nuevoProducto, setNuevoProducto] = useState({
     nombre: '',
     categoria: '',
+    nuevaCategoria: '',
     color: '',
     marca: '',
     ubicacion: '',
     proveedor: '',
+    codigo: '',
     dimensiones: {
       alto: '',
       ancho: '',
@@ -222,7 +252,15 @@ const ComprasPage = ({ userRole }) => {
         });
         setProveedores([...proveedores, proveedorCreado]);
         setShowProveedorForm(false);
-        setNuevoProveedor({ nombre: '', contacto: { telefono: '', email: '' }, direccion: '', nit: '' });
+        setNuevoProveedor({
+          nombre: '',
+          nombreComercial: '',
+          contacto: { telefono: '', email: '' },
+          direccion: '',
+          ubicacion: '',
+          nit: '',
+          bancos: [{ nombre: '', numeroCuenta: '' }]
+        });
         seleccionarProveedor(proveedorCreado); // Auto-select the new provider
         alert('Proveedor creado y seleccionado exitosamente.');
     } catch (error) {
@@ -230,15 +268,32 @@ const ComprasPage = ({ userRole }) => {
         alert(`Error creando proveedor: ${error.message}`);
     }
   };
-  
+
   const seleccionarProveedor = (proveedor) => {
     setCompra({
       ...compra,
       proveedorId: proveedor._id,
-      proveedorNombreX: proveedor.nombre
+      proveedorNombre: proveedor.nombre
     });
     setBusquedaProveedor(proveedor.nombre);
     setMostrarResultadosProveedor(false);
+  };
+
+  const handleCategoriaChange = (e) => {
+    const value = e.target.value;
+    if (value === 'nueva') {
+      setNuevoProducto(prev => ({
+        ...prev,
+        categoria: 'nueva',
+        nuevaCategoria: ''
+      }));
+    } else {
+      setNuevoProducto(prev => ({
+        ...prev,
+        categoria: value,
+        nuevaCategoria: ''
+      }));
+    }
   };
 
   const handleCrearProducto = async () => {
@@ -250,6 +305,15 @@ const ComprasPage = ({ userRole }) => {
         alert('La categoría "Mesas" no es válida. Selecciona "Mesa" en su lugar.');
         return;
     }
+
+    // Usar nueva categoría si se especificó
+    const categoriaFinal = nuevoProducto.nuevaCategoria.trim() || nuevoProducto.categoria;
+
+    if (!categoriaFinal) {
+        alert('Debe seleccionar o crear una categoría');
+        return;
+    }
+
     try {
         // Filtrar campos vacíos para evitar errores de ObjectId
         const productoData = { ...nuevoProducto };
@@ -260,13 +324,16 @@ const ComprasPage = ({ userRole }) => {
             delete productoData.marca;
         }
 
+        // Usar la categoría final
+        productoData.categoria = categoriaFinal;
+
         const productoCreado = await apiFetch('/productos', {
             method: 'POST',
             body: JSON.stringify(productoData)
         });
         setProductos([...productos, productoCreado]);
         setShowProductoForm(false);
-        setNuevoProducto({ nombre: '', categoria: '', color: '', marca: '', ubicacion: '', proveedor: '', dimensiones: { alto: '', ancho: '', profundidad: '' } });
+        setNuevoProducto({ nombre: '', categoria: '', nuevaCategoria: '', color: '', marca: '', ubicacion: '', proveedor: '', codigo: '', dimensiones: { alto: '', ancho: '', profundidad: '' } });
         alert('Producto creado exitosamente.');
     } catch (error) {
         console.error("Error creando producto:", error);
@@ -352,14 +419,17 @@ const ComprasPage = ({ userRole }) => {
               dimensiones: { alto: 0, ancho: 0, profundidad: 0 }, // Default dimensions
               imagenProducto: '' // Default empty image
           })),
-          metodosPago: Object.entries(pagos).filter(([key, value]) => value > 0).map(([tipo, monto]) => ({
-              tipo,
-              monto,
-              referencia: tipo === 'Cheque' ? 'REF-CHQ-' + Date.now() : '',
-              cuenta: ''
-          })),
+          metodosPago: Object.entries(pagos)
+    .filter(([tipo, valor]) => valor > 0 && tipo !== 'Credito') // Excluir 'Credito'
+    .map(([tipo, monto]) => ({
+        tipo,
+        monto,
+        referencia: tipo === 'Cheque' ? 'REF-CHQ-' + Date.now() : '',
+        cuenta: ''
+    })),
           totalCompra: totalCompra,
-          estado: 'Pagada',
+          credito: pagos.Credito || 0,
+          estado: pagos.Credito > 0 ? 'Pendiente' : 'Pagada',
           observaciones: compra.observaciones,
           chequeImage: chequeImage ? chequeImage.name : null // Solo el nombre por ahora, en producción subir a servidor
       };
@@ -369,7 +439,15 @@ const ComprasPage = ({ userRole }) => {
               method: 'POST',
               body: JSON.stringify(compraData)
           });
-          alert(`Compra registrada exitosamente. Total: Bs. ${totalCompra.toFixed(2)}. Redirigiendo al módulo de inventario para verificar.`);
+
+          if (pagos.Credito > 0) {
+              alert(`Compra registrada exitosamente. Total: Bs. ${totalCompra.toFixed(2)}. Estado: PENDIENTE DE PAGO. Redirigiendo al módulo de inventario para su verificación.`);
+              navigate('/inventario');
+          } else {
+              alert(`Compra registrada exitosamente. Total: Bs. ${totalCompra.toFixed(2)}. Redirigiendo al módulo de inventario para verificar.`);
+              navigate('/inventario');
+          }
+
           // Reset form
           setCompra({
               fecha: new Date().toISOString().split('T')[0],
@@ -385,8 +463,6 @@ const ComprasPage = ({ userRole }) => {
           });
           setPagos({ Efectivo: 0, Transferencia: 0, Cheque: 0, Credito: 0 });
           setChequeImage(null);
-          // Redirect to inventory module
-          navigate('/inventario');
       } catch (error) {
           console.error("Error al confirmar la compra:", error);
           alert(`Error al registrar la compra: ${error.message}`);
@@ -430,7 +506,7 @@ const ComprasPage = ({ userRole }) => {
           <div className="space-y-6">
             <div className="bg-white rounded-xl shadow-md p-6">
               <h2 className="text-2xl font-semibold text-gray-800 mb-6 border-b pb-4">Información General de la Compra</h2>
-              
+
               {/* Basic Info */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
                 <div>
@@ -488,12 +564,58 @@ const ComprasPage = ({ userRole }) => {
                   <h3 className="text-lg font-semibold text-green-800 mb-4">Nuevo Proveedor</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <input type="text" placeholder="Nombre del proveedor" value={nuevoProveedor.nombre} onChange={(e) => setNuevoProveedor({...nuevoProveedor, nombre: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                    <input type="text" placeholder="Nombre comercial" value={nuevoProveedor.nombreComercial} onChange={(e) => setNuevoProveedor({...nuevoProveedor, nombreComercial: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
                     <input type="text" placeholder="NIT" value={nuevoProveedor.nit} onChange={(e) => setNuevoProveedor({...nuevoProveedor, nit: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                    <input type="text" placeholder="Ubicación" value={nuevoProveedor.ubicacion} onChange={(e) => setNuevoProveedor({...nuevoProveedor, ubicacion: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
                     <input type="text" placeholder="Teléfono" value={nuevoProveedor.contacto.telefono} onChange={(e) => setNuevoProveedor({...nuevoProveedor, contacto: {...nuevoProveedor.contacto, telefono: e.target.value}})} className="px-4 py-2 border border-gray-300 rounded-lg" />
                     <input type="email" placeholder="Email" value={nuevoProveedor.contacto.email} onChange={(e) => setNuevoProveedor({...nuevoProveedor, contacto: {...nuevoProveedor.contacto, email: e.target.value}})} className="px-4 py-2 border border-gray-300 rounded-lg" />
                     <div className="md:col-span-2">
                       <input type="text" placeholder="Dirección" value={nuevoProveedor.direccion} onChange={(e) => setNuevoProveedor({...nuevoProveedor, direccion: e.target.value})} className="w-full px-4 py-2 border border-gray-300 rounded-lg" />
                     </div>
+
+                    {/* Información Bancaria */}
+                    <div className="md:col-span-2">
+                      <h4 className="text-md font-semibold text-gray-800 mb-3">Información Bancaria</h4>
+                      {nuevoProveedor.bancos.map((banco, index) => (
+                        <div key={index} className="mb-4 p-3 bg-gray-50 rounded-lg border">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-2">
+                            <input
+                              type="text"
+                              placeholder="Nombre del banco"
+                              value={banco.nombre}
+                              onChange={(e) => actualizarBanco(index, 'nombre', e.target.value)}
+                              className="px-3 py-2 border border-gray-300 rounded-lg"
+                            />
+                            <input
+                              type="text"
+                              placeholder="Número de cuenta"
+                              value={banco.numeroCuenta}
+                              onChange={(e) => actualizarBanco(index, 'numeroCuenta', e.target.value)}
+                              className="px-3 py-2 border border-gray-300 rounded-lg"
+                            />
+                            <div className="flex items-center space-x-2">
+                              {nuevoProveedor.bancos.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => eliminarBanco(index)}
+                                  className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm"
+                                >
+                                  Eliminar
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={agregarBanco}
+                        className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm"
+                      >
+                        + Agregar Banco
+                      </button>
+                    </div>
+
                     <div className="md:col-span-2 flex space-x-4">
                       <button onClick={handleCrearProveedor} className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">Guardar</button>
                     </div>
@@ -510,7 +632,7 @@ const ComprasPage = ({ userRole }) => {
               {/* --- Products Section --- */}
               <div className="border-t pt-6">
                  <h2 className="text-2xl font-semibold text-gray-800 mb-6">Productos de la Compra</h2>
-                
+
                 {/* Search and Add Product */}
                 <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
                   <h3 className="text-lg font-semibold text-blue-800 mb-4">Buscar y Agregar Producto</h3>
@@ -559,17 +681,30 @@ const ComprasPage = ({ userRole }) => {
                     <h3 className="text-lg font-semibold text-teal-800 mb-4">Crear Nuevo Producto</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <input type="text" placeholder="Nombre del producto" value={nuevoProducto.nombre} onChange={(e) => setNuevoProducto({...nuevoProducto, nombre: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                      <input type="text" placeholder="Código del producto" value={nuevoProducto.codigo} onChange={(e) => setNuevoProducto({...nuevoProducto, codigo: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
 
-                      <select value={nuevoProducto.categoria} onChange={(e) => setNuevoProducto({...nuevoProducto, categoria: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg">
+                      <select value={nuevoProducto.categoria} onChange={handleCategoriaChange} className="px-4 py-2 border border-gray-300 rounded-lg">
                         <option value="">-- Seleccionar Categoría --</option>
-                        <option value="Silla">Silla</option>
-                        <option value="Mesa">Mesa</option>
-                        <option value="Sofá">Sofá</option>
-                        <option value="Estantería">Estantería</option>
-                        <option value="Armario">Armario</option>
-                        <option value="Otro">Otro</option>
+                        {categorias.map(cat => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                        <option value="nueva">Crear nueva categoría</option>
                       </select>
-                      {nuevoProducto.categoria === 'Mesas' && <p className="text-red-500 text-sm">Nota: La categoría 'Mesas' no es válida. Selecciona 'Mesa' en su lugar.</p>}
+
+                      {nuevoProducto.categoria === 'nueva' && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Nueva Categoría *</label>
+                          <input
+                            type="text"
+                            name="nuevaCategoria"
+                            value={nuevoProducto.nuevaCategoria}
+                            onChange={(e) => setNuevoProducto({...nuevoProducto, nuevaCategoria: e.target.value})}
+                            placeholder="Ingrese nueva categoría"
+                            required
+                            className="w-full p-2 border border-gray-300 rounded-md"
+                          />
+                        </div>
+                      )}
 
                       <input type="text" placeholder="Color" value={nuevoProducto.color} onChange={(e) => setNuevoProducto({...nuevoProducto, color: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
                       <input type="text" placeholder="Marca" value={nuevoProducto.marca} onChange={(e) => setNuevoProducto({...nuevoProducto, marca: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
@@ -615,51 +750,78 @@ const ComprasPage = ({ userRole }) => {
                         </tbody>
                     </table>
                 </div>
-              </div>
 
-              {/* --- Payment Section --- */}
-              <div className="border-t pt-6 mt-6">
-                <h2 className="text-2xl font-semibold text-gray-800 mb-6">Pago</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 mb-4">
-                    {metodosPagoOptions.map(metodo => (
-                        <div key={metodo}>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">{metodo}</label>
-                            <input
+                {/* --- Totals and Payment Section --- */}
+                <div className="border-t pt-6 mt-6">
+                  <h2 className="text-2xl font-semibold text-gray-800 mb-6">Pago y Confirmación</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {/* Payment Methods */}
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-700 mb-4">Métodos de Pago</h3>
+                      <div className="space-y-4">
+                        {metodosPagoOptions.map(metodo => (
+                          <div key={metodo} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <label className="text-md font-medium text-gray-800">{metodo}</label>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-gray-600">Bs.</span>
+                              <input
                                 type="number"
-                                placeholder="0.00"
+                                step="0.01"
                                 value={pagos[metodo]}
                                 onChange={(e) => handlePagoChange(metodo, parseFloat(e.target.value) || 0)}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                className="w-32 px-3 py-1 border border-gray-300 rounded-md text-right"
+                                placeholder="0.00"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                        {pagos.Cheque > 0 && (
+                          <div className="mt-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Imagen del Cheque</label>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => setChequeImage(e.target.files[0])}
+                              className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
                             />
-                            {metodo === 'Cheque' && pagos.Cheque > 0 && (
-                                <div className="mt-2">
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Imagen del Cheque</label>
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={(e) => setChequeImage(e.target.files[0])}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                                    />
-                                    {chequeImage && <p className="text-sm text-green-600 mt-1">Imagen seleccionada: {chequeImage.name}</p>}
-                                </div>
-                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Summary */}
+                    <div className="bg-purple-50 p-6 rounded-xl border border-purple-200">
+                      <h3 className="text-xl font-bold text-purple-800 mb-4">Resumen de la Compra</h3>
+                      <div className="space-y-3">
+                        <div className="flex justify-between text-lg">
+                          <span className="text-gray-700">Subtotal:</span>
+                          <span className="font-semibold text-gray-800">Bs. {totalCompra.toFixed(2)}</span>
                         </div>
-                    ))}
-                </div>
-                <div className="text-right mt-6">
-                    <div className="text-gray-600">Total Pagado: <span className="font-bold text-blue-600">Bs. {totalPagado.toFixed(2)}</span></div>
-                    <div className="text-2xl font-bold text-gray-800">Total de la Compra: Bs. {totalCompra.toFixed(2)}</div>
-                    <div className="text-red-600 font-semibold">Saldo Pendiente: Bs. {Math.max(0, totalCompra - totalPagado).toFixed(2)}</div>
+                        <div className="flex justify-between text-lg">
+                          <span className="text-gray-700">Total Pagado:</span>
+                          <span className="font-semibold text-green-600">Bs. {totalPagado.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-xl font-bold border-t pt-3 mt-3">
+                          <span className="text-purple-800">Saldo Pendiente:</span>
+                          <span className="text-red-600">Bs. {(totalCompra - totalPagado).toFixed(2)}</span>
+                        </div>
+                      </div>
+                      <div className="mt-6">
+                        <button
+                          onClick={confirmarCompra}
+                          disabled={compra.productos.length === 0 || totalPagado > totalCompra}
+                          className="w-full bg-purple-600 text-white py-3 rounded-lg text-lg font-semibold hover:bg-purple-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
+                        >
+                          Confirmar y Registrar Compra
+                        </button>
+                        {totalPagado > totalCompra && (
+                          <p className="text-red-500 text-sm mt-2 text-center">El total pagado no puede ser mayor al total de la compra.</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-
-              {/* --- Finalize --- */}
-              <div className="border-t pt-6 mt-6 flex justify-end">
-                <button onClick={confirmarCompra} className="bg-purple-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-purple-700 transition shadow-lg">
-                  Confirmar y Registrar Compra
-                </button>
-              </div>
-
             </div>
           </div>
         </div>

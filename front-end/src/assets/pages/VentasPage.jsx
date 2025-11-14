@@ -129,7 +129,8 @@ const VentasPage = ({ userRole }) => {
     telefono: '',
     email: '',
     nit: '',
-    ci: ''
+    ci: '',
+    ubicacion: ''
   });
 
   // Función de búsqueda
@@ -299,7 +300,8 @@ const VentasPage = ({ userRole }) => {
         telefono: nuevoCliente.telefono.trim(),
         email: nuevoCliente.email.trim() || '',
         nit: nuevoCliente.nit.trim() || '',
-        ci: nuevoCliente.ci.trim() || ''
+        ci: nuevoCliente.ci.trim() || '',
+        ubicacion: nuevoCliente.ubicacion.trim() || ''
       };
 
       const clienteCreado = await apiFetch('/clientes', {
@@ -670,6 +672,17 @@ const VentasPage = ({ userRole }) => {
                     placeholder="Número de CI"
                   />
                   {clienteErrors.ci && <p className="text-red-500 text-sm mt-1">{clienteErrors.ci}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Ubicación</label>
+                  <input
+                    type="text"
+                    value={nuevoCliente.ubicacion}
+                    onChange={(e) => setNuevoCliente({...nuevoCliente, ubicacion: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="Ubicación del cliente (opcional)"
+                  />
                 </div>
               </div>
 

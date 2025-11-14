@@ -15,6 +15,7 @@ import FinanzasPage from "./assets/pages/FinanzasPage.jsx";
 import LogisticaPage from "./assets/pages/LogisticaPage.jsx";
 import AdminCatalogPage from "./assets/pages/AdminCatalogPage.jsx";
 import ReporteVentasDiario from "./assets/pages/ReporteVentasDiario.jsx";
+import ReporteComprasDiario from "./assets/pages/ReporteComprasDiario.jsx";
 import DashboardPage from "./assets/pages/DashboardPage.jsx";
 import CatalogPage from "./assets/pages/CatalogPage.jsx";
 import ThemeToggle from "./components/ThemeToggle.jsx";
@@ -103,6 +104,7 @@ function AppContent() {
             <Route path="/logistica" element={<LogisticaPage userRole={userRole} />} />
             <Route path="/admin-catalogo" element={<AdminCatalogPage userRole={userRole} />} />
             <Route path="/reporte-ventas-diario" element={<ReporteVentasDiario userRole={userRole} />} />
+            <Route path="/reporte-compras-diario" element={<ReporteComprasDiario userRole={userRole} />} />
             <Route path="/dashboard" element={<DashboardPage userRole={userRole} />} />
             {/* AGREGADO: Fallback para rutas inválidas cuando logueado - redirige a home */}
             <Route path="*" element={<Navigate to="/home" replace />} />

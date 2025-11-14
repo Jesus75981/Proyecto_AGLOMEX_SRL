@@ -1,5 +1,5 @@
 import express from 'express';
-import { registrarVenta, listarVentas, getVentasByDay, getEstadisticasVentas } from '../controllers/ventas.controller.js';
+import { registrarVenta, listarVentas, getVentasByDay, getEstadisticasVentas, getComprasByDay } from '../controllers/ventas.controller.js';
 
 const router = express.Router();
 
@@ -14,5 +14,8 @@ router.post('/reporte-diario', getVentasByDay);
 
 // Ruta para estadísticas de ventas (mensuales y anuales)
 router.get('/estadisticas', getEstadisticasVentas);
+
+// Ruta para reporte diario de compras
+router.post('/reporte-compras-diario', getComprasByDay);
 
 export default router;

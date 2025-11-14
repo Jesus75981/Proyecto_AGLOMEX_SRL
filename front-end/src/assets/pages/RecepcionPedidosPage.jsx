@@ -51,8 +51,8 @@ const RecepcionPedidosPage = () => {
   const handleConfirmarRecepcion = async (e) => {
     e.preventDefault();
 
-    if (!pedidoNumero.trim()) {
-      setMessage('Por favor ingrese el número de pedido');
+    if (!pedidoNumero.trim() || !nombre.trim() || !telefono.trim() || !ciudad.trim()) {
+      setMessage('Por favor complete todos los campos');
       setMessageType('error');
       return;
     }
@@ -62,7 +62,10 @@ const RecepcionPedidosPage = () => {
 
     try {
       const response = await axios.post('http://localhost:5000/api/pedidos-publico/confirmar-recepcion', {
-        pedidoNumero: pedidoNumero.trim()
+        pedidoNumero: pedidoNumero.trim(),
+        nombre: nombre.trim(),
+        telefono: telefono.trim(),
+        ciudad: ciudad.trim()
       });
 
       setMessage('¡Recepción confirmada exitosamente! Gracias por su compra.');
@@ -268,6 +271,17 @@ const RecepcionPedidosPage = () => {
                     {loading ? 'Confirmando...' : 'Confirmar Recepción'}
                   </button>
                 </form>
+
+                {/* Información de WhatsApp */}
+                <div className="mt-4 p-4 bg-green-900 border border-green-700 rounded-lg">
+                  <h4 className="text-green-200 font-semibold mb-2">📱 Contacto de WhatsApp</h4>
+                  <p className="text-green-100 text-sm">
+                    Después de confirmar la recepción, recibirás un mensaje de confirmación en WhatsApp al número que proporciones.
+                  </p>
+                  <p className="text-green-200 font-medium mt-2">
+                    WhatsApp de Aglomex: +591 72876225
+                  </p>
+                </div>
               </div>
             )}
 
@@ -293,7 +307,7 @@ const RecepcionPedidosPage = () => {
             </p>
             <div className="text-center">
               <a
-                href="https://wa.me/1234567890?text=Hola,%20tengo%20un%20reclamo%20sobre%20mi%20pedido"
+                href="https://wa.me/59172876225?text=Hola,%20tengo%20un%20reclamo%20sobre%20mi%20pedido"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 shadow-lg"
@@ -304,7 +318,7 @@ const RecepcionPedidosPage = () => {
                 Contactar por WhatsApp
               </a>
               <p className="text-gray-400 text-sm mt-2">
-                Número: +1 (555) 123-4567
+                Número: +591 72876225
               </p>
             </div>
           </div>

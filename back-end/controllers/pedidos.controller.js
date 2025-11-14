@@ -1,4 +1,5 @@
 import Pedido from "../models/pedido.model.js";
+import Logistica from "../models/logistica.model.js";
 import Contador from "../models/contador.model.js";
 
 // Función auxiliar para obtener el siguiente valor de la secuencia del contador
@@ -46,7 +47,14 @@ export const obtenerPedidoPorNumero = async (req, res) => {
       return res.status(400).json({ message: "Número de pedido inválido" });
     }
 
-    const pedido = await Pedido.findOne({ pedidoNumero: numeroParsed }).populate("cliente productos.producto");
+    // Buscar primero en Logistica (pedidos de envío)
+    let pedido = await Logistica.findOne({ pedidoNumero: numeroParsed }).populate("cliente productos.producto");
+
+    // Si no se encuentra en Logistica, buscar en Pedido (pedidos internos)
+    if (!pedido) {
+      pedido = await Pedido.findOne({ pedidoNumero: numeroParsed }).populate("cliente productos.producto");
+    }
+
     if (!pedido) {
       return res.status(404).json({ message: "Pedido no encontrado" });
     }
@@ -70,11 +78,21 @@ export const confirmarRecepcionPedido = async (req, res) => {
       return res.status(400).json({ message: "Todos los campos son requeridos" });
     }
 
-    const pedido = await Pedido.findOneAndUpdate(
+    // Buscar primero en Logistica (pedidos de envío)
+    let pedido = await Logistica.findOneAndUpdate(
       { pedidoNumero: numero },
       { estado: "entregado" },
       { new: true }
     ).populate("cliente productos.producto");
+
+    // Si no se encuentra en Logistica, buscar en Pedido (pedidos internos)
+    if (!pedido) {
+      pedido = await Pedido.findOneAndUpdate(
+        { pedidoNumero: numero },
+        { estado: "entregado" },
+        { new: true }
+      ).populate("cliente productos.producto");
+    }
 
     if (!pedido) {
       return res.status(404).json({ message: "Pedido no encontrado" });
@@ -83,7 +101,23 @@ export const confirmarRecepcionPedido = async (req, res) => {
     // Aquí se podrían almacenar los datos adicionales en un log o tabla separada si es necesario
     console.log(`Recepción confirmada para pedido ${numero} por ${nombre} (${telefono}) de ${ciudad}`);
 
-    res.json({ message: "Recepción confirmada exitosamente", pedido });
+    // Enviar WhatsApp de confirmación
+    const whatsappMessage = `¡Hola ${nombre}! Tu pedido #${numero} ha sido confirmado como recibido exitosamente. Gracias por tu compra en Aglomex SRL. 📦✅`;
+    const whatsappUrl = `https://wa.me/591${telefono}?text=${encodeURIComponent(whatsappMessage)}`;
+
+    // Log del WhatsApp (en producción se enviaría automáticamente)
+    console.log(`WhatsApp enviado a ${telefono}: ${whatsappMessage}`);
+    console.log(`URL WhatsApp: ${whatsappUrl}`);
+
+    res.json({
+      message: "Recepción confirmada exitosamente",
+      pedido,
+      whatsapp: {
+        numero: "72876225",
+        mensaje: whatsappMessage,
+        url: whatsappUrl
+      }
+    });
   } catch (error) {
     res.status(500).json({ message: "Error al confirmar recepción", error: error.message });
   }

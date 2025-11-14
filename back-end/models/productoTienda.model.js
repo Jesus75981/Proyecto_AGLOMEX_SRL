@@ -16,16 +16,6 @@ const productoTiendaSchema = new mongoose.Schema({
     type: String,
     default: ""
   },
-  // --- CAMPOS DE INVENTARIO Y PRECIO (Ahora son Opcionales) ---
-  cantidad: {
-    type: Number,
-    // required: true, <--- Eliminado: La cantidad inicial se setea en la compra
-    default: 0
-  },
-  precioCompra: {
-    type: Number,
-    // required: true <--- Eliminado: Se define al momento de la compra
-  },
   precioVenta: {
     type: Number,
     // required: true <--- Eliminado: Se define posteriormente o se inicializa
@@ -35,9 +25,8 @@ const productoTiendaSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    categoria: { // <-- NUEVO CAMPO REQUERIDO
+    categoria: { // <-- CAMPO REQUERIDO - Ahora permite categorías dinámicas
         type: String,
-        enum: ["Silla", "Mesa", "Sofá", "Estantería", "Armario", "Otro"], // O ajusta las categorías
         required: true
     },
     marca: {
@@ -58,7 +47,8 @@ const productoTiendaSchema = new mongoose.Schema({
     },
     codigo: {
         type: String,
-        default: ""
+        required: true,
+        trim: true
     },
   proveedor: {
     type: mongoose.Schema.Types.ObjectId,
@@ -72,10 +62,6 @@ const productoTiendaSchema = new mongoose.Schema({
     alto: { type: Number },
     ancho: { type: Number },
     profundidad: { type: Number }
-  },
-  objeto3D: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Objeto3D" // para vincular con el modelo 3D en RA
   },
   objeto3D: {
     type: mongoose.Schema.Types.ObjectId,

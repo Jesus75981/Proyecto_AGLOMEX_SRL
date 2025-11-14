@@ -1,35 +1,24 @@
-# Automatizaciones del Sistema Aglomex
+# TODO: Implementar módulo de crear/buscar producto con categoría dinámica, cajas y ubicación
 
-## 1. Envío automático de recordatorios a clientes con pagos pendientes
-- [x] Instalar dependencias: node-cron, nodemailer (para email) y twilio (para WhatsApp)
-- [x] Crear módulo de notificaciones (back-end/services/notifications.service.js)
-- [x] Implementar función para identificar ventas con pagos pendientes
-- [x] Configurar cron job diario para envío de recordatorios
-- [x] Integrar con server.js
+## Tareas Pendientes
 
-## 2. Generación y envío diario/semanal de reportes ejecutivos por WhatsApp
-- [ ] Crear módulo de reportes (back-end/services/reports.service.js)
-- [ ] Implementar funciones para generar reportes resumidos (ventas, producción, finanzas)
-- [ ] Configurar conversión de reportes a formato WhatsApp (texto/imagen)
-- [ ] Configurar cron jobs diario/semanal para envío automático
-- [ ] Integrar con server.js
+### Backend
+- [ ] Actualizar modelo productoTienda.model.js: Cambiar categoria de enum a string para permitir categorías dinámicas
+- [ ] Agregar endpoint en productos.routes.js para obtener categorías únicas existentes
+- [ ] Actualizar controlador productoTienda.controller.js si es necesario para manejar categorías nuevas
 
-## 3. Asignación automática de transportistas basada en ubicación, capacidad y disponibilidad
-- [ ] Actualizar modelo de transportista para incluir ubicación y capacidad
-- [ ] Crear algoritmo de asignación automática en logistica.controller.js
-- [ ] Implementar lógica de optimización (distancia, capacidad, disponibilidad)
-- [ ] Integrar asignación automática en creación de pedidos
+### Frontend
+- [ ] Implementar AdminCatalogPage.jsx con formulario completo para crear productos
+  - [ ] Campo categoría: dropdown con opciones existentes + opción para crear nueva
+  - [ ] Campos cajas y ubicación
+  - [ ] Otros campos del producto (nombre, color, etc.)
+  - [ ] Funcionalidad de búsqueda/listado de productos
+- [ ] Integrar con API para crear productos y obtener categorías
 
-## 4. Respaldos diarios automáticos con notificaciones de estado
-- [ ] Instalar mongodb-tools o usar mongoose para backups
-- [ ] Crear script de backup (back-end/scripts/backup.js)
-- [ ] Configurar cron job diario para backups
-- [ ] Implementar notificaciones de éxito/error
-- [ ] Integrar con server.js
+### Testing
+- [ ] Probar creación de productos con categorías nuevas y existentes
+- [ ] Verificar que cajas y ubicación se guarden correctamente
+- [ ] Probar búsqueda y listado en AdminCatalogPage
 
-## Dependencias a instalar
-- node-cron: Para tareas programadas
-- nodemailer: Para envío de emails
-- twilio: Para WhatsApp Business API
-- whatsapp-web.js: Alternativa gratuita para WhatsApp
-- moment: Para manejo de fechas
+### Adicional (mencionado por usuario)
+- [ ] Revisar lógica de pagos a crédito: mostrar pendientes, proceder compra aunque falte pago, mostrar en inventario

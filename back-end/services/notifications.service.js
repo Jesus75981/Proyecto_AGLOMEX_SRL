@@ -5,7 +5,7 @@ import Cliente from '../models/cliente.model.js';
 import moment from 'moment';
 
 // Configuración de email
-const emailTransporter = nodemailer.createTransporter({
+const emailTransporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER,

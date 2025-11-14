@@ -56,6 +56,10 @@ const clienteSchema = new mongoose.Schema({
   ci: {
     type: String,
     default: ""
+  },
+  ubicacion: {
+    type: String,
+    default: ""
   }
 }, { timestamps: true });
 

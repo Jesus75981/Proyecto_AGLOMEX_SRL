@@ -1,120 +1,169 @@
 import Venta from "../models/venta.model.js";
 import ProductoTienda from "../models/productoTienda.model.js";
+import Compra from "../models/compra.model.js";
+import DeudaVenta from "../models/deudaVenta.model.js"; // Importar el modelo de deudas de venta
 import { registrarTransaccionFinanciera } from './finanzas.controller.js';
 
 export const registrarVenta = async (req, res) => {
     try {
         const ventaData = req.body;
 
-        // 1. VALIDACIÓN DE STOCK: Verificar que hay suficiente stock para todos los productos
+        // 1. VALIDACIÓN DE STOCK
         const productosVendidos = ventaData.productos;
         const productosInsuficientes = [];
-
         for (const item of productosVendidos) {
-            const { producto: productoId, cantidad } = item;
-            const producto = await ProductoTienda.findById(productoId);
-
-            if (!producto) {
-                return res.status(404).json({
-                    msg: `Producto con ID ${productoId} no encontrado.`
-                });
-            }
-
-            if (producto.cantidad < cantidad) {
-                productosInsuficientes.push({
-                    nombre: producto.nombre,
-                    stockActual: producto.cantidad,
-                    solicitado: cantidad
-                });
+            const producto = await ProductoTienda.findById(item.producto);
+            if (!producto) return res.status(404).json({ msg: `Producto con ID ${item.producto} no encontrado.` });
+            if (producto.cantidad < item.cantidad) {
+                productosInsuficientes.push({ nombre: producto.nombre, stockActual: producto.cantidad, solicitado: item.cantidad });
             }
         }
-
-        // Si hay productos con stock insuficiente, rechazar la venta
         if (productosInsuficientes.length > 0) {
-            return res.status(400).json({
-                msg: "Stock insuficiente para los siguientes productos:",
-                productosInsuficientes,
-                sugerencia: "Reduzca las cantidades o espere a que llegue más inventario."
-            });
+            return res.status(400).json({ msg: "Stock insuficiente", productosInsuficientes });
         }
 
-        // 2. Crear el documento de Venta
+        // 2. VALIDACIÓN Y CÁLCULO DE PAGOS Y CRÉDITO
+        const pagosReales = [];
+        let montoCredito = 0;
+        const totalVenta = ventaData.productos.reduce((sum, item) => sum + (item.cantidad * item.precioUnitario), 0);
+
+        if (!ventaData.metodosPago || !Array.isArray(ventaData.metodosPago) || ventaData.metodosPago.length === 0) {
+            montoCredito = totalVenta; // Asumir toda la venta a crédito si no hay métodos de pago
+        } else {
+            for (const pago of ventaData.metodosPago) {
+                if (!pago.tipo || !["Efectivo", "Transferencia", "Cheque", "Crédito"].includes(pago.tipo)) {
+                    return res.status(400).json({ message: "Tipo de pago no válido." });
+                }
+                if (pago.monto <= 0 || typeof pago.monto !== 'number') {
+                    return res.status(400).json({ message: "Monto de pago no válido." });
+                }
+                if (pago.tipo === "Crédito") {
+                    montoCredito += pago.monto;
+                } else {
+                    pagosReales.push(pago);
+                }
+            }
+        }
+
+        const totalPagadoDirectamente = pagosReales.reduce((sum, pago) => sum + pago.monto, 0);
+        if (Math.abs(totalVenta - (totalPagadoDirectamente + montoCredito)) > 0.01) {
+            return res.status(400).json({ message: "La suma de pagos y crédito no coincide con el total de la venta." });
+        }
+
+        // Configurar datos de la venta
+        ventaData.saldoPendiente = 0; // El saldo se gestiona en DeudaVenta
+        ventaData.estado = "Pagada"; // La venta se considera 'Pagada'
+        ventaData.metodosPago = pagosReales; // Guardar solo pagos reales
+
+        // 3. CREAR VENTA Y ACTUALIZAR INVENTARIO
         const nuevaVenta = new Venta(ventaData);
-        await nuevaVenta.save();
+        const ventaGuardada = await nuevaVenta.save();
+        await ventaGuardada.populate("cliente productos.producto");
 
-        // Poblar los datos del cliente y productos para la respuesta
-        await nuevaVenta.populate("cliente productos.producto");
-
-        // 3. Actualizar el inventario y ventasAcumuladas (operaciones atómicas)
-        const operacionesActualizacion = productosVendidos.map(item => {
-            const { producto: productoId, cantidad } = item;
-
-            return ProductoTienda.findByIdAndUpdate(
-                productoId,
-                {
-                    $inc: {
-                        cantidad: -cantidad, // Decrementa el stock
-                        ventasAcumuladas: cantidad // Incrementa las ventas acumuladas
-                    }
-                },
-                { new: true }
-            );
-        });
-
-        // Ejecutar todas las actualizaciones simultáneamente
-        await Promise.all(operacionesActualizacion);
-
-        // 4. REGISTRAR TRANSACCIÓN FINANCIERA: Ingreso por venta de productos
-        const totalVenta = productosVendidos.reduce((total, item) => total + (item.precioUnitario * item.cantidad), 0);
-        await registrarTransaccionFinanciera(
-            'ingreso',
-            'venta_productos',
-            `Venta #${ventaData.numVenta} - ${productosVendidos.length} producto(s)`,
-            totalVenta,
-            nuevaVenta._id,
-            'Venta',
-            {
-                metodoPago: ventaData.metodoPago,
-                numFactura: ventaData.numFactura,
-                numVenta: ventaData.numVenta
-            },
-            'BOB', // Moneda: Bolivianos
-            1 // Tipo de cambio: 1 para BOB
+        const updatePromises = productosVendidos.map(item =>
+            ProductoTienda.findByIdAndUpdate(item.producto, {
+                $inc: { cantidad: -item.cantidad, ventasAcumuladas: item.cantidad }
+            }, { new: true })
         );
+        await Promise.all(updatePromises);
 
-        // 5. VERIFICAR ALERTAS DE STOCK BAJO: Después de la venta, verificar si algún producto quedó con stock bajo
+        // 4. GESTIONAR DEUDA SI HAY CRÉDITO
+        if (montoCredito > 0) {
+            const nuevaDeuda = new DeudaVenta({
+                ventaId: ventaGuardada._id,
+                cliente: ventaGuardada.cliente,
+                montoOriginal: montoCredito,
+                saldoActual: montoCredito,
+                estado: 'Pendiente'
+            });
+            await nuevaDeuda.save();
+            console.log(`[DEUDA VENTA]: Deuda registrada por venta ${ventaGuardada.numVenta}. Saldo: ${montoCredito}`);
+        }
+
+        // 5. REGISTRAR TRANSACCIÓN FINANCIERA (SOLO INGRESO REAL)
+        if (totalPagadoDirectamente > 0) {
+            await registrarTransaccionFinanciera(
+                'ingreso',
+                'venta_productos',
+                `Ingreso por Venta #${ventaGuardada.numVenta}`,
+                totalPagadoDirectamente,
+                ventaGuardada._id,
+                'Venta',
+                { metodosPago: pagosReales, numVenta: ventaGuardada.numVenta },
+                'BOB', 1
+            );
+        }
+
+        // 6. VERIFICAR ALERTAS DE STOCK BAJO
         const alertasStockBajo = [];
         for (const item of productosVendidos) {
             const productoActualizado = await ProductoTienda.findById(item.producto);
-            if (productoActualizado && productoActualizado.cantidad <= 5) { // Umbral de stock bajo: 5 unidades
+            if (productoActualizado && productoActualizado.cantidad <= 5) {
                 alertasStockBajo.push({
                     producto: productoActualizado.nombre,
                     stockActual: productoActualizado.cantidad,
-                    mensaje: "Stock bajo - Considerar reabastecimiento"
+                    mensaje: "Stock bajo"
                 });
             }
         }
 
-        // 6. Respuesta exitosa con alertas si las hay
+        // 7. RESPUESTA
         const respuesta = {
-            msg: "Venta registrada exitosamente y productos actualizados.",
-            venta: nuevaVenta
+            msg: "Venta registrada exitosamente.",
+            venta: ventaGuardada,
+            ...(alertasStockBajo.length > 0 && { alertas: alertasStockBajo })
         };
-
-        if (alertasStockBajo.length > 0) {
-            respuesta.alertas = alertasStockBajo;
-            respuesta.mensajeAdicional = "Algunos productos tienen stock bajo después de esta venta.";
-        }
-
         return res.status(201).json(respuesta);
 
     } catch (error) {
         console.error("Error al registrar la venta:", error);
-        return res.status(500).json({
-            msg: "Error interno del servidor al procesar la venta.",
-            error: error.message
-        });
+        return res.status(500).json({ msg: "Error interno del servidor.", error: error.message });
     }
+};
+
+// Nueva función para obtener compras por día
+export const getComprasByDay = async (req, res) => {
+  try {
+    // Obtener la fecha del cuerpo de la solicitud (asegúrate de que el formato es 'YYYY-MM-DD')
+    const { date } = req.body;
+
+    // Convertir la fecha de entrada en un objeto de fecha para la consulta
+    const targetDate = new Date(date);
+    const startOfDay = new Date(targetDate.setHours(0, 0, 0, 0));
+    const endOfDay = new Date(targetDate.setHours(23, 59, 59, 999));
+
+    // Buscar compras en la base de datos para ese día y poblar productos y proveedor
+    const comprasDelDia = await Compra.find({
+      fecha: {
+        $gte: startOfDay,
+        $lt: endOfDay
+      }
+    }).populate('productos.producto proveedor');
+
+    // Calcular el total para cada compra y agregar el campo
+    const comprasConTotal = comprasDelDia.map(compra => {
+      const total = compra.productos.reduce((sum, item) => {
+        return sum + (item.precioUnitario * item.cantidad);
+      }, 0);
+
+      return {
+        ...compra.toObject(),
+        total: total
+      };
+    });
+
+    // Enviar los datos encontrados como una respuesta
+    res.status(200).json({
+      success: true,
+      data: comprasConTotal
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener las compras del día',
+      error: error.message
+    });
+  }
 };
 
 export const listarVentas = async (req, res) => {
@@ -150,18 +199,30 @@ export const getVentasByDay = async (req, res) => {
     const startOfDay = new Date(targetDate.setHours(0, 0, 0, 0));
     const endOfDay = new Date(targetDate.setHours(23, 59, 59, 999));
 
-    // Buscar ventas en la base de datos para ese día
+    // Buscar ventas en la base de datos para ese día y poblar cliente y productos
     const ventasDelDia = await Venta.find({
       fecha: {
         $gte: startOfDay,
         $lt: endOfDay
       }
+    }).populate('cliente productos.producto');
+
+    // Calcular el total para cada venta y agregar el campo
+    const ventasConTotal = ventasDelDia.map(venta => {
+      const total = venta.productos.reduce((sum, item) => {
+        return sum + (item.precioUnitario * item.cantidad);
+      }, 0);
+
+      return {
+        ...venta.toObject(),
+        total: total
+      };
     });
 
     // Enviar los datos encontrados como una respuesta
     res.status(200).json({
       success: true,
-      data: ventasDelDia
+      data: ventasConTotal
     });
   } catch (error) {
     res.status(500).json({

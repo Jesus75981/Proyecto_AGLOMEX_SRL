@@ -106,7 +106,7 @@ const HomePage = ({ userRole, onLogout }) => {
               </span>
               <h2 className="text-2xl font-bold text-gray-800 mb-2">Reportes Diarios</h2>
               <p className="text-sm text-gray-500 text-center">
-                Visualiza las ventas por día.
+                Visualiza las ventas y compras por día.
               </p>
             </div>
           </Link>

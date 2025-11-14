@@ -1,5 +1,6 @@
 import Compra from "../models/compra.model.js";
-import ProductoTienda from "../models/productoTienda.model.js"; // Asegúrate de que esta línea exista
+import ProductoTienda from "../models/productoTienda.model.js";
+import DeudaCompra from "../models/deudaCompra.model.js"; // Importar el modelo de deudas
 import { registrarTransaccionFinanciera } from './finanzas.controller.js';
 
 /**
@@ -68,24 +69,96 @@ export const registrarCompra = async (req, res) => {
     const datosCompra = req.body;
 
     try {
-        if (!datosCompra.productos || datosCompra.productos.length === 0) {
+        // --- GENERAR NÚMERO DE COMPRA CORRELATIVO ---
+        const today = new Date();
+        const dateStr = today.getFullYear().toString() +
+                        (today.getMonth() + 1).toString().padStart(2, '0') +
+                        today.getDate().toString().padStart(2, '0');
+        const prefix = `COMP-${dateStr}-`;
+
+        const ultimaCompraDelDia = await Compra.findOne({
+            numCompra: { $regex: `^${prefix}` }
+        }).sort({ numCompra: -1 });
+
+        let nextNum = 1;
+        if (ultimaCompraDelDia && ultimaCompraDelDia.numCompra) {
+            const lastNumStr = ultimaCompraDelDia.numCompra.split('-')[2];
+            const lastNum = parseInt(lastNumStr, 10);
+            nextNum = lastNum + 1;
+        }
+        datosCompra.numCompra = `${prefix}${nextNum.toString().padStart(4, '0')}`;
+
+        // --- VALIDACIONES INICIALES ---
+        if (!datosCompra.tipoCompra || !["Materia Prima", "Producto Terminado"].includes(datosCompra.tipoCompra)) {
+            return res.status(400).json({ message: "El tipo de compra es obligatorio y debe ser 'Materia Prima' o 'Producto Terminado'." });
+        }
+        if (!datosCompra.proveedor) {
+            return res.status(400).json({ message: "El proveedor es obligatorio." });
+        }
+        const Proveedor = (await import("../models/proveedores.model.js")).default;
+        const proveedorExistente = await Proveedor.findById(datosCompra.proveedor);
+        if (!proveedorExistente) {
+            return res.status(400).json({ message: "El proveedor especificado no existe." });
+        }
+        if (!datosCompra.productos || !Array.isArray(datosCompra.productos) || datosCompra.productos.length === 0) {
             return res.status(400).json({ message: "La compra debe contener al menos un producto." });
         }
-
-        // --- VALIDACIÓN DE PAGOS MÚLTIPLES (CRÍTICO) ---
-        // Calcula la suma de todos los montos de pago del array metodosPago
-        const totalPagos = datosCompra.metodosPago
-            ? datosCompra.metodosPago.reduce((sum, pago) => sum + pago.monto, 0)
-            : 0;
-
-        // Compara la suma de pagos con el total de la compra (usando tolerancia para flotantes)
-        if (Math.abs(totalPagos - datosCompra.totalCompra) > 0.01) {
+        for (const item of datosCompra.productos) {
+            if (!item.producto && (!item.nombreProducto || !item.colorProducto || !item.categoriaProducto)) {
+                return res.status(400).json({ message: "Cada producto debe tener un ID o nombre, color y categoría para crearlo." });
+            }
+            if (item.cantidad <= 0 || typeof item.cantidad !== 'number') {
+                return res.status(400).json({ message: "La cantidad de cada producto debe ser un número positivo." });
+            }
+            if (item.precioUnitario <= 0 || typeof item.precioUnitario !== 'number') {
+                return res.status(400).json({ message: "El precio unitario de cada producto debe ser un número positivo." });
+            }
+        }
+        const totalEsperado = datosCompra.productos.reduce((sum, item) => sum + (item.cantidad * item.precioUnitario), 0);
+        if (Math.abs(totalEsperado - datosCompra.totalCompra) > 0.01) {
             return res.status(400).json({
-                message: `Error de pago. El total de la compra (${datosCompra.totalCompra.toFixed(2)}) no coincide con la suma de los pagos (${totalPagos.toFixed(2)}).`
+                message: `El total de la compra (${datosCompra.totalCompra}) no coincide con la suma de los productos (${totalEsperado.toFixed(2)}).`
             });
         }
-        // -------------------------------------------------
 
+        // --- VALIDACIÓN Y CÁLCULO DE PAGOS (LÓGICA MODIFICADA PARA CRÉDITO) ---
+        const pagosReales = [];
+        let montoCredito = 0;
+
+        if (!datosCompra.metodosPago || !Array.isArray(datosCompra.metodosPago) || datosCompra.metodosPago.length === 0) {
+            // Si no hay métodos de pago, se asume que toda la compra es a crédito.
+            montoCredito = datosCompra.totalCompra;
+        } else {
+            for (const pago of datosCompra.metodosPago) {
+                if (!pago.tipo || !["Efectivo", "Transferencia", "Cheque", "Crédito"].includes(pago.tipo)) {
+                    return res.status(400).json({ message: "Cada método de pago debe tener un tipo válido: Efectivo, Transferencia, Cheque o Crédito." });
+                }
+                if (pago.monto <= 0 || typeof pago.monto !== 'number') {
+                    return res.status(400).json({ message: "El monto de cada pago debe ser un número positivo." });
+                }
+
+                if (pago.tipo === "Crédito") {
+                    montoCredito += pago.monto;
+                } else {
+                    pagosReales.push(pago);
+                }
+            }
+        }
+
+        const totalPagadoDirectamente = pagosReales.reduce((sum, pago) => sum + pago.monto, 0);
+        const totalComprometido = totalPagadoDirectamente + montoCredito;
+
+        if (Math.abs(datosCompra.totalCompra - totalComprometido) > 0.01) {
+            return res.status(400).json({
+                message: `La suma de los pagos (${totalPagadoDirectamente.toFixed(2)}) y el crédito (${montoCredito.toFixed(2)}) no coincide con el total de la compra (${datosCompra.totalCompra.toFixed(2)}).`
+            });
+        }
+
+        // La compra se considera 'Pagada' o 'Cerrada' porque el crédito está documentado en DeudaCompra.
+        // El saldo pendiente en la COMPRA ahora es CERO.
+        datosCompra.saldoPendiente = 0;
+        datosCompra.estado = "Pagada";
+        datosCompra.metodosPago = pagosReales; // Guardar solo los pagos reales en la compra.
 
         // --- 1. PRE-PROCESAMIENTO: IDENTIFICAR O CREAR PRODUCTOS NUEVOS ---
         const preProcessPromises = datosCompra.productos.map(async (item) => {
@@ -97,64 +170,65 @@ export const registrarCompra = async (req, res) => {
                 dimensiones: item.dimensiones,
                 imagenProducto: item.imagenProducto
             });
-            // Reemplazamos el campo 'producto' (que podría ser el nombre) con el ObjectId real
             return { ...item, producto: productoObjectId };
         });
-
         datosCompra.productos = await Promise.all(preProcessPromises);
 
-        // --- 2. REGISTRAR LA COMPRA (incluye metodosPago) ---
+        // --- 2. REGISTRAR LA COMPRA ---
         const nuevaCompra = new Compra(datosCompra);
         const compraGuardada = await nuevaCompra.save();
 
-        // --- 3. ACTUALIZAR EL INVENTARIO (productos_tienda) - AUMENTAR STOCK Y PRECIO COMPRA ---
-
+        // --- 3. ACTUALIZAR EL INVENTARIO ---
         const updatePromises = datosCompra.productos.map(item => {
-            const cantidadAumentada = item.cantidad;
-            const precioCompra = item.precioUnitario;
-
-            const updateFields = {
-                $inc: {
-                    cantidad: cantidadAumentada
-                },
-                $set: {
-                    precioCompra: precioCompra,
-                }
-            };
-
             return ProductoTienda.findByIdAndUpdate(
                 item.producto,
-                updateFields,
+                {
+                    $inc: { cantidad: item.cantidad },
+                    $set: { precioCompra: item.precioUnitario }
+                },
                 { new: true }
-            ).orFail(new Error(`ProductoTienda con ID ${item.producto} no encontrado para actualizar stock.`));
+            ).orFail(new Error(`ProductoTienda con ID ${item.producto} no encontrado.`));
         });
-
         const inventarioActualizado = await Promise.all(updatePromises);
 
-        // --- 4. REGISTRAR TRANSACCIÓN FINANCIERA: Egreso por compra de productos ---
-        await registrarTransaccionFinanciera(
-            'egreso',
-            datosCompra.tipoCompra === 'Materia Prima' ? 'compra_materias' : 'compra_productos',
-            `Compra #${compraGuardada.numCompra} - ${datosCompra.tipoCompra}`,
-            datosCompra.totalCompra,
-            compraGuardada._id,
-            'Compra',
-            {
-                numCompra: compraGuardada.numCompra,
-                tipoCompra: datosCompra.tipoCompra,
-                metodosPago: datosCompra.metodosPago
-            },
-            'BOB', // Moneda: Bolivianos
-            1 // Tipo de cambio: 1 para BOB
-        );
+        // --- 4. GESTIONAR DEUDA SI HAY MONTO A CRÉDITO ---
+        if (montoCredito > 0) {
+            const nuevaDeuda = new DeudaCompra({
+                compraId: compraGuardada._id,
+                proveedor: compraGuardada.proveedor,
+                montoOriginal: montoCredito,
+                montoPagado: 0,
+                saldoActual: montoCredito,
+                estado: 'Pendiente'
+            });
+            await nuevaDeuda.save();
+            console.log(`[DEUDA]: Se registró deuda por la compra ${compraGuardada.numCompra}. Saldo: ${montoCredito}`);
+        }
 
-        // 5. VERIFICAR ALERTAS DE STOCK BAJO DESPUÉS DE LA COMPRA: Verificar si algún producto salió del estado "Stock Bajo"
+        // --- 5. REGISTRAR TRANSACCIÓN FINANCIERA (SOLO EGRESO REAL) ---
+        if (totalPagadoDirectamente > 0) {
+            await registrarTransaccionFinanciera(
+                'egreso',
+                datosCompra.tipoCompra === 'Materia Prima' ? 'compra_materias' : 'compra_productos',
+                `Pago de Compra #${compraGuardada.numCompra}`,
+                totalPagadoDirectamente,
+                compraGuardada._id,
+                'Compra',
+                {
+                    numCompra: compraGuardada.numCompra,
+                    tipoCompra: datosCompra.tipoCompra,
+                    metodosPago: pagosReales
+                },
+                'BOB',
+                1
+            );
+        }
+
+        // --- 6. VERIFICAR ALERTAS DE STOCK ---
         const alertasStockNormalizado = [];
         for (const item of datosCompra.productos) {
             const productoActualizado = await ProductoTienda.findById(item.producto);
-            if (productoActualizado && productoActualizado.cantidad > 5) { // Si ahora tiene más de 5 unidades
-                // Verificar si antes estaba en stock bajo (esto es aproximado, ya que no tenemos el estado anterior)
-                // Podríamos agregar un campo para trackear cambios de estado
+            if (productoActualizado && productoActualizado.cantidad > 5) {
                 alertasStockNormalizado.push({
                     producto: productoActualizado.nombre,
                     stockActual: productoActualizado.cantidad,
@@ -163,25 +237,20 @@ export const registrarCompra = async (req, res) => {
             }
         }
 
-        // 6. Respuesta exitosa con alertas si las hay
+        // --- 7. RESPUESTA EXITOSA ---
         const respuesta = {
-            message: `Compra #${compraGuardada.numCompra} registrada y stock actualizado.`,
+            message: `Compra #${compraGuardada.numCompra} registrada. Stock actualizado.`,
             compra: compraGuardada,
             inventarioAfectado: inventarioActualizado
         };
-
         if (alertasStockNormalizado.length > 0) {
             respuesta.alertas = alertasStockNormalizado;
-            respuesta.mensajeAdicional = "Algunos productos han salido del estado de stock bajo.";
         }
-
         res.status(201).json(respuesta);
 
     } catch (error) {
-        console.error("Error al registrar la compra y actualizar stock:", error.message);
-
-        // Manejo de errores específicos para validación de datos (pago, producto, esquema)
-        const statusCode = error.name === 'ValidationError' || error.message.includes('insuficientes') || error.message.includes('crear') || error.message.includes('pago') ? 400 : 500;
+        console.error("Error al registrar la compra:", error.message);
+        const statusCode = error.name === 'ValidationError' || error.message.includes('insuficientes') || error.message.includes('no coincide') ? 400 : 500;
         res.status(statusCode).json({ message: "Error al registrar la compra.", error: error.message });
     }
 };
@@ -199,5 +268,22 @@ export const listarCompras = async (req, res) => {
         res.status(200).json(historial);
     } catch (error) {
         res.status(500).json({ message: "Error al listar compras", error: error.message });
+    }
+};
+
+/**
+ * Lista las Compras que tienen saldo pendiente.
+ */
+export const listarComprasConSaldo = async (req, res) => {
+    try {
+        const comprasConSaldo = await Compra.find({
+            saldoPendiente: { $gt: 0 },
+            estado: { $in: ["Pendiente", "Parcialmente Pagada"] }
+        })
+        .populate('proveedor')
+        .sort({ fecha: -1 });
+        res.status(200).json(comprasConSaldo);
+    } catch (error) {
+        res.status(500).json({ message: "Error al listar las compras con saldo.", error: error.message });
     }
 };

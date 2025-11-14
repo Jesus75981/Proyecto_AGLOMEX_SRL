@@ -5,11 +5,19 @@ const proveedorSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  nombreComercial: {
+    type: String,
+    default: ""
+  },
   contacto: {
     telefono: String,
     email: String
   },
   direccion: {
+    type: String,
+    default: ""
+  },
+  ubicacion: {
     type: String,
     default: ""
   },
@@ -20,10 +28,10 @@ const proveedorSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
-  banco: {
+  bancos: [{
     nombre: String,
     numeroCuenta: String
-  }
+  }]
 }, { timestamps: true });
 
 export default mongoose.model("Proveedor", proveedorSchema);

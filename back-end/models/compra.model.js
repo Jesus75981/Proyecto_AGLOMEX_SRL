@@ -4,7 +4,7 @@ const pagoSchema = new mongoose.Schema({
     tipo: {
         type: String,
         // ENUM ACTUALIZADO: Incluye los 4 métodos de pago solicitados
-        enum: ["Efectivo", "Transferencia", "Cheque", "Credito"],
+        enum: ["Efectivo", "Transferencia", "Cheque"],
         required: true,
     },
     monto: { // Monto específico pagado con este método
@@ -47,11 +47,18 @@ const compraSchema = new mongoose.Schema({
                 ref: "ProductoTienda", 
                 required: true,
             },
-            cantidad: { type: Number, required: true },
             precioUnitario: { type: Number, required: true },
             codigoProveedor: String
         },
     ],
+    totalCompra: {
+        type: Number,
+        required: true
+    },
+    saldoPendiente: {
+        type: Number,
+        default: 0
+    },
    metodosPago: {
         type: [pagoSchema], // Un array de los pagos realizados
         required: true,
@@ -65,8 +72,7 @@ const compraSchema = new mongoose.Schema({
     
     estado: {
         type: String,
-        enum: ["Pendiente", "Pagada", "Parcialmente Pagada", "Cancelada"],
-        default: "Pagada"
+        enum: ["Pendiente", "Pagada", "Parcialmente Pagada", "Cancelada"]
     },
     observaciones: String
 }, { timestamps: true });

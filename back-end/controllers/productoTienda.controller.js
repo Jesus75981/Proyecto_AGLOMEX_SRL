@@ -15,7 +15,7 @@ export const crearProducto = async (req, res) => {
     // { nombre: String, imagen: String, dimensiones: { alto: N, ancho: N, profundidad: N } }
     try {
         // 1. Validación adicional en el controlador
-        const { nombre, color, categoria } = req.body;
+        const { nombre, color, categoria, codigo } = req.body;
 
         if (!nombre || nombre.trim().length === 0) {
             return res.status(400).json({ error: 'El campo "nombre" es obligatorio y no puede estar vacío.' });
@@ -29,14 +29,19 @@ export const crearProducto = async (req, res) => {
             return res.status(400).json({ error: 'El campo "categoria" es obligatorio y no puede estar vacío.' });
         }
 
+        if (!codigo || codigo.trim().length === 0) {
+            return res.status(400).json({ error: 'El campo "codigo" es obligatorio y no puede estar vacío.' });
+        }
+
         // 2. Generar el código interno usando el nombre (requerido)
         const idProductoTienda = generarCodigoInterno(req.body.nombre);
 
-        // 3. Combinar los datos del body con el código generado
+        // 3. Combinar los datos del body con el código generado, excluyendo campos no deseados
+        const { cantidad, precioCompra, ...restoDelBody } = req.body;
         const productoData = {
-            ...req.body,
+            ...restoDelBody,
             idProductoTienda: idProductoTienda,
-            // Los campos 'precioVenta', 'cantidad' y 'descripcion'
+            // El campo 'precioVenta' y 'descripcion'
             // se omiten si no se envían, y se permiten vacíos por el esquema.
         };
 
@@ -86,6 +91,15 @@ export const eliminarProducto = async (req, res) => {
       return res.status(404).json({ message: "Producto no encontrado" });
     }
     res.json({ message: "Producto eliminado lógicamente (inactivado)" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const obtenerCategorias = async (req, res) => {
+  try {
+    const categorias = await ProductoTienda.distinct('categoria', { activo: true });
+    res.json(categorias);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

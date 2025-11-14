@@ -41,9 +41,10 @@ const InventarioPage = ({ userRole }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('productos');
   const [showForm, setShowForm] = useState(false);
-  const [showMovimientoForm, setShowMovimientoForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [selectedImage, setSelectedImage] = useState(null);
 
   // Estados para búsqueda en formularios
   const [categoriaSearch, setCategoriaSearch] = useState('');
@@ -52,6 +53,28 @@ const InventarioPage = ({ userRole }) => {
   const [showCategoriaDropdown, setShowCategoriaDropdown] = useState(false);
   const [showProveedorDropdown, setShowProveedorDropdown] = useState(false);
   const [showProductoDropdown, setShowProductoDropdown] = useState(false);
+
+  // Estados para modificar producto
+  const [modificarProducto, setModificarProducto] = useState({
+    nombre: '',
+    descripcion: '',
+    color: '',
+    categoria: '',
+    marca: '',
+    cajas: '',
+    ubicacion: '',
+    tamano: '',
+    codigo: '',
+    precioCompra: '',
+    precioVenta: '',
+    cantidad: '',
+    imagen: ''
+  });
+  const [showModificarForm, setShowModificarForm] = useState(false);
+  const [productoEditando, setProductoEditando] = useState(null);
+
+  // Estado para formulario de movimiento
+  const [showMovimientoForm, setShowMovimientoForm] = useState(false);
 
   // Datos de API - Inventario
   const [inventario, setInventario] = useState([]);
@@ -112,6 +135,9 @@ const InventarioPage = ({ userRole }) => {
       stockActual: 25
     }
   ]);
+
+  // Cuentas por pagar
+  const [deudas, setDeudas] = useState([]);
 
   // Categorías
   const categorias = ['Sillas', 'Mesas', 'Sofás', 'Estanterías', 'Escritorios', 'Iluminación', 'Accesorios'];
@@ -257,6 +283,107 @@ const InventarioPage = ({ userRole }) => {
 
   const eliminarProducto = (id) => {
     setInventario(inventario.filter(item => item.id !== id));
+  };
+
+  // Función para iniciar edición de producto
+  const iniciarEdicion = (item) => {
+    const productoCompleto = productosAPI.find(p => p._id === item.id);
+    if (productoCompleto) {
+      setModificarProducto({
+        nombre: productoCompleto.nombre || '',
+        descripcion: productoCompleto.descripcion || '',
+        color: productoCompleto.color || '',
+        categoria: productoCompleto.categoria || '',
+        marca: productoCompleto.marca || '',
+        cajas: productoCompleto.cajas || '',
+        ubicacion: productoCompleto.ubicacion || '',
+        tamano: productoCompleto.tamano || '',
+        codigo: productoCompleto.idProductoTienda || '',
+        precioCompra: productoCompleto.precioCompra || '',
+        precioVenta: productoCompleto.precioVenta || '',
+        cantidad: productoCompleto.cantidad || '',
+        imagen: productoCompleto.imagen || ''
+      });
+      setProductoEditando(productoCompleto);
+      setShowModificarForm(true);
+    }
+  };
+
+  // Validación para modificar producto
+  const validarModificarProducto = () => {
+    const errores = {};
+    if (!modificarProducto.nombre.trim()) {
+      errores.nombre = 'El nombre es obligatorio';
+    }
+    if (!modificarProducto.categoria) {
+      errores.categoria = 'Debe seleccionar una categoría';
+    }
+    if (modificarProducto.cantidad === '' || isNaN(modificarProducto.cantidad) || parseInt(modificarProducto.cantidad) < 0) {
+      errores.cantidad = 'La cantidad debe ser un número entero positivo o cero';
+    }
+    if (modificarProducto.precioCompra === '' || isNaN(modificarProducto.precioCompra) || parseFloat(modificarProducto.precioCompra) < 0) {
+      errores.precioCompra = 'El precio de compra debe ser un número positivo';
+    }
+    if (modificarProducto.precioVenta === '' || isNaN(modificarProducto.precioVenta) || parseFloat(modificarProducto.precioVenta) < 0) {
+      errores.precioVenta = 'El precio de venta debe ser un número positivo';
+    }
+    if (!errores.precioCompra && !errores.precioVenta && parseFloat(modificarProducto.precioVenta) < parseFloat(modificarProducto.precioCompra)) {
+      errores.precioVenta = 'El precio de venta debe ser mayor o igual al precio de compra';
+    }
+    setErroresProducto(errores);
+    return Object.keys(errores).length === 0;
+  };
+
+  // Función para modificar producto
+  const modificarProductoFunc = async () => {
+    if (!validarModificarProducto()) return;
+    try {
+      const updatedProduct = {
+        nombre: modificarProducto.nombre,
+        descripcion: modificarProducto.descripcion,
+        color: modificarProducto.color,
+        categoria: modificarProducto.categoria,
+        marca: modificarProducto.marca,
+        cajas: modificarProducto.cajas,
+        ubicacion: modificarProducto.ubicacion,
+        tamano: modificarProducto.tamano,
+        idProductoTienda: modificarProducto.codigo,
+        precioCompra: parseFloat(modificarProducto.precioCompra),
+        precioVenta: parseFloat(modificarProducto.precioVenta),
+        cantidad: parseInt(modificarProducto.cantidad),
+        imagen: modificarProducto.imagen
+      };
+      await apiFetch(`/productos/${productoEditando._id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updatedProduct)
+      });
+      // Recargar productos
+      const productos = await apiFetch('/productos');
+      setProductosAPI(productos);
+      const inventarioMapeado = productos.map((prod) => ({
+        id: prod._id,
+        producto: prod.nombre,
+        sku: prod.idProductoTienda,
+        categoria: prod.categoria,
+        proveedor: prod.proveedor?.nombre || 'Sin proveedor',
+        cantidad: prod.cantidad || 0,
+        cantidadMinima: 5,
+        cantidadMaxima: 100,
+        ubicacion: prod.ubicacion || '',
+        precioCosto: prod.precioCompra || 0,
+        precioVenta: prod.precioVenta || 0,
+        estado: (prod.cantidad || 0) <= 0 ? 'Agotado' :
+                (prod.cantidad || 0) <= 5 ? 'Stock Bajo' : 'Disponible',
+        fechaIngreso: prod.createdAt ? new Date(prod.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        ultimaActualizacion: prod.updatedAt ? new Date(prod.updatedAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+      }));
+      setInventario(inventarioMapeado);
+      setShowModificarForm(false);
+      setProductoEditando(null);
+    } catch (err) {
+      console.error('Error modificando producto:', err);
+      setError('Error al modificar el producto');
+    }
   };
 
   // Validaciones para movimientos
@@ -776,6 +903,120 @@ const InventarioPage = ({ userRole }) => {
                   </div>
                 )}
 
+                {/* Formulario Modificar Producto */}
+                {showModificarForm && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 p-4 bg-green-50 rounded-lg">
+                    <h3 className="md:col-span-3 text-lg font-semibold text-gray-800 mb-2">Editar Producto</h3>
+                    <input
+                      type="text"
+                      placeholder="Nombre del producto"
+                      value={modificarProducto.nombre}
+                      onChange={(e) => setModificarProducto({...modificarProducto, nombre: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Descripción"
+                      value={modificarProducto.descripcion}
+                      onChange={(e) => setModificarProducto({...modificarProducto, descripcion: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Color"
+                      value={modificarProducto.color}
+                      onChange={(e) => setModificarProducto({...modificarProducto, color: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Categoría"
+                      value={modificarProducto.categoria}
+                      onChange={(e) => setModificarProducto({...modificarProducto, categoria: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Marca"
+                      value={modificarProducto.marca}
+                      onChange={(e) => setModificarProducto({...modificarProducto, marca: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Cajas"
+                      value={modificarProducto.cajas}
+                      onChange={(e) => setModificarProducto({...modificarProducto, cajas: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Ubicación"
+                      value={modificarProducto.ubicacion}
+                      onChange={(e) => setModificarProducto({...modificarProducto, ubicacion: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Tamaño"
+                      value={modificarProducto.tamano}
+                      onChange={(e) => setModificarProducto({...modificarProducto, tamano: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Código"
+                      value={modificarProducto.codigo}
+                      onChange={(e) => setModificarProducto({...modificarProducto, codigo: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="Precio Compra"
+                      value={modificarProducto.precioCompra}
+                      onChange={(e) => setModificarProducto({...modificarProducto, precioCompra: parseFloat(e.target.value) || 0})}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="Precio Venta"
+                      value={modificarProducto.precioVenta}
+                      onChange={(e) => setModificarProducto({...modificarProducto, precioVenta: parseFloat(e.target.value) || 0})}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Cantidad"
+                      value={modificarProducto.cantidad}
+                      onChange={(e) => setModificarProducto({...modificarProducto, cantidad: parseInt(e.target.value) || 0})}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Imagen URL"
+                      value={modificarProducto.imagen}
+                      onChange={(e) => setModificarProducto({...modificarProducto, imagen: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <div className="md:col-span-3 flex space-x-4">
+                      <button
+                        onClick={modificarProductoFunc}
+                        className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition duration-200"
+                      >
+                        Guardar Cambios
+                      </button>
+                      <button
+                        onClick={() => setShowModificarForm(false)}
+                        className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition duration-200"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Lista de Productos */}
                 <h3 className="text-xl font-semibold text-gray-800 mb-4">Inventario Actual</h3>
                 <div className="overflow-x-auto">
@@ -840,6 +1081,12 @@ const InventarioPage = ({ userRole }) => {
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
                             <div className="flex space-x-2">
+                              <button
+                                onClick={() => iniciarEdicion(item)}
+                                className="text-green-600 hover:text-green-900 text-xs"
+                              >
+                                Editar
+                              </button>
                               <button
                                 onClick={() => {
                                   setNuevoMovimiento({
