@@ -45,70 +45,16 @@ const LogisticaPage = ({ userRole }) => {
   const [selectedEnvio, setSelectedEnvio] = useState(null);
   const [estadisticas, setEstadisticas] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [selectedRuta, setSelectedRuta] = useState(null);
 
-  // Datos de ejemplo
-  const [envios, setEnvios] = useState([
-    {
-      id: 1,
-      pedidoId: 'PED-001',
-      cliente: 'Juan Pérez',
-      direccion: 'Av. Principal 123, Ciudad',
-      productos: ['Silla Ejecutiva', 'Mesa de Centro'],
-      estado: 'En tránsito',
-      transportista: 'Transportes XYZ',
-      fechaEnvio: '2024-01-15',
-      fechaEstimada: '2024-01-18',
-      tiempoEstimado: '3-5 días',
-      costoEnvio: 45.00,
-      tracking: 'TRK123456789',
-      ubicacionActual: 'Centro de Distribución Norte'
-    },
-    {
-      id: 2,
-      pedidoId: 'PED-002',
-      cliente: 'María García',
-      direccion: 'Calle Secundaria 456, Ciudad',
-      productos: ['Sofá 3 Plazas'],
-      estado: 'En almacén',
-      transportista: 'Logística Rápida',
-      fechaEnvio: '2024-01-16',
-      fechaEstimada: '2024-01-20',
-      tiempoEstimado: '4-7 días',
-      costoEnvio: 75.00,
-      tracking: 'TRK987654321',
-      ubicacionActual: 'Almacén Principal'
-    },
-    {
-      id: 3,
-      pedidoId: 'PED-003',
-      cliente: 'Carlos López',
-      direccion: 'Plaza Central 789, Ciudad',
-      productos: ['Estantería Moderna', 'Escritorio Oficina'],
-      estado: 'Entregado',
-      transportista: 'Envios Express',
-      fechaEnvio: '2024-01-10',
-      fechaEstimada: '2024-01-14',
-      tiempoEstimado: 'Entregado',
-      costoEnvio: 60.00,
-      tracking: 'TRK456123789',
-      ubicacionActual: 'Entregado al cliente'
-    },
-    {
-      id: 4,
-      pedidoId: 'PED-004',
-      cliente: 'Ana Martínez',
-      direccion: 'Boulevard Industrial 321, Ciudad',
-      productos: ['Cama King Size'],
-      estado: 'En reparto',
-      transportista: 'Transportes Veloz',
-      fechaEnvio: '2024-01-17',
-      fechaEstimada: '2024-01-19',
-      tiempoEstimado: '1-2 días',
-      costoEnvio: 85.00,
-      tracking: 'TRK789456123',
-      ubicacionActual: 'En ruta de reparto'
-    }
-  ]);
+  // Estados para datos de la API
+  const [pedidos, setPedidos] = useState([]);
+  const [clientes, setClientes] = useState([]);
+  const [productos, setProductos] = useState([]);
+
+  // Estados para envíos (integrados con API)
+  const [envios, setEnvios] = useState([]);
+  const [loadingEnvios, setLoadingEnvios] = useState(false);
 
   const [inventario, setInventario] = useState([
     {
@@ -262,18 +208,6 @@ const LogisticaPage = ({ userRole }) => {
   );
 
   // Funciones para envíos
-  const cambiarEstadoEnvio = (id, nuevoEstado) => {
-    setEnvios(envios.map(envio =>
-      envio.id === id ? {
-        ...envio,
-        estado: nuevoEstado,
-        ubicacionActual: nuevoEstado === 'Entregado' ? 'Entregado al cliente' :
-                         nuevoEstado === 'En reparto' ? 'En ruta de reparto' :
-                         nuevoEstado === 'En tránsito' ? 'Centro de Distribución Norte' : envio.ubicacionActual
-      } : envio
-    ));
-  };
-
   // Función para notificar retraso
   const notificarRetraso = (envio) => {
     setSelectedEnvio(envio);
@@ -400,12 +334,114 @@ const LogisticaPage = ({ userRole }) => {
     }
   };
 
-  // Cargar estadísticas al montar el componente
+  // Funciones para envíos (integradas con API)
+  const cargarEnvios = async () => {
+    setLoadingEnvios(true);
+    try {
+      const data = await apiFetch('/logistica');
+      // Mapear datos del backend al formato del frontend
+      const enviosMapeados = data.map(envio => ({
+        id: envio._id,
+        pedidoId: `PED-${envio.pedidoNumero}`,
+        cliente: envio.cliente?.nombre || 'Cliente no encontrado',
+        direccion: `${envio.direccionEnvio?.calle || ''}, ${envio.direccionEnvio?.ciudad || ''}, ${envio.direccionEnvio?.departamento || ''}`,
+        productos: envio.productos?.map(p => p.producto?.nombre || 'Producto desconocido') || [],
+        estado: envio.estado === 'en_proceso' ? 'En tránsito' :
+               envio.estado === 'despachado' ? 'En reparto' :
+               envio.estado === 'entregado' ? 'Entregado' :
+               envio.estado === 'cancelado' ? 'Cancelado' :
+               envio.estado === 'retrasado' ? 'Retrasado' : 'En almacén',
+        transportista: 'Por asignar', // TODO: Integrar con transportistas
+        fechaEnvio: new Date(envio.fechaPedido).toLocaleDateString(),
+        fechaEstimada: new Date(envio.fechaEntrega).toLocaleDateString(),
+        tiempoEstimado: envio.tiempoEstimado,
+        costoEnvio: envio.costoAdicional || 0,
+        tracking: `TRK${envio.pedidoNumero}`,
+        ubicacionActual: envio.estado === 'entregado' ? 'Entregado al cliente' :
+                        envio.estado === 'despachado' ? 'En ruta de reparto' :
+                        envio.estado === 'en_proceso' ? 'Centro de Distribución Norte' : 'Almacén Principal'
+      }));
+      setEnvios(enviosMapeados);
+    } catch (error) {
+      console.error('Error cargando envíos:', error);
+      alert('Error al cargar envíos: ' + error.message);
+    } finally {
+      setLoadingEnvios(false);
+    }
+  };
+
+  const cambiarEstadoEnvioAPI = async (id, nuevoEstado) => {
+    try {
+      // Mapear estado del frontend al backend
+      const estadoBackend = nuevoEstado === 'En tránsito' ? 'en_proceso' :
+                           nuevoEstado === 'En reparto' ? 'despachado' :
+                           nuevoEstado === 'Entregado' ? 'entregado' :
+                           nuevoEstado === 'Cancelado' ? 'cancelado' :
+                           nuevoEstado === 'Retrasado' ? 'retrasado' : 'pendiente';
+
+      await apiFetch(`/logistica/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ estado: estadoBackend })
+      });
+
+      // Recargar envíos después de actualizar
+      cargarEnvios();
+      alert('✅ Estado del envío actualizado exitosamente');
+    } catch (error) {
+      console.error('Error actualizando estado:', error);
+      alert('Error al actualizar estado: ' + error.message);
+    }
+  };
+
+  // Cargar datos al montar el componente
   useEffect(() => {
-    cargarEstadisticas();
-    cargarTransportistas();
-    cargarEstadisticasTransportistas();
+    cargarDatos();
   }, []);
+
+  const cargarDatos = async () => {
+    setLoading(true);
+    try {
+      // Verificar si hay token antes de hacer llamadas
+      const token = getAuthToken();
+      if (!token) {
+        console.warn('No hay token de autenticación. Redirigiendo al login...');
+        navigate('/login');
+        return;
+      }
+
+      const [pedidosData, clientesData, productosData] = await Promise.all([
+        apiFetch('/logistica'),
+        apiFetch('/clientes'),
+        apiFetch('/productos')
+      ]);
+      setPedidos(pedidosData);
+      setClientes(clientesData);
+      setProductos(productosData);
+      cargarEstadisticas();
+      cargarTransportistas();
+      cargarEstadisticasTransportistas();
+      cargarEnvios(); // Cargar envíos desde API
+    } catch (error) {
+      console.error('Error cargando datos:', error);
+
+      // Manejar errores de autenticación
+      if (error.message?.includes('Token no válido') ||
+          error.message?.includes('No autorizado') ||
+          error.message?.includes('Forbidden') ||
+          error.status === 403 ||
+          error.status === 401) {
+        console.warn('Token inválido o expirado. Redirigiendo al login...');
+        localStorage.removeItem('token'); // Limpiar token inválido
+        navigate('/login');
+        return;
+      }
+
+      // Para otros errores, mostrar mensaje pero no redirigir
+      alert('Error al cargar los datos: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const agregarEnvio = () => {
     if (!nuevoEnvio.pedidoId || !nuevoEnvio.cliente) return;
@@ -638,9 +674,9 @@ return (
                       onChange={(e) => setNuevoEnvio({...nuevoEnvio, transportista: e.target.value})}
                       className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     >
-                      <option value="">Seleccionar transportista</option>
+                      <option key="default-transportista" value="">Seleccionar transportista</option>
                       {transportistas.filter(t => t.estado === 'Activo').map(trans => (
-                        <option key={trans._id || trans.id} value={trans.nombre}>
+                        <option key={trans._id || trans.id || `trans-${trans.nombre}`} value={trans.nombre}>
                           {trans.nombre} - {trans.tipo}
                         </option>
                       ))}
@@ -717,13 +753,13 @@ return (
                             <div className="flex space-x-2">
                               {envio.estado !== 'Entregado' && (
                                 <button
-                                  onClick={() => cambiarEstadoEnvio(envio.id, 
-                                    envio.estado === 'En almacén' ? 'En tránsito' : 
+                                  onClick={() => cambiarEstadoEnvioAPI(envio.id,
+                                    envio.estado === 'En almacén' ? 'En tránsito' :
                                     envio.estado === 'En tránsito' ? 'En reparto' : 'Entregado'
                                   )}
                                   className="text-indigo-600 hover:text-indigo-900 text-xs"
                                 >
-                                  {envio.estado === 'En almacén' ? 'Despachar' : 
+                                  {envio.estado === 'En almacén' ? 'Despachar' :
                                    envio.estado === 'En tránsito' ? 'En Reparto' : 'Entregar'}
                                 </button>
                               )}
@@ -1022,9 +1058,9 @@ return (
                       onChange={(e) => setNuevaRuta({...nuevaRuta, transportista: e.target.value})}
                       className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                     >
-                      <option value="">Seleccionar transportista</option>
+                      <option key="default-ruta-transportista" value="">Seleccionar transportista</option>
                       {transportistas.filter(t => t.estado === 'Activo').map(trans => (
-                        <option key={trans.id} value={trans.nombre}>
+                        <option key={trans._id || trans.id || `ruta-trans-${trans.nombre}`} value={trans.nombre}>
                           {trans.nombre}
                         </option>
                       ))}
