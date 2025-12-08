@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, useNavigate, BrowserRouter, Navigate } from 'react-router-dom'; // AGREGADO: Navigate
-import axios from 'axios'; // AGREGADO: Para headers de auth en API calls
+import { Routes, Route, useNavigate, BrowserRouter, Navigate } from 'react-router-dom';
+import axios from 'axios';
 
 // ✅ IMPORTACIONES DIRECTAS
 import LandingPage from "./assets/pages/LandingPage.jsx";
@@ -14,8 +14,8 @@ import FabricacionPage from "./assets/pages/FabricacionPage.jsx";
 import FinanzasPage from "./assets/pages/FinanzasPage.jsx";
 import LogisticaPage from "./assets/pages/LogisticaPage.jsx";
 import AdminCatalogPage from "./assets/pages/AdminCatalogPage.jsx";
-import ReporteVentasDiario from "./assets/pages/ReporteVentasDiario.jsx";
-import ReporteComprasDiario from "./assets/pages/ReporteComprasDiario.jsx";
+import ReportesDiarios from "./assets/pages/ReportesDiarios.jsx";
+import ReportesPage from "./assets/pages/ReportesPage.jsx";
 import DashboardPage from "./assets/pages/DashboardPage.jsx";
 import CatalogPage from "./assets/pages/CatalogPage.jsx";
 import ThemeToggle from "./components/ThemeToggle.jsx";
@@ -41,7 +41,7 @@ function AppContent() {
       try {
         const token = localStorage.getItem('token');
         const userData = localStorage.getItem('user');
-        
+
         if (token && userData) {
           const user = JSON.parse(userData);
           setUserRole(user.rol);
@@ -91,7 +91,7 @@ function AppContent() {
         <Route path="/catalogo" element={<CatalogPage />} />
         <Route path="/recepcion-pedidos" element={<RecepcionPedidosPage />} />
         <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
-        
+
         {/* ✅ RUTAS PRIVADAS */}
         {userRole ? (
           <>
@@ -103,28 +103,28 @@ function AppContent() {
             <Route path="/finanzas" element={<FinanzasPage userRole={userRole} />} />
             <Route path="/logistica" element={<LogisticaPage userRole={userRole} />} />
             <Route path="/admin-catalogo" element={<AdminCatalogPage userRole={userRole} />} />
-            <Route path="/reporte-ventas-diario" element={<ReporteVentasDiario userRole={userRole} />} />
-            <Route path="/reporte-compras-diario" element={<ReporteComprasDiario userRole={userRole} />} />
+            <Route path="/reportes-diarios" element={<ReportesDiarios userRole={userRole} />} />
+            <Route path="/reportes" element={<ReportesPage userRole={userRole} />} />
             <Route path="/dashboard" element={<DashboardPage userRole={userRole} />} />
             {/* AGREGADO: Fallback para rutas inválidas cuando logueado - redirige a home */}
             <Route path="*" element={<Navigate to="/home" replace />} />
           </>
         ) : (
-          <Route 
-            path="*" 
+          <Route
+            path="*"
             element={
               <div className="min-h-screen flex items-center justify-center bg-gray-900">
                 <div className="text-center text-white">
                   <h1 className="text-2xl font-bold mb-4">Acceso Restringido</h1>
                   <p className="text-gray-400 mb-6">Necesitas iniciar sesión para acceder al sistema</p>
                   <div className="space-x-4">
-                    <button 
+                    <button
                       onClick={() => navigate('/')}
                       className="bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700"
                     >
                       Ver Catálogo
                     </button>
-                    <button 
+                    <button
                       onClick={() => navigate('/login')}
                       className="bg-orange-500 text-white px-6 py-3 rounded-lg hover:bg-orange-600"
                     >
@@ -133,7 +133,7 @@ function AppContent() {
                   </div>
                 </div>
               </div>
-            } 
+            }
           />
         )}
       </Routes>

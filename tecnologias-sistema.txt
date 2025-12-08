@@ -1,0 +1,127 @@
+TECNOLOGÍAS IMPLEMENTADAS EN EL SISTEMA DE GESTIÓN "AGLOMEX"
+================================================================
+
+BACKEND TECHNOLOGIES
+====================
+
+Runtime & Framework:
+- Node.js (ES Modules)
+- Express.js v5.1.0 (Framework web moderno)
+
+Base de Datos:
+- MongoDB (NoSQL Database)
+- Mongoose v8.18.2 (ODM para MongoDB)
+
+Autenticación & Seguridad:
+- JSON Web Tokens (JWT)
+- bcrypt/bcryptjs (Hashing de contraseñas)
+- dotenv (Variables de entorno)
+
+Comunicación & APIs:
+- Axios v1.12.2 (HTTP Client)
+- CORS (Cross-Origin Resource Sharing)
+- RESTful APIs
+
+Automatización & Tareas:
+- node-cron (Tareas programadas)
+- Sistema de producción automática
+- Notificaciones automáticas
+
+Servicios Externos:
+- Nodemailer (Envío de emails)
+- Twilio (WhatsApp Business API)
+- Moment.js (Manejo de fechas)
+
+FRONTEND TECHNOLOGIES
+=====================
+
+Framework & Librerías:
+- React v18.2.0 (con Concurrent Features)
+- React DOM v18.2.0
+- React Router DOM v7.8.2 (Navegación SPA)
+
+Build Tools:
+- Vite v4.5.0 (Build tool ultra-rápido)
+- @vitejs/plugin-react (Optimización React)
+
+Styling & UI:
+- Tailwind CSS v3.4.3 (Utility-first CSS)
+- PostCSS (Procesamiento CSS)
+- Autoprefixer (Prefijos CSS automáticos)
+- ThemeProvider (Tema oscuro/claro personalizado)
+
+HTTP & Data:
+- Axios v1.11.0 (HTTP Client)
+- Recharts v3.3.0 (Visualización de datos)
+
+CARACTERÍSTICAS TÉCNICAS AVANZADAS
+==================================
+
+Arquitectura:
+- MVC Pattern (Model-View-Controller)
+- Separación modular por negocio
+- API-first approach
+- Soft deletes en modelos
+- Índices optimizados en MongoDB
+
+Automatización:
+- Transacciones financieras automáticas
+- Progreso de producción automático (cada 5 min)
+- Creación automática de productos
+- Recordatorios de pagos pendientes (diarios 9 AM)
+- Integración cross-module automática
+
+Análisis & Reportes:
+- MongoDB Aggregation Framework
+- Estadísticas en tiempo real
+- Métricas financieras y de producción
+- Visualización con gráficos interactivos
+
+Seguridad & Escalabilidad:
+- Autenticación stateless con JWT
+- Middleware de autorización
+- Manejo centralizado de errores
+- Logging integrado
+- Environment-based configuration
+
+HERRAMIENTAS DE DESARROLLO
+==========================
+
+- Nodemon (Recarga automática en desarrollo)
+- ESLint (Linter de código)
+- Git (Control de versiones)
+- VSCode (IDE principal)
+
+DEPLOYMENT & INFRAESTRUCTURA
+============================
+
+- Local development servers
+- MongoDB local instance
+- Environment variables configuration
+- CORS enabled for cross-origin requests
+- Health check endpoints
+
+TECNOLOGÍAS ADICIONALES
+=======================
+
+- Concurrent React (React 18 features)
+- Hot Module Replacement (HMR)
+- Responsive design
+- Progressive Web App ready
+- Multi-currency support (BOB/USD)
+- Real-time progress tracking
+- Automated workflow management
+
+VERSIÓN ACTUAL DEL SISTEMA
+==========================
+
+Backend: v1.0.0
+Frontend: v1.0.0
+Database: MongoDB mueblesDB
+Node.js: Compatible con ES Modules
+React: v18 con Hooks modernos
+
+================================================================
+Fecha de actualización: $(date)
+Total de tecnologías documentadas: 35+
+================================================================

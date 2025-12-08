@@ -1,25 +1,37 @@
-// routes/logistica.routes.js
-import express from "express";
+import express from 'express';
 import {
-  crearPedido,
-  listarPedidos,
-  actualizarEstadoPedido,
-  eliminarPedido,
-  actualizarTiempoEstimado,
-  notificarRetraso,
-  obtenerEstadisticas,
-} from "../controllers/logistica.controller.js";
+    getAll,
+    getById,
+    create,
+    update,
+    deletePedido,
+    getEnviosActivos,
+    updateEstadoEnvio,
+    getRutas,
+    createRuta,
+    updateRuta,
+    deleteRuta,
+    obtenerEstadisticas
+} from '../controllers/logistica.controller.js';
 
 const router = express.Router();
 
-router.post("/", crearPedido);
-router.get("/", listarPedidos);
-router.patch("/:id", actualizarEstadoPedido); // Usamos PATCH para actualizar parcialmente
-router.delete("/:id", eliminarPedido);
+// Rutas para logística
+router.get('/', getAll);
+router.get('/estadisticas', obtenerEstadisticas);
+router.get('/:id', getById);
+router.post('/', create);
+router.patch('/:id', update);
+router.delete('/:id', deletePedido);
 
-// Nuevos endpoints para automatización
-router.put("/:id/tiempo-estimado", actualizarTiempoEstimado);
-router.post("/:id/notificar-retraso", notificarRetraso);
-router.get("/estadisticas", obtenerEstadisticas);
+// Rutas específicas para envíos
+router.get('/envios/activos', getEnviosActivos);
+router.patch('/envios/:id/estado', updateEstadoEnvio);
+
+// Rutas para rutas de distribución
+router.get('/rutas', getRutas);
+router.post('/rutas', createRuta);
+router.patch('/rutas/:id', updateRuta);
+router.delete('/rutas/:id', deleteRuta);
 
 export default router;

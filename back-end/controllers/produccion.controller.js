@@ -22,11 +22,38 @@ const generarCodigoInterno = (nombre) => {
 
 export const crearProduccion = async (req, res) => {
   try {
+    console.log('Creating Production:', req.body);
+
+    // Validar stock de materiales antes de crear la orden
+    if (req.body.materiales && req.body.materiales.length > 0) {
+      for (const item of req.body.materiales) {
+        // item.material puede ser el ID directamente o un objeto con _id
+        const materialId = item.material._id || item.material;
+        const material = await ProductoTienda.findById(materialId);
+
+        if (!material) {
+          return res.status(400).json({ message: `Material no encontrado: ${materialId}` });
+        }
+
+        if (material.cantidad < item.cantidad) {
+          return res.status(400).json({
+            message: `Stock insuficiente para: ${material.nombre}. Disponible: ${material.cantidad}, Requerido: ${item.cantidad}`
+          });
+        }
+      }
+    }
+
     const produccion = new Produccion(req.body);
     await produccion.save();
+    console.log('Production created:', produccion._id);
     res.status(201).json(produccion);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error creating production:', error);
+    res.status(500).json({
+      error: 'Error creating production',
+      details: error.message,
+      stack: error.stack
+    });
   }
 };
 
@@ -42,13 +69,26 @@ export const listarProducciones = async (req, res) => {
 // Función para iniciar producción automática
 export const iniciarProduccion = async (req, res) => {
   try {
-    const produccion = await Produccion.findById(req.params.id);
+    const produccion = await Produccion.findById(req.params.id).populate('materiales.material');
     if (!produccion) {
       return res.status(404).json({ message: "Registro de producción no encontrado" });
     }
 
     if (produccion.estado !== 'Pendiente') {
       return res.status(400).json({ message: "La producción ya ha sido iniciada" });
+    }
+
+    // Verificar y descontar stock de materiales
+    for (const item of produccion.materiales) {
+      const material = await ProductoTienda.findById(item.material._id);
+      if (!material) {
+        return res.status(400).json({ message: `Material no encontrado: ${item.material.nombre}` });
+      }
+      if (material.cantidad < item.cantidad) {
+        return res.status(400).json({ message: `Stock insuficiente para: ${material.nombre}` });
+      }
+      material.cantidad -= item.cantidad;
+      await material.save();
     }
 
     produccion.fechaInicio = new Date();
@@ -58,7 +98,7 @@ export const iniciarProduccion = async (req, res) => {
 
     await produccion.save();
 
-    res.json({ message: "Producción iniciada automáticamente", produccion });
+    res.json({ message: "Producción iniciada y materiales descontados", produccion });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -92,7 +132,7 @@ export const actualizarProgresoAutomatico = async () => {
       await produccion.save();
     }
 
-    console.log(`✅ Progreso actualizado para ${produccionesEnProgreso.length} producciones`);
+    // console.log(`✅ Progreso actualizado para ${produccionesEnProgreso.length} producciones`);
   } catch (error) {
     console.error('❌ Error actualizando progreso automático:', error);
   }
@@ -101,36 +141,50 @@ export const actualizarProgresoAutomatico = async () => {
 // Función para completar producción automáticamente
 const completarProduccionAutomatica = async (produccion) => {
   try {
-    const idProductoTienda = generarCodigoInterno(produccion.nombre);
-    const nuevoProducto = new ProductoTienda({
-      idProductoTienda: idProductoTienda,
-      nombre: produccion.nombre,
-      descripcion: `Producto fabricado automáticamente - ${produccion.nombre}`,
-      cantidad: produccion.cantidad,
-      precioCompra: produccion.precioCompra,
-      precioVenta: produccion.precioVenta,
-      imagen: produccion.imagen,
-    });
+    // Buscar si ya existe un producto con el mismo nombre
+    let productoFinal = await ProductoTienda.findOne({ nombre: produccion.nombre });
 
-    await nuevoProducto.save();
+    if (productoFinal) {
+      // Si existe, actualizamos el stock y el precio si es necesario
+      productoFinal.cantidad += produccion.cantidad;
+      // Opcional: Actualizar precio de costo promedio ponderado si se desea
+      await productoFinal.save();
+    } else {
+      // Si no existe, lo creamos
+      const idProductoTienda = generarCodigoInterno(produccion.nombre);
+      productoFinal = new ProductoTienda({
+        idProductoTienda: idProductoTienda,
+        nombre: produccion.nombre,
+        descripcion: `Producto fabricado automáticamente - ${produccion.nombre}`,
+        cantidad: produccion.cantidad,
+        precioCompra: produccion.precioCompra,
+        precioVenta: produccion.precioVenta,
+        imagen: produccion.imagen,
+        tipo: 'Producto Terminado',
+        categoria: 'Muebles', // Categoría por defecto, podría venir de la orden
+        color: 'Estándar',
+        codigo: idProductoTienda
+      });
+      await productoFinal.save();
+    }
 
-    produccion.productoFinal = nuevoProducto._id;
+    produccion.productoFinal = productoFinal._id;
     await produccion.save();
 
     // Crear registro de logística para el traslado interno
     const pedidoNumero = await getNextSequenceValue('pedidoNumero');
     const trasladoLogistico = new Logistica({
-        pedidoNumero: pedidoNumero,
-        productos: [{
-            producto: nuevoProducto._id,
-            cantidad: nuevoProducto.cantidad,
-            precioUnitario: nuevoProducto.precioVenta,
-            precioTotal: nuevoProducto.precioVenta * nuevoProducto.cantidad
-        }],
-        tipoMovimiento: "Traslado Interno",
-        direccionEntrega: "Almacén de la Tienda",
-        metodoEntrega: "Recojo en Tienda",
-        estado: "En Proceso",
+      pedidoNumero: pedidoNumero,
+      productos: [{
+        producto: productoFinal._id,
+        cantidad: produccion.cantidad,
+        precioUnitario: productoFinal.precioVenta,
+        precioTotal: productoFinal.precioVenta * produccion.cantidad
+      }],
+      tipoMovimiento: "Traslado Interno",
+      direccionEntrega: "Almacén de la Tienda",
+      metodoEntrega: "Recojo en Tienda",
+      estado: "En Proceso",
     });
     await trasladoLogistico.save();
 
@@ -232,7 +286,8 @@ export const getEstadisticasProduccion = async (req, res) => {
           },
           totalUnidadesProducidas: { $sum: "$cantidad" },
           tiempoPromedioEstimado: { $avg: "$tiempoEstimado" },
-          tiempoPromedioReal: { $avg: "$tiempoTranscurrido" }
+          tiempoPromedioReal: { $avg: "$tiempoTranscurrido" },
+          progresoPromedio: { $avg: "$progreso" }
         }
       }
     ]);

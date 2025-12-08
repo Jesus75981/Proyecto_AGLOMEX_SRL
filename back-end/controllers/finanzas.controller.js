@@ -1,8 +1,11 @@
-// controllers/finanzas.controller.js
 import Finanzas from '../models/finanzas.model.js';
 import Venta from '../models/venta.model.js';
 import Compra from '../models/compra.model.js';
 import Anticipo from '../models/anticipo.model.js';
+import DeudaCompra from '../models/deudaCompra.model.js';
+import Proveedor from '../models/proveedores.model.js';
+import BankAccount from '../models/bankAccount.model.js';
+import BankTransaction from '../models/bankTransaction.model.js';
 
 // Función para registrar transacción financiera automáticamente
 export const registrarTransaccionFinanciera = async (tipo, categoria, descripcion, monto, referenciaId = null, referenciaModel = null, metadata = {}, currency = 'BOB', exchangeRate = 1) => {
@@ -34,112 +37,112 @@ export const registrarTransaccionFinanciera = async (tipo, categoria, descripcio
 
 // Obtener todas las transacciones
 export const getTransactions = async (req, res) => {
-    try {
-        const transactions = await Finanzas.find().sort({ date: -1 }); // Ordena de más reciente a más antiguo
-        res.json(transactions);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: 'Error al obtener transacciones.' });
-    }
+  try {
+    const transactions = await Finanzas.find().sort({ date: -1 }); // Ordena de más reciente a más antiguo
+    res.json(transactions);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error al obtener transacciones.' });
+  }
 };
 
 // Crear una nueva transacción
 export const createTransaction = async (req, res) => {
-    const { type, category, description, amount, currency, exchangeRate, date } = req.body;
+  const { type, category, description, amount, currency, exchangeRate, date } = req.body;
 
-    if (!type || !category || !description || !amount) {
-        return res.status(400).json({ message: 'Todos los campos son obligatorios.' });
-    }
+  if (!type || !category || !description || !amount) {
+    return res.status(400).json({ message: 'Todos los campos son obligatorios.' });
+  }
 
-    try {
-        const newTransaction = new Finanzas({
-            type,
-            category,
-            description,
-            amount,
-            currency: currency || 'BOB',
-            exchangeRate: exchangeRate || 1,
-            amountBOB: currency === 'USD' ? amount * (exchangeRate || 1) : amount,
-            date: date || Date.now()
-        });
-        await newTransaction.save();
-        res.status(201).json(newTransaction);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: 'Error al crear la transacción.' });
-    }
+  try {
+    const newTransaction = new Finanzas({
+      type,
+      category,
+      description,
+      amount,
+      currency: currency || 'BOB',
+      exchangeRate: exchangeRate || 1,
+      amountBOB: currency === 'USD' ? amount * (exchangeRate || 1) : amount,
+      date: date || Date.now()
+    });
+    await newTransaction.save();
+    res.status(201).json(newTransaction);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error al crear la transacción.' });
+  }
 };
 
 // Obtener una transacción por ID
 export const getTransactionById = async (req, res) => {
-    const { id } = req.params;
-    try {
-        const transaction = await Finanzas.findById(id);
-        if (!transaction) {
-            return res.status(404).json({ message: 'Transacción no encontrada.' });
-        }
-        res.json(transaction);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: 'Error al obtener la transacción.' });
+  const { id } = req.params;
+  try {
+    const transaction = await Finanzas.findById(id);
+    if (!transaction) {
+      return res.status(404).json({ message: 'Transacción no encontrada.' });
     }
+    res.json(transaction);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error al obtener la transacción.' });
+  }
 };
 
 // Actualizar una transacción
 export const updateTransaction = async (req, res) => {
-    const { id } = req.params;
-    const { type, category, description, amount, currency, exchangeRate, date } = req.body;
+  const { id } = req.params;
+  const { type, category, description, amount, currency, exchangeRate, date } = req.body;
 
-    try {
-        const updateData = {
-            type,
-            category,
-            description,
-            amount,
-            currency,
-            exchangeRate,
-            date
-        };
+  try {
+    const updateData = {
+      type,
+      category,
+      description,
+      amount,
+      currency,
+      exchangeRate,
+      date
+    };
 
-        // Recalcular amountBOB si se actualiza amount, currency o exchangeRate
-        if (amount !== undefined || currency !== undefined || exchangeRate !== undefined) {
-            const currentTransaction = await Finanzas.findById(id);
-            if (currentTransaction) {
-                const finalAmount = amount !== undefined ? amount : currentTransaction.amount;
-                const finalCurrency = currency !== undefined ? currency : currentTransaction.currency;
-                const finalExchangeRate = exchangeRate !== undefined ? exchangeRate : currentTransaction.exchangeRate;
-                updateData.amountBOB = finalCurrency === 'USD' ? finalAmount * finalExchangeRate : finalAmount;
-            }
-        }
-
-        const updated = await Finanzas.findByIdAndUpdate(
-            id,
-            updateData,
-            { new: true, runValidators: true }
-        );
-
-        if (!updated) return res.status(404).json({ message: 'Transacción no encontrada.' });
-
-        res.json(updated);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: 'Error al actualizar la transacción.' });
+    // Recalcular amountBOB si se actualiza amount, currency o exchangeRate
+    if (amount !== undefined || currency !== undefined || exchangeRate !== undefined) {
+      const currentTransaction = await Finanzas.findById(id);
+      if (currentTransaction) {
+        const finalAmount = amount !== undefined ? amount : currentTransaction.amount;
+        const finalCurrency = currency !== undefined ? currency : currentTransaction.currency;
+        const finalExchangeRate = exchangeRate !== undefined ? exchangeRate : currentTransaction.exchangeRate;
+        updateData.amountBOB = finalCurrency === 'USD' ? finalAmount * finalExchangeRate : finalAmount;
+      }
     }
+
+    const updated = await Finanzas.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true, runValidators: true }
+    );
+
+    if (!updated) return res.status(404).json({ message: 'Transacción no encontrada.' });
+
+    res.json(updated);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error al actualizar la transacción.' });
+  }
 };
 
 // Eliminar una transacción
 export const deleteTransaction = async (req, res) => {
-    const { id } = req.params;
+  const { id } = req.params;
 
-    try {
-        const deleted = await Finanzas.findByIdAndDelete(id);
-        if (!deleted) return res.status(404).json({ message: 'Transacción no encontrada.' });
+  try {
+    const deleted = await Finanzas.findByIdAndDelete(id);
+    if (!deleted) return res.status(404).json({ message: 'Transacción no encontrada.' });
 
-        res.json({ message: 'Transacción eliminada correctamente.' });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: 'Error al eliminar la transacción.' });
-    }
+    res.json({ message: 'Transacción eliminada correctamente.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error al eliminar la transacción.' });
+  }
 };
 
 // Función para obtener métricas financieras
@@ -277,6 +280,7 @@ export const getCashFlow = async (req, res) => {
 };
 
 // Función para obtener el tipo de cambio actual
+// Función para obtener el tipo de cambio actual
 export const getExchangeRate = async (req, res) => {
   try {
     // En una implementación real, esto podría obtenerse de una API externa
@@ -290,5 +294,414 @@ export const getExchangeRate = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+// Función para obtener estadísticas generales (Dashboard)
+export const getFinancialStatistics = async (req, res) => {
+  try {
+    const { year, period = 'year', month, week, date } = req.query;
+    const selectedYear = parseInt(year) || new Date().getFullYear();
+
+    let startDate, endDate;
+    let groupBy = {};
+    let sort = {};
+
+    if (period === 'month') {
+      const selectedMonth = parseInt(month) || 0; // 0-indexed (0 = Jan)
+      startDate = new Date(selectedYear, selectedMonth, 1);
+      endDate = new Date(selectedYear, selectedMonth + 1, 0, 23, 59, 59);
+
+      // Group by day for monthly view
+      groupBy = {
+        day: { $dayOfMonth: '$date' }
+      };
+      sort = { 'period.day': 1 };
+    } else if (period === 'week') {
+      // Logic for 'week': if a specific date is provided, find the start/end of that week
+      // If 'week' number is provided... it's complex. Let's use a reference date for the week.
+      // Simplify: User picks a date (or we default to current week).
+      const refDate = date ? new Date(date) : new Date();
+      const day = refDate.getDay(); // 0 (Sun) to 6 (Sat)
+      const diff = refDate.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+      startDate = new Date(refDate.setDate(diff));
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 6);
+      endDate.setHours(23, 59, 59, 999);
+
+      groupBy = {
+        day: { $dayOfMonth: '$date' }, // Also group by day, but labels will be week days
+        dayOfWeek: { $dayOfWeek: '$date' }
+      };
+      sort = { 'period.day': 1 };
+    } else {
+      // Default: Year
+      startDate = new Date(selectedYear, 0, 1);
+      endDate = new Date(selectedYear, 11, 31, 23, 59, 59);
+      groupBy = {
+        year: { $year: '$date' },
+        month: { $month: '$date' }
+      };
+      sort = { 'period.month': 1 };
+    }
+
+    // Métricas generales (Totales en el rango seleccionado)
+    const metricsAggregation = await Finanzas.aggregate([
+      {
+        $match: {
+          date: { $gte: startDate, $lte: endDate }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalIngresos: {
+            $sum: { $cond: [{ $eq: ['$type', 'ingreso'] }, '$amountBOB', 0] }
+          },
+          totalEgresos: {
+            $sum: { $cond: [{ $eq: ['$type', 'egreso'] }, '$amountBOB', 0] }
+          },
+          countIngresos: {
+            $sum: { $cond: [{ $eq: ['$type', 'ingreso'] }, 1, 0] }
+          },
+          countEgresos: {
+            $sum: { $cond: [{ $eq: ['$type', 'egreso'] }, 1, 0] }
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          totalIngresos: 1,
+          totalEgresos: 1,
+          countIngresos: 1,
+          countEgresos: 1,
+          utilidadNeta: { $subtract: ['$totalIngresos', '$totalEgresos'] }
+        }
+      }
+    ]);
+
+    const metrics = metricsAggregation[0] || {
+      totalIngresos: 0,
+      totalEgresos: 0,
+      countIngresos: 0,
+      countEgresos: 0,
+      utilidadNeta: 0
+    };
+
+    // Cashflow (distribución por periodo)
+    const cashflow = await Finanzas.aggregate([
+      {
+        $match: {
+          date: { $gte: startDate, $lte: endDate }
+        }
+      },
+      {
+        $group: {
+          _id: groupBy,
+          ingresos: {
+            $sum: { $cond: [{ $eq: ['$type', 'ingreso'] }, '$amountBOB', 0] }
+          },
+          egresos: {
+            $sum: { $cond: [{ $eq: ['$type', 'egreso'] }, '$amountBOB', 0] }
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          period: '$_id',
+          ingresos: 1,
+          egresos: 1,
+          flujoNeto: { $subtract: ['$ingresos', '$egresos'] },
+          // Include date info for sorting/labeling
+          dateInfo: '$_id'
+        }
+      },
+      { $sort: sort }
+    ]);
+
+    res.json({
+      metrics,
+      cashflow,
+      periodInfo: {
+        startDate,
+        endDate,
+        type: period
+      }
+    });
+
+  } catch (error) {
+    console.error('Error al obtener estadísticas financieras:', error);
+    res.status(500).json({ message: 'Error al obtener estadísticas financieras' });
+  }
+};
+
+// --- GESTIÓN DE DEUDAS (CUENTAS POR PAGAR) ---
+
+// Obtener deudas pendientes
+export const getDeudas = async (req, res) => {
+  try {
+    const deudas = await DeudaCompra.find({ estado: { $ne: 'Pagada' } })
+      .populate('proveedor', 'nombre')
+      .populate('compraId', 'numCompra fecha totalCompra')
+      .sort({ fechaCreacion: -1 });
+    res.json(deudas);
+  } catch (error) {
+    import('fs').then(fs => {
+      fs.appendFileSync('error.log', `[${new Date().toISOString()}] Error en getDeudas: ${error.stack}\n`);
+    });
+    console.error('Error al obtener deudas:', error);
+    res.status(500).json({ message: 'Error al obtener las cuentas por pagar.', error: error.message });
+  }
+};
+
+// Registrar pago de deuda
+export const registrarPagoDeuda = async (req, res) => {
+  const { deudaId, monto, tipoPago, cuenta, referencia } = req.body;
+
+  if (!deudaId || !monto || !tipoPago) {
+    return res.status(400).json({ message: 'Faltan datos requeridos (deudaId, monto, tipoPago).' });
+  }
+
+  try {
+    const deuda = await DeudaCompra.findById(deudaId).populate('proveedor');
+    if (!deuda) {
+      return res.status(404).json({ message: 'Deuda no encontrada.' });
+    }
+
+    if (monto > deuda.saldoActual) {
+      return res.status(400).json({ message: 'El monto a pagar excede el saldo actual.' });
+    }
+
+    // 1. Actualizar Deuda
+    deuda.montoPagado += parseFloat(monto);
+    deuda.saldoActual -= parseFloat(monto);
+
+    // Determinar nuevo estado
+    if (deuda.saldoActual <= 0.01) { // Margen de error por decimales
+      deuda.saldoActual = 0;
+      deuda.estado = 'Pagada';
+    } else {
+      deuda.estado = 'Parcialmente Pagada';
+    }
+
+    // Agregar al historial
+    deuda.historialPagos.push({
+      monto: parseFloat(monto),
+      tipoPago,
+      referencia,
+      cuenta,
+      fechaPago: new Date()
+    });
+
+    await deuda.save();
+
+    // 2. Registrar Transacción en Finanzas (Egreso)
+    const descripcion = `Pago de deuda a ${deuda.proveedor.nombre} (Ref: ${referencia || 'S/N'})`;
+    await registrarTransaccionFinanciera(
+      'egreso',
+      'compra_productos', // O 'pago_deuda' si existiera esa categoría
+      descripcion,
+      parseFloat(monto),
+      deuda.compraId, // Referencia a la compra original si es posible, o a la deuda
+      'Compra', // Modelo referenciado
+      {
+        metodoPago: tipoPago,
+        banco: cuenta,
+        deudaId: deuda._id
+      }
+    );
+
+    res.json({ message: 'Pago registrado exitosamente', deuda });
+
+  } catch (error) {
+    console.error('Error al registrar pago de deuda:', error);
+    res.status(500).json({ message: 'Error al procesar el pago de la deuda.' });
+  }
+};
+
+// --- GESTIÓN DE CUENTAS BANCARIAS ---
+
+// Crear nueva cuenta bancaria
+export const createAccount = async (req, res) => {
+  try {
+    const { nombreBanco, numeroCuenta, saldoInicial } = req.body;
+
+    if (!nombreBanco || !numeroCuenta) {
+      return res.status(400).json({ message: "Nombre del banco y número de cuenta son obligatorios." });
+    }
+
+    const existingAccount = await BankAccount.findOne({ numeroCuenta });
+    if (existingAccount) {
+      return res.status(400).json({ message: "Ya existe una cuenta con este número." });
+    }
+
+    const newAccount = new BankAccount({
+      nombreBanco,
+      numeroCuenta,
+      saldo: saldoInicial || 0
+    });
+
+    await newAccount.save();
+
+    // Si hay saldo inicial, registrar como depósito inicial
+    if (saldoInicial > 0) {
+      const transaction = new BankTransaction({
+        cuentaId: newAccount._id,
+        tipo: 'Deposito',
+        monto: saldoInicial,
+        descripcion: 'Saldo Inicial',
+        fecha: new Date()
+      });
+      await transaction.save();
+    }
+
+    res.status(201).json(newAccount);
+  } catch (error) {
+    console.error("Error al crear cuenta bancaria:", error);
+    res.status(500).json({ message: "Error al crear la cuenta bancaria." });
+  }
+};
+
+// Obtener todas las cuentas activas
+export const getAccounts = async (req, res) => {
+  try {
+    const accounts = await BankAccount.find({ isActive: true }).sort({ fechaCreacion: -1 });
+    res.json(accounts);
+  } catch (error) {
+    console.error("Error al obtener cuentas bancarias:", error);
+    res.status(500).json({ message: "Error al obtener las cuentas bancarias." });
+  }
+};
+
+// Actualizar cuenta (incluyendo Soft Delete y Transferencia de Saldo)
+export const updateAccount = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nombreBanco, isActive, transferToAccountId } = req.body;
+
+    const account = await BankAccount.findById(id);
+    if (!account) {
+      return res.status(404).json({ message: "Cuenta no encontrada." });
+    }
+
+    // Si se está desactivando y tiene saldo, verificar transferencia
+    if (isActive === false && account.saldo > 0) {
+      if (!transferToAccountId) {
+        return res.status(400).json({
+          message: "La cuenta tiene saldo pendiente. Debe especificar una cuenta destino para transferir los fondos antes de desactivarla."
+        });
+      }
+
+      const targetAccount = await BankAccount.findById(transferToAccountId);
+      if (!targetAccount) {
+        return res.status(404).json({ message: "Cuenta destino no encontrada." });
+      }
+
+      if (!targetAccount.isActive) {
+        return res.status(400).json({ message: "La cuenta destino debe estar activa." });
+      }
+
+      // Realizar transferencia
+      const montoTransferencia = account.saldo;
+
+      // 1. Retiro de cuenta origen (cierre)
+      account.saldo = 0;
+      const retiroTx = new BankTransaction({
+        cuentaId: account._id,
+        tipo: 'Retiro',
+        monto: montoTransferencia,
+        descripcion: `Transferencia por cierre de cuenta a ${targetAccount.nombreBanco}`,
+        fecha: new Date()
+      });
+      await retiroTx.save();
+
+      // 2. Depósito a cuenta destino
+      targetAccount.saldo += montoTransferencia;
+      const depositoTx = new BankTransaction({
+        cuentaId: targetAccount._id,
+        tipo: 'Deposito',
+        monto: montoTransferencia,
+        descripcion: `Transferencia por cierre de cuenta desde ${account.nombreBanco}`,
+        fecha: new Date()
+      });
+      await depositoTx.save();
+      await targetAccount.save();
+
+      // 3. Registrar en Finanzas (Movimiento interno - opcional, o solo log)
+      console.log(`[FINANZAS] Transferencia por cierre: ${montoTransferencia} de ${account.nombreBanco} a ${targetAccount.nombreBanco}`);
+    }
+
+    if (nombreBanco) account.nombreBanco = nombreBanco;
+    if (isActive !== undefined) account.isActive = isActive;
+
+    await account.save();
+    res.json(account);
+  } catch (error) {
+    console.error("Error al actualizar cuenta bancaria:", error);
+    res.status(500).json({ message: "Error al actualizar la cuenta bancaria." });
+  }
+};
+
+// Agregar Depósito
+export const addDeposit = async (req, res) => {
+  try {
+    const { cuentaId, monto, descripcion, comprobanteUrl } = req.body;
+
+    if (!cuentaId || !monto || monto <= 0) {
+      return res.status(400).json({ message: "Cuenta y monto válido son obligatorios." });
+    }
+
+    const account = await BankAccount.findById(cuentaId);
+    if (!account) {
+      return res.status(404).json({ message: "Cuenta no encontrada." });
+    }
+
+    // Actualizar saldo
+    account.saldo += parseFloat(monto);
+    await account.save();
+
+    // Registrar transacción bancaria
+    const transaction = new BankTransaction({
+      cuentaId,
+      tipo: 'Deposito',
+      monto: parseFloat(monto),
+      descripcion: descripcion || 'Depósito Manual',
+      comprobanteUrl,
+      fecha: new Date()
+    });
+    await transaction.save();
+
+    // Registrar también en Finanzas General como Ingreso
+    await registrarTransaccionFinanciera(
+      'ingreso',
+      'otros_ingresos',
+      `Depósito a ${account.nombreBanco} (${account.numeroCuenta}) - ${descripcion || ''}`,
+      parseFloat(monto),
+      transaction._id,
+      'BankTransaction',
+      { banco: account.nombreBanco, cuenta: account.numeroCuenta },
+      'BOB',
+      1
+    );
+
+    res.json({ message: "Depósito registrado correctamente.", account, transaction });
+  } catch (error) {
+    console.error("Error al registrar depósito:", error);
+    res.status(500).json({ message: "Error al registrar el depósito." });
+  }
+};
+
+// Obtener historial de transacciones de una cuenta
+export const getAccountTransactions = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const transactions = await BankTransaction.find({ cuentaId: id }).sort({ fecha: -1 });
+    res.json(transactions);
+  } catch (error) {
+    console.error("Error al obtener historial bancario:", error);
+    res.status(500).json({ message: "Error al obtener el historial." });
   }
 };

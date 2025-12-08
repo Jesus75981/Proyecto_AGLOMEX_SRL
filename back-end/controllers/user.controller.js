@@ -22,4 +22,25 @@ export const loginUsuario = async (req, res) => {
   const token = jwt.sign({ id: user._id, rol: user.rol }, process.env.JWT_SECRET, { expiresIn: "1d" });
   res.json({ token, user });
 };
- 
+
+// Crear usuarios de prueba
+export const createTestUsers = async (req, res) => {
+  try {
+    const users = [
+      { username: "dueno", password: "admin123", nombre: "Dueño", rol: "admin" },
+      { username: "tienda", password: "admin123", nombre: "Vendedor", rol: "empleado_tienda" },
+      { username: "stock", password: "admin123", nombre: "Almacenista", rol: "empleado_stock" }
+    ];
+
+    for (const user of users) {
+      const exists = await User.findOne({ username: user.username });
+      if (!exists) {
+        await new User(user).save();
+      }
+    }
+
+    res.status(201).json({ message: "Usuarios de prueba creados" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};

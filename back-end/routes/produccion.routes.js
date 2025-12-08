@@ -3,6 +3,11 @@ import { crearProduccion, listarProducciones, confirmarProduccion, iniciarProduc
 
 const router = express.Router();
 
+router.use((req, res, next) => {
+    console.log('DEBUG: Request inside produccion.routes.js');
+    next();
+});
+
 router.post("/", crearProduccion);
 router.get("/", listarProducciones);
 router.patch("/:id/iniciar", iniciarProduccion);

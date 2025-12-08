@@ -4,7 +4,7 @@ const pagoSchema = new mongoose.Schema({
     tipo: {
         type: String,
         // ENUM ACTUALIZADO: Incluye los 4 métodos de pago solicitados
-        enum: ["Efectivo", "Transferencia", "Cheque"],
+        enum: ["Efectivo", "Transferencia", "Cheque", "Crédito"],
         required: true,
     },
     monto: { // Monto específico pagado con este método
@@ -45,7 +45,11 @@ const compraSchema = new mongoose.Schema({
         {
             producto: {
                 type: mongoose.Schema.Types.ObjectId,
+<<<<<<< HEAD
                 refPath: 'productos.onModel', // Referencia dinámica
+=======
+                ref: "ProductoTienda",
+>>>>>>> origin/main
                 required: true,
             },
             onModel: {

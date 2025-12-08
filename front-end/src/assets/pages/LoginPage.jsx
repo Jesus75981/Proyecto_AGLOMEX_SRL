@@ -22,9 +22,9 @@ const LoginPage = ({ onLogin }) => {
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/login', {
+      const response = await fetch('http://localhost:5000/api/auth/login', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ username, password }),
@@ -35,14 +35,14 @@ const LoginPage = ({ onLogin }) => {
       if (response.ok) {
         // ✅ CORRECCIÓN: usar data.user.rol en lugar de data.user.role
         const userRole = data.user.rol;
-        
+
         // Guardar token en localStorage
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
-        
+
         // ✅ CORRECCIÓN: Llamar a onLogin con el rol del usuario
         onLogin(userRole);
-        
+
         // Redirigir al dashboard
         navigate('/home');
       } else {
@@ -59,11 +59,11 @@ const LoginPage = ({ onLogin }) => {
   // Función para crear usuarios de prueba (si el servidor no responde)
   const createTestUsers = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/create-test-users', {
+      const response = await fetch('http://localhost:5000/api/auth/create-test-users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
-      
+
       if (response.ok) {
         alert('Usuarios de prueba creados exitosamente');
       } else {
@@ -84,24 +84,24 @@ const LoginPage = ({ onLogin }) => {
       <div className="p-8 bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm border-2 border-gray-700">
         <div className="flex justify-center mb-6">
           {/* Muestra el logo de Aglomex */}
-          <img 
-            src={aglomexLogo} 
-            alt="Logo Aglomex" 
-            className="w-48 h-auto object-contain rounded-xl" 
+          <img
+            src={aglomexLogo}
+            alt="Logo Aglomex"
+            className="w-48 h-auto object-contain rounded-xl"
             onError={(e) => {
               e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2Y1ZjVmNSIvPjx0ZXh0IHg9IjEwMCIgeT0iMTAwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiM2NjYiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkxPR088L3RleHQ+PC9zdmc+';
             }}
           />
         </div>
-        
+
         <h2 className="text-3xl font-extrabold text-white text-center mb-2">
           Iniciar Sesión
         </h2>
-        
+
         <p className="text-gray-400 text-sm text-center mb-8">
           Accede a tu panel de gestión de Muebles 2025
         </p>
-        
+
         <form onSubmit={handleLogin}>
           <div className="mb-4">
             <label className="block text-gray-300 text-sm font-semibold mb-2" htmlFor="username">
@@ -117,7 +117,7 @@ const LoginPage = ({ onLogin }) => {
               disabled={isLoading}
             />
           </div>
-          
+
           <div className="mb-6">
             <label className="block text-gray-300 text-sm font-semibold mb-2" htmlFor="password">
               Contraseña
@@ -132,13 +132,13 @@ const LoginPage = ({ onLogin }) => {
               disabled={isLoading}
             />
           </div>
-          
+
           {error && (
             <div className="mb-4 p-3 bg-red-900 border border-red-700 rounded-lg">
               <p className="text-red-300 text-sm text-center">{error}</p>
             </div>
           )}
-          
+
           <div className="flex items-center justify-center mb-4">
             <button
               className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-opacity-50 transition-colors duration-200 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
@@ -180,7 +180,7 @@ const LoginPage = ({ onLogin }) => {
               <span className="text-orange-400">stock / admin123</span>
             </div>
           </div>
-          
+
           <button
             onClick={createTestUsers}
             className="w-full mt-3 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 py-1 px-2 rounded transition-colors duration-200"

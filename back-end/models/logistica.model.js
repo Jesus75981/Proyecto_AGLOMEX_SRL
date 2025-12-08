@@ -1,4 +1,3 @@
-// models/logistica.model.js
 import mongoose from "mongoose";
 
 const logisticaSchema = new mongoose.Schema({
@@ -12,6 +11,14 @@ const logisticaSchema = new mongoose.Schema({
     ref: "Cliente",
     required: true
   },
+  transportista: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Transportista"
+  },
+  empresaEnvio: {
+    type: String,
+    default: ""
+  },
   productos: [
     {
       producto: {
@@ -20,49 +27,42 @@ const logisticaSchema = new mongoose.Schema({
         required: true
       },
       cantidad: { type: Number, required: true }
-      // ❌ ELIMINAR: precioUnitario y precioTotal (no necesarios en logística)
     }
   ],
   fechaPedido: {
     type: Date,
     default: Date.now
   },
-  fechaEntrega: {  // ✅ AGREGAR: Campo que espera el frontend
+  fechaEntrega: {
     type: Date,
     required: true
   },
   estado: {
     type: String,
-    enum: ["pendiente", "en_proceso", "despachado", "entregado", "cancelado", "retrasado"], // ✅ MINÚSCULAS + retrasado
+    enum: ["pendiente", "en_proceso", "despachado", "entregado", "cancelado", "retrasado"],
     default: "pendiente"
   },
   tiempoEstimado: {
-    type: String, // Ej: "2-3 días", "1 semana"
+    type: String,
     default: "3-5 días"
   },
   ultimaActualizacion: {
     type: Date,
     default: Date.now
   },
-  direccionEnvio: {  // ✅ CAMBIAR: de direccionEntrega a direccionEnvio (OBJETO)
+  direccionEnvio: {
     calle: { type: String, required: true },
-    ciudad: { type: String, required: true },
-    departamento: { type: String, required: true }, // ✅ AGREGAR: departamento
-    codigoPostal: { type: String }
-  },
-  metodoEntrega: {
-    type: String,
-    enum: ["Recojo en Tienda", "Envio Domicilio", "Envio Departamental"], // ✅ CORREGIR: "Evio" → "Envio"
-    default: "Envio Domicilio"
-  },
-  tipoMovimiento: {
-    type: String,
-    enum: ["Envío a Cliente", "Traslado Interno"],
-    default: "Envío a Cliente",
+    ciudad: { type: String },
+    departamento: { type: String },
+    pais: { type: String }
   },
   costoAdicional: {
     type: Number,
     default: 0,
+  },
+  costoEnvio: {
+    type: Number,
+    default: 0
   },
   observaciones: {
     type: String,

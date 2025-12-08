@@ -6,6 +6,11 @@ const transportistaSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  nit: {
+    type: String,
+    required: true,
+    trim: true
+  },
   contacto: {
     type: String,
     required: true,
@@ -15,12 +20,6 @@ const transportistaSchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true
-  },
-  email: {
-    type: String,
-    required: true,
-    trim: true,
-    lowercase: true
   },
   tipo: {
     type: String,

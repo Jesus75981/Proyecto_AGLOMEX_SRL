@@ -12,6 +12,18 @@ import aglomex9 from '../images/aglomex9.jpg';
 import aglomex10 from '../images/aglomex10.jpg';
 import aglomexblanco from '../images/aglomexblanco.jpg';
 
+import Aglomex1 from '../images/Aglomex1.jpg';
+import Aglomex2 from '../images/Aglomex2.jpg';
+import Aglomex3 from '../images/Aglomex3.jpg';
+import aglomex4 from '../images/aglomex4.jpg';
+import aglomex5 from '../images/aglomex5.jpg';
+import aglomex6 from '../images/aglomex6.jpg';
+import aglomex7 from '../images/aglomex7.jpg';
+import aglomex8 from '../images/aglomex8.jpg';
+import aglomex9 from '../images/aglomex9.jpg';
+import aglomex10 from '../images/aglomex10.jpg';
+import aglomexblanco from '../images/aglomexblanco.jpg';
+
 // Componente de Carrusel de Imágenes
 const ImageCarousel = () => {
   const images = [
@@ -94,12 +106,7 @@ const LandingPage = () => {
             <span className="text-orange-500">Aglomex</span> SRL
           </div>
           <div className="flex space-x-4">
-            <button
-              onClick={openCatalog}
-              className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300"
-            >
-              Catálogo
-            </button>
+            {/* Catalog Button Removed */}
             <button
               onClick={() => navigate('/recepcion-pedidos')}
               className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300"
