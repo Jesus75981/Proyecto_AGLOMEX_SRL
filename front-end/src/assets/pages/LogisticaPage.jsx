@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { SkeletonMetrics, SkeletonTable, SkeletonCard } from '../../components/Skeleton';
+import useDebounce from '../../hooks/useDebounce';
 
 // --- API Helper ---
 const API_URL = 'http://localhost:5000/api';
@@ -31,13 +33,13 @@ const apiFetch = async (endpoint, options = {}) => {
 
 const LogisticaPage = ({ userRole }) => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
-  // ✅ CORREGIDO: Volver al HOME (menú principal)
   const volverAlHome = () => {
     navigate('/home');
   };
 
-  // Estados para el módulo de logística
+  // Estados
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('envios');
   const [showForm, setShowForm] = useState(false);
@@ -45,214 +47,83 @@ const LogisticaPage = ({ userRole }) => {
   const [selectedEnvio, setSelectedEnvio] = useState(null);
   const [estadisticas, setEstadisticas] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [selectedRuta, setSelectedRuta] = useState(null);
+  const [debouncedSearchTerm] = useDebounce(searchTerm, 300);
 
-  // Estados para datos de la API
+  // Datos API
   const [pedidos, setPedidos] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [productos, setProductos] = useState([]);
-
-  // Estados para envíos (integrados con API)
   const [envios, setEnvios] = useState([]);
   const [loadingEnvios, setLoadingEnvios] = useState(false);
 
-  const [inventario, setInventario] = useState([
-    {
-      id: 1,
-      producto: 'Silla Ejecutiva',
-      sku: 'SCH-EXEC-001',
-      cantidad: 150,
-      ubicacion: 'Almacén A - Pasillo 1 - Estante 3',
-      nivelMinimo: 20,
-      estado: 'Disponible',
-      categoria: 'Sillas'
-    },
-    {
-      id: 2,
-      producto: 'Mesa de Centro',
-      sku: 'MES-CENT-002',
-      cantidad: 75,
-      ubicacion: 'Almacén A - Pasillo 2 - Estante 1',
-      nivelMinimo: 15,
-      estado: 'Disponible',
-      categoria: 'Mesas'
-    },
-    {
-      id: 3,
-      producto: 'Sofá 3 Plazas',
-      sku: 'SOF-3PL-003',
-      cantidad: 8,
-      ubicacion: 'Almacén B - Pasillo 1 - Estante 2',
-      nivelMinimo: 5,
-      estado: 'Stock Bajo',
-      categoria: 'Sofás'
-    },
-    {
-      id: 4,
-      producto: 'Estantería Moderna',
-      sku: 'EST-MOD-004',
-      cantidad: 0,
-      ubicacion: 'Almacén B - Pasillo 2 - Estante 4',
-      nivelMinimo: 10,
-      estado: 'Agotado',
-      categoria: 'Estanterías'
-    },
-    {
-      id: 5,
-      producto: 'Escritorio Oficina',
-      sku: 'ESC-OFI-005',
-      cantidad: 25,
-      ubicacion: 'Almacén C - Pasillo 1 - Estante 1',
-      nivelMinimo: 8,
-      estado: 'Disponible',
-      categoria: 'Escritorios'
-    }
-  ]);
+  // Búsqueda Pedidos
+  const [pedidosEncontrados, setPedidosEncontrados] = useState([]);
+  const [mostrarDropdownPedidos, setMostrarDropdownPedidos] = useState(false);
+  const [busquedaPedido, setBusquedaPedido] = useState('');
 
+  // Transportistas
   const [transportistas, setTransportistas] = useState([]);
   const [nuevoTransportista, setNuevoTransportista] = useState({
-    nombre: '',
-    contacto: '',
-    telefono: '',
-    email: '',
-    tipo: 'Terrestre',
-    costoBase: 0,
-    cobertura: [],
-    tiempoEntrega: '',
-    observaciones: ''
+    nombre: '', nit: '', contacto: '', telefono: '',
+    tipo: 'Terrestre', costoBase: 0, cobertura: [],
+    tiempoEntrega: '', observaciones: ''
   });
+  const [editingTransportistaId, setEditingTransportistaId] = useState(null);
   const [showTransportistaForm, setShowTransportistaForm] = useState(false);
   const [loadingTransportistas, setLoadingTransportistas] = useState(false);
   const [estadisticasTransportistas, setEstadisticasTransportistas] = useState(null);
 
-  const [rutas, setRutas] = useState([
-    {
-      id: 1,
-      nombre: 'Ruta Norte',
-      origen: 'CD Norte',
-      destino: 'Zona Norte',
-      distancia: 350,
-      duracion: '5 horas',
-      estado: 'Activa',
-      transportista: 'Transportes XYZ',
-      frecuencia: 'Diaria'
-    },
-    {
-      id: 2,
-      nombre: 'Ruta Sur',
-      origen: 'CD Central',
-      destino: 'Zona Sur',
-      distancia: 280,
-      duracion: '4 horas',
-      estado: 'Activa',
-      transportista: 'Envios Express',
-      frecuencia: 'Diaria'
-    },
-    {
-      id: 3,
-      nombre: 'Ruta Internacional',
-      origen: 'Aeropuerto',
-      destino: 'Internacional',
-      distancia: 0,
-      duracion: '2-3 días',
-      estado: 'Activa',
-      transportista: 'Logística Rápida',
-      frecuencia: 'Semanal'
-    }
-  ]);
+  // Rutas
+  const [rutas, setRutas] = useState([]);
+  const [nuevaRuta, setNuevaRuta] = useState({
+    nombre: '', origen: '', destino: '', transportista: ''
+  });
+  const [loadingRutas, setLoadingRutas] = useState(false);
 
+  // Nuevo Envío State
   const [nuevoEnvio, setNuevoEnvio] = useState({
     pedidoId: '',
     cliente: '',
-    direccion: '',
+    calle: '',
+    ciudad: '',
+    departamento: '',
+    pais: 'Bolivia',
     productos: [],
     transportista: '',
-    costoEnvio: 0
+    tipoTransporte: 'Terrestre',
+    metodoEntrega: 'Envio Domicilio',
+    costoEnvio: 0,
+    empresaEnvio: ''
   });
 
-  const [nuevaRuta, setNuevaRuta] = useState({
-    nombre: '',
-    origen: '',
-    destino: '',
-    distancia: 0,
-    transportista: '',
-    frecuencia: 'Diaria'
-  });
-
-  // Filtrar datos según búsqueda
+  // Filtrado
+  const searchTermLower = (debouncedSearchTerm || '').toLowerCase();
   const enviosFiltrados = envios.filter(envio =>
-    envio.cliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    envio.pedidoId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    envio.estado.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    envio.tracking.toLowerCase().includes(searchTerm.toLowerCase())
+    (envio.cliente?.toLowerCase() || '').includes(searchTermLower) ||
+    (envio.pedidoId?.toLowerCase() || '').includes(searchTermLower) ||
+    (envio.estado?.toLowerCase() || '').includes(searchTermLower) ||
+    (envio.tracking?.toLowerCase() || '').includes(searchTermLower)
   );
+  const transportistasFiltrados = transportistas.filter(t => (t.nombre?.toLowerCase() || '').includes(searchTermLower));
+  const rutasFiltradas = rutas.filter(r => (r.nombre?.toLowerCase() || '').includes(searchTermLower));
 
-  const inventarioFiltrado = inventario.filter(item =>
-    item.producto.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.ubicacion.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.estado.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const transportistasFiltrados = transportistas.filter(trans =>
-    trans.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    trans.tipo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    trans.estado.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const rutasFiltradas = rutas.filter(ruta =>
-    ruta.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    ruta.origen.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    ruta.destino.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    ruta.transportista.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // Funciones para envíos
-  // Función para notificar retraso
-  const notificarRetraso = (envio) => {
-    setSelectedEnvio(envio);
-    setShowRetrasoForm(true);
-  };
-
-  // Función para actualizar tiempo estimado
-  const actualizarTiempoEstimado = (envio) => {
-    const nuevoTiempo = prompt('Nuevo tiempo estimado (ej: "5-7 días", "1 semana"):');
-    if (nuevoTiempo) {
-      setEnvios(envios.map(e =>
-        e.id === envio.id ? { ...e, tiempoEstimado: nuevoTiempo } : e
-      ));
-    }
-  };
-
-  // Función para cargar estadísticas
+  // Funciones
   const cargarEstadisticas = async () => {
-    setLoading(true);
-    try {
-      // Simular carga de estadísticas
-      setTimeout(() => {
-        setEstadisticas({
-          periodo: 'mes',
-          totalPedidos: envios.length,
-          pedidosPorEstado: {
-            pendiente: envios.filter(e => e.estado === 'En almacén').length,
-            en_proceso: envios.filter(e => e.estado === 'En tránsito').length,
-            despachado: envios.filter(e => e.estado === 'En reparto').length,
-            entregado: envios.filter(e => e.estado === 'Entregado').length,
-            retrasado: envios.filter(e => e.estado === 'Retrasado').length
-          },
-          costoTotalEnvios: envios.reduce((sum, e) => sum + e.costoEnvio, 0),
-          tiempoPromedioEntrega: 4.2,
-          tasaEntregaExitosa: 87.5
-        });
-        setLoading(false);
-      }, 1000);
-    } catch (error) {
-      console.error('Error cargando estadísticas:', error);
-      setLoading(false);
-    }
+    // Mock stats for now
+    setEstadisticas({
+      periodo: 'mes', totalPedidos: envios.length,
+      pedidosPorEstado: {
+        pendiente: envios.filter(e => e.estado === 'En almacén').length,
+        en_proceso: envios.filter(e => e.estado === 'En tránsito').length,
+        despachado: envios.filter(e => e.estado === 'En reparto').length,
+        entregado: envios.filter(e => e.estado === 'Entregado').length,
+        retrasado: envios.filter(e => e.estado === 'Retrasado').length
+      },
+      costoTotalEnvios: envios.reduce((sum, e) => sum + e.costoEnvio, 0),
+      tiempoPromedioEntrega: 4.2, tasaEntregaExitosa: 87.5
+    });
   };
 
-  // Funciones para transportistas
   const cargarTransportistas = async () => {
     setLoadingTransportistas(true);
     try {
@@ -260,9 +131,20 @@ const LogisticaPage = ({ userRole }) => {
       setTransportistas(data);
     } catch (error) {
       console.error('Error cargando transportistas:', error);
-      alert('Error al cargar transportistas: ' + error.message);
     } finally {
       setLoadingTransportistas(false);
+    }
+  };
+
+  const cargarRutas = async () => {
+    setLoadingRutas(true);
+    try {
+      const data = await apiFetch('/rutas');
+      setRutas(data);
+    } catch (error) {
+      console.error('Error cargando rutas:', error);
+    } finally {
+      setLoadingRutas(false);
     }
   };
 
@@ -271,100 +153,138 @@ const LogisticaPage = ({ userRole }) => {
       const data = await apiFetch('/transportistas/estadisticas');
       setEstadisticasTransportistas(data);
     } catch (error) {
-      console.error('Error cargando estadísticas de transportistas:', error);
+      console.error('Error stats transportistas:', error);
     }
   };
 
   const agregarTransportista = async () => {
-    // Validaciones
-    if (!nuevoTransportista.nombre.trim()) {
-      alert('El nombre es requerido');
-      return;
-    }
-    if (!nuevoTransportista.contacto.trim()) {
-      alert('El contacto es requerido');
-      return;
-    }
-    if (!nuevoTransportista.telefono.trim()) {
-      alert('El teléfono es requerido');
-      return;
-    }
-    if (!nuevoTransportista.email.trim()) {
-      alert('El email es requerido');
-      return;
-    }
-    if (nuevoTransportista.costoBase <= 0) {
-      alert('El costo base debe ser mayor a 0');
-      return;
-    }
-    if (!nuevoTransportista.tiempoEntrega.trim()) {
-      alert('El tiempo de entrega es requerido');
-      return;
-    }
-
+    if (!nuevoTransportista.nombre.trim()) return alert('Nombre requerido');
     try {
-      const transportistaData = {
-        ...nuevoTransportista,
-        costoBase: parseFloat(nuevoTransportista.costoBase)
-      };
-
-      await apiFetch('/transportistas', {
-        method: 'POST',
-        body: JSON.stringify(transportistaData)
-      });
-
-      alert('✅ Transportista creado exitosamente');
-      setNuevoTransportista({
-        nombre: '',
-        contacto: '',
-        telefono: '',
-        email: '',
-        tipo: 'Terrestre',
-        costoBase: 0,
-        cobertura: [],
-        tiempoEntrega: '',
-        observaciones: ''
-      });
+      if (editingTransportistaId) {
+        await apiFetch(`/transportistas/${editingTransportistaId}`, {
+          method: 'PUT',
+          body: JSON.stringify({ ...nuevoTransportista, costoBase: parseFloat(nuevoTransportista.costoBase) })
+        });
+        alert('✅ Transportista actualizado');
+      } else {
+        await apiFetch('/transportistas', {
+          method: 'POST',
+          body: JSON.stringify({ ...nuevoTransportista, costoBase: parseFloat(nuevoTransportista.costoBase) })
+        });
+        alert('✅ Transportista creado');
+      }
+      setNuevoTransportista({ nombre: '', nit: '', contacto: '', telefono: '', tipo: 'Terrestre', costoBase: 0, cobertura: [], tiempoEntrega: '', observaciones: '' });
+      setEditingTransportistaId(null);
       setShowTransportistaForm(false);
       cargarTransportistas();
-      cargarEstadisticasTransportistas();
     } catch (error) {
-      console.error('Error creando transportista:', error);
-      alert('Error al crear transportista: ' + error.message);
+      alert('Error: ' + error.message);
     }
   };
 
-  // Funciones para envíos (integradas con API)
+  const editarTransportista = (t) => {
+    setNuevoTransportista({
+      nombre: t.nombre,
+      nit: t.nit || '',
+      contacto: t.contacto,
+      telefono: t.telefono,
+      tipo: t.tipo,
+      costoBase: t.costoBase,
+      cobertura: t.cobertura || [],
+      tiempoEntrega: t.tiempoEntrega,
+      observaciones: t.observaciones || ''
+    });
+    setEditingTransportistaId(t._id);
+    setShowTransportistaForm(true);
+  };
+
+  const eliminarTransportista = async (id) => {
+    if (!window.confirm('¿Estás seguro de eliminar este transportista?')) return;
+    try {
+      await apiFetch(`/transportistas/${id}`, { method: 'DELETE' });
+      alert('✅ Transportista eliminado');
+      cargarTransportistas();
+    } catch (error) {
+      alert('Error: ' + error.message);
+    }
+  };
+
+  const buscarPedidos = async (numero) => {
+    if (!numero.trim()) {
+      setPedidosEncontrados([]);
+      setMostrarDropdownPedidos(false);
+      return;
+    }
+    try {
+      const pedidosData = await apiFetch('/pedidos');
+      const ventasData = await apiFetch('/ventas'); // ✅ Fetch sales too
+
+      const pedidosFiltrados = pedidosData.filter(p => p.pedidoNumero.toString().includes(numero));
+      // Map sales to match the structure expected by the dropdown/selection
+      const ventasFiltradas = ventasData
+        .filter(v => v.numVenta && v.numVenta.toString().includes(numero))
+        .map(v => ({
+          ...v,
+          _id: v._id,
+          pedidoNumero: v.numVenta, // Map numVenta to pedidoNumero
+          cliente: v.cliente, // Object populated
+          productos: v.productos, // List
+          metodoEntrega: v.metodoEntrega || "Recojo en Tienda", // Inherit delivery method
+          origen: 'Venta' // Flag to know it's a sale
+        }));
+
+      const logisticaData = await apiFetch('/logistica');
+      const logisticaFiltrados = logisticaData.filter(e => e.pedidoNumero.toString().includes(numero));
+
+      setPedidosEncontrados([...pedidosFiltrados, ...ventasFiltradas, ...logisticaFiltrados]);
+      setMostrarDropdownPedidos(true);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const seleccionarPedido = (pedido) => {
+    setNuevoEnvio({
+      ...nuevoEnvio,
+      pedidoId: pedido.pedidoNumero.toString(),
+      cliente: pedido.cliente?.nombre || '',
+      productos: pedido.productos || [],
+      metodoEntrega: pedido.metodoEntrega || 'Envio Domicilio' // ✅ Auto-select delivery method
+    });
+    setBusquedaPedido(pedido.pedidoNumero.toString());
+    setMostrarDropdownPedidos(false);
+  };
+
   const cargarEnvios = async () => {
     setLoadingEnvios(true);
     try {
       const data = await apiFetch('/logistica');
-      // Mapear datos del backend al formato del frontend
       const enviosMapeados = data.map(envio => ({
         id: envio._id,
         pedidoId: `PED-${envio.pedidoNumero}`,
         cliente: envio.cliente?.nombre || 'Cliente no encontrado',
-        direccion: `${envio.direccionEnvio?.calle || ''}, ${envio.direccionEnvio?.ciudad || ''}, ${envio.direccionEnvio?.departamento || ''}`,
-        productos: envio.productos?.map(p => p.producto?.nombre || 'Producto desconocido') || [],
+        direccion: `${envio.direccionEnvio?.calle || ''}, ${envio.direccionEnvio?.ciudad || ''}`,
+        productos: envio.productos?.map(p => p.producto?.nombre || 'Producto') || [],
         estado: envio.estado === 'en_proceso' ? 'En tránsito' :
-               envio.estado === 'despachado' ? 'En reparto' :
-               envio.estado === 'entregado' ? 'Entregado' :
-               envio.estado === 'cancelado' ? 'Cancelado' :
-               envio.estado === 'retrasado' ? 'Retrasado' : 'En almacén',
-        transportista: 'Por asignar', // TODO: Integrar con transportistas
+          envio.estado === 'despachado' ? 'En reparto' :
+            envio.estado === 'entregado' ? 'Entregado' :
+              envio.estado === 'cancelado' ? 'Cancelado' :
+                envio.estado === 'retrasado' ? 'Retrasado' : 'En almacén',
+        transportista: envio.transportista?.nombre || 'Por asignar',
         fechaEnvio: new Date(envio.fechaPedido).toLocaleDateString(),
         fechaEstimada: new Date(envio.fechaEntrega).toLocaleDateString(),
         tiempoEstimado: envio.tiempoEstimado,
-        costoEnvio: envio.costoAdicional || 0,
+        metodoEntrega: envio.metodoEntrega || 'Envio Domicilio',
+        metodoEntrega: envio.metodoEntrega || 'Envio Domicilio',
+        costoEnvio: envio.costoEnvio || envio.costoAdicional || 0,
         tracking: `TRK${envio.pedidoNumero}`,
-        ubicacionActual: envio.estado === 'entregado' ? 'Entregado al cliente' :
-                        envio.estado === 'despachado' ? 'En ruta de reparto' :
-                        envio.estado === 'en_proceso' ? 'Centro de Distribución Norte' : 'Almacén Principal'
+        tracking: `TRK${envio.pedidoNumero}`,
+        ubicacionActual: envio.estado === 'entregado' ? 'Entregado' : 'En proceso',
+        empresaEnvio: envio.empresaEnvio || ''
       }));
       setEnvios(enviosMapeados);
     } catch (error) {
       console.error('Error cargando envíos:', error);
-      alert('Error al cargar envíos: ' + error.message);
     } finally {
       setLoadingEnvios(false);
     }
@@ -372,47 +292,27 @@ const LogisticaPage = ({ userRole }) => {
 
   const cambiarEstadoEnvioAPI = async (id, nuevoEstado) => {
     try {
-      // Mapear estado del frontend al backend
       const estadoBackend = nuevoEstado === 'En tránsito' ? 'en_proceso' :
-                           nuevoEstado === 'En reparto' ? 'despachado' :
-                           nuevoEstado === 'Entregado' ? 'entregado' :
-                           nuevoEstado === 'Cancelado' ? 'cancelado' :
-                           nuevoEstado === 'Retrasado' ? 'retrasado' : 'pendiente';
-
+        nuevoEstado === 'En reparto' ? 'despachado' :
+          nuevoEstado === 'Entregado' ? 'entregado' : 'pendiente';
       await apiFetch(`/logistica/${id}`, {
         method: 'PATCH',
         body: JSON.stringify({ estado: estadoBackend })
       });
-
-      // Recargar envíos después de actualizar
       cargarEnvios();
-      alert('✅ Estado del envío actualizado exitosamente');
+      alert('✅ Estado actualizado');
     } catch (error) {
-      console.error('Error actualizando estado:', error);
-      alert('Error al actualizar estado: ' + error.message);
+      alert('Error: ' + error.message);
     }
   };
-
-  // Cargar datos al montar el componente
-  useEffect(() => {
-    cargarDatos();
-  }, []);
 
   const cargarDatos = async () => {
     setLoading(true);
     try {
-      // Verificar si hay token antes de hacer llamadas
       const token = getAuthToken();
-      if (!token) {
-        console.warn('No hay token de autenticación. Redirigiendo al login...');
-        navigate('/login');
-        return;
-      }
-
+      if (!token) return navigate('/login');
       const [pedidosData, clientesData, productosData] = await Promise.all([
-        apiFetch('/logistica'),
-        apiFetch('/clientes'),
-        apiFetch('/productos')
+        apiFetch('/pedidos'), apiFetch('/clientes'), apiFetch('/productos')
       ]);
       setPedidos(pedidosData);
       setClientes(clientesData);
@@ -420,447 +320,291 @@ const LogisticaPage = ({ userRole }) => {
       cargarEstadisticas();
       cargarTransportistas();
       cargarEstadisticasTransportistas();
-      cargarEnvios(); // Cargar envíos desde API
+      cargarRutas();
+      cargarEnvios();
     } catch (error) {
-      console.error('Error cargando datos:', error);
-
-      // Manejar errores de autenticación
-      if (error.message?.includes('Token no válido') ||
-          error.message?.includes('No autorizado') ||
-          error.message?.includes('Forbidden') ||
-          error.status === 403 ||
-          error.status === 401) {
-        console.warn('Token inválido o expirado. Redirigiendo al login...');
-        localStorage.removeItem('token'); // Limpiar token inválido
-        navigate('/login');
-        return;
-      }
-
-      // Para otros errores, mostrar mensaje pero no redirigir
-      alert('Error al cargar los datos: ' + error.message);
+      console.error(error);
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    cargarDatos();
+  }, []);
+
+  // ✅ AUTO-DETECTAR PETICIÓN DE ENVÍO DESDE VENTAS
+  useEffect(() => {
+    const action = searchParams.get('action');
+    const pedidoNumero = searchParams.get('pedidoNumero');
+
+    if (action === 'create' && pedidoNumero) {
+      const autoCargarPedido = async () => {
+        try {
+          // Asegurar que los datos base estén cargados
+          if (pedidos.length === 0 && envios.length === 0) {
+            await cargarDatos();
+          }
+
+          // Buscar en ventas (ya que el ID viene de una venta)
+          const ventasData = await apiFetch('/ventas');
+          const ventaEncontrada = ventasData.find(v => v.numVenta && v.numVenta.toString() === pedidoNumero);
+
+          if (ventaEncontrada) {
+            // Mapear venta a formato de pedido para logística
+            const pedidoMapeado = {
+              pedidoNumero: ventaEncontrada.numVenta,
+              cliente: ventaEncontrada.cliente, // Objeto completo
+              productos: ventaEncontrada.productos,
+              metodoEntrega: ventaEncontrada.metodoEntrega
+            };
+
+            seleccionarPedido(pedidoMapeado);
+            setShowForm(true);
+            setBusquedaPedido(pedidoNumero);
+          } else {
+            // Si no está en ventas, buscar en pedidos normales
+            const pedidosData = await apiFetch('/pedidos');
+            const pedidoEncontrado = pedidosData.find(p => p.pedidoNumero && p.pedidoNumero.toString() === pedidoNumero);
+
+            if (pedidoEncontrado) {
+              seleccionarPedido(pedidoEncontrado);
+              setShowForm(true);
+              setBusquedaPedido(pedidoNumero);
+            }
+          }
+        } catch (error) {
+          console.error("Error auto-cargando pedido:", error);
+        }
+      };
+
+      autoCargarPedido();
+    }
+  }, [searchParams]);
+
   const agregarEnvio = () => {
     if (!nuevoEnvio.pedidoId || !nuevoEnvio.cliente) return;
+    try {
+      const datosEnvio = {
+        pedidoNumero: parseInt(nuevoEnvio.pedidoId.replace('PED-', '') || Date.now().toString().slice(-6)),
+        cliente: clientes.find(c => c.nombre === nuevoEnvio.cliente)?._id,
+        productos: nuevoEnvio.productos.map(p => ({
+          producto: p.producto?._id || p._id,
+          cantidad: p.cantidad || 1
+        })),
+        fechaEntrega: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+        direccionEnvio: {
+          calle: nuevoEnvio.calle,
+          ciudad: nuevoEnvio.ciudad,
+          departamento: nuevoEnvio.departamento,
+          pais: nuevoEnvio.pais
+        },
+        metodoEntrega: nuevoEnvio.metodoEntrega,
+        tipoMovimiento: 'Envío a Cliente',
+        tipoMovimiento: 'Envío a Cliente',
+        costoAdicional: 0, // Deprecated in favor of costoEnvio
+        costoEnvio: parseFloat(nuevoEnvio.costoEnvio),
+        transportista: transportistas.find(t => t.nombre === nuevoEnvio.transportista)?._id,
+        empresaEnvio: nuevoEnvio.empresaEnvio
+      };
 
-    const envio = {
-      id: envios.length + 1,
-      ...nuevoEnvio,
-      fechaEnvio: new Date().toISOString().split('T')[0],
-      fechaEstimada: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      estado: 'En almacén',
-      tracking: `TRK${Date.now()}`,
-      ubicacionActual: 'Almacén Principal'
-    };
-
-    setEnvios([...envios, envio]);
-    setNuevoEnvio({
-      pedidoId: '',
-      cliente: '',
-      direccion: '',
-      productos: [],
-      transportista: '',
-      costoEnvio: 0
-    });
-    setShowForm(false);
+      apiFetch('/logistica', {
+        method: 'POST',
+        body: JSON.stringify(datosEnvio)
+      }).then(() => {
+        cargarEnvios();
+        alert('✅ Envío programado');
+        setNuevoEnvio({
+          pedidoId: '', cliente: '', calle: '', ciudad: '', departamento: '', pais: 'Bolivia',
+          productos: [], transportista: '', tipoTransporte: 'Terrestre',
+          metodoEntrega: 'Envio Domicilio', costoEnvio: 0, empresaEnvio: ''
+        });
+        setShowForm(false);
+      }).catch(err => alert('Error: ' + err.message));
+    } catch (error) {
+      alert('Error preparando datos: ' + error.message);
+    }
   };
 
-  // Funciones para rutas
-  const agregarRuta = () => {
-    if (!nuevaRuta.nombre || !nuevaRuta.origen || !nuevaRuta.destino) return;
-
-    const ruta = {
-      id: rutas.length + 1,
-      ...nuevaRuta,
-      estado: 'Activa',
-      duracion: nuevaRuta.distancia > 500 ? '8+ horas' : 
-                nuevaRuta.distancia > 300 ? '5-7 horas' :
-                nuevaRuta.distancia > 150 ? '3-4 horas' : '1-2 horas'
-    };
-
-    setRutas([...rutas, ruta]);
-    setNuevaRuta({
-      nombre: '',
-      origen: '',
-      destino: '',
-      distancia: 0,
-      transportista: '',
-      frecuencia: 'Diaria'
-    });
+  const agregarRuta = async () => {
+    if (!nuevaRuta.nombre || !nuevaRuta.transportista) return alert('Nombre y Transportista son requeridos');
+    try {
+      await apiFetch('/rutas', {
+        method: 'POST',
+        body: JSON.stringify(nuevaRuta)
+      });
+      alert('✅ Ruta creada');
+      setNuevaRuta({ nombre: '', origen: '', destino: '', transportista: '' });
+      setShowForm(false);
+      cargarRutas();
+    } catch (error) {
+      alert('Error: ' + error.message);
+    }
   };
 
-  // Cálculos de métricas
-  const totalEnvios = envios.length;
-  const enviosEntregados = envios.filter(e => e.estado === 'Entregado').length;
-  const enviosTransito = envios.filter(e => e.estado === 'En tránsito').length;
-  const costoTotalEnvios = envios.reduce((sum, envio) => sum + envio.costoEnvio, 0);
+  const eliminarRuta = async (id) => {
+    if (!window.confirm('¿Estás seguro de eliminar esta ruta?')) return;
+    try {
+      await apiFetch(`/rutas/${id}`, { method: 'DELETE' });
+      alert('✅ Ruta eliminada');
+      cargarRutas();
+    } catch (error) {
+      alert('Error: ' + error.message);
+    }
+  };
 
-  const productosDisponibles = inventario.filter(p => p.estado === 'Disponible').length;
-  const productosStockBajo = inventario.filter(p => p.estado === 'Stock Bajo').length;
-  const productosAgotados = inventario.filter(p => p.estado === 'Agotado').length;
+  if (loading) return <div className="p-6"><SkeletonMetrics /></div>;
 
-  const transportistasActivos = transportistas.filter(t => t.estado === 'Activo').length;
-  const rutasActivas = rutas.filter(r => r.estado === 'Activa').length;
-
-return (
+  return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navbar de Navegación */}
       <nav className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={volverAlHome}
-                className="flex items-center space-x-2 bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition duration-200"
-              >
-                <span>←</span>
-                <span>Volver al Home</span>
-              </button>
-              <h1 className="text-2xl font-bold text-gray-800">Sistema Aglomex</h1>
-            </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">Módulo de Logística</span>
-              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                {userRole || 'Usuario'}
-              </span>
-            </div>
+        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+          <div className="flex items-center space-x-4">
+            <button onClick={volverAlHome} className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600">← Volver</button>
+            <h1 className="text-2xl font-bold text-gray-800">Sistema Aglomex</h1>
           </div>
+          <span className="text-sm text-gray-600">Módulo de Logística</span>
         </div>
       </nav>
 
-      {/* Contenido Principal */}
       <div className="p-6">
         <div className="max-w-7xl mx-auto">
-          {/* Header */}
           <div className="mb-8">
             <h1 className="text-4xl font-bold text-indigo-600 mb-2">Módulo de Logística</h1>
-            <p className="text-gray-600 text-lg">Gestión de envíos, inventario y distribución</p>
+            <p className="text-gray-600 text-lg">Gestión de envíos y distribución</p>
           </div>
 
-          {/* Métricas */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-indigo-500">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-600">Total Envíos</h3>
-                  <p className="text-2xl font-bold text-gray-800">{totalEnvios}</p>
-                </div>
-                <div className="bg-indigo-100 p-3 rounded-lg">
-                  <span className="text-indigo-600 text-xl">🚚</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-green-500">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-600">Entregados</h3>
-                  <p className="text-2xl font-bold text-gray-800">{enviosEntregados}</p>
-                </div>
-                <div className="bg-green-100 p-3 rounded-lg">
-                  <span className="text-green-600 text-xl">✅</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-blue-500">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-600">En Tránsito</h3>
-                  <p className="text-2xl font-bold text-gray-800">{enviosTransito}</p>
-                </div>
-                <div className="bg-blue-100 p-3 rounded-lg">
-                  <span className="text-blue-600 text-xl">📦</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-purple-500">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-600">Costo Total</h3>
-                  <p className="text-2xl font-bold text-gray-800">${costoTotalEnvios}</p>
-                </div>
-                <div className="bg-purple-100 p-3 rounded-lg">
-                  <span className="text-purple-600 text-xl">💰</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Pestañas */}
           <div className="bg-white rounded-xl shadow-md mb-6">
             <div className="border-b border-gray-200">
               <nav className="flex -mb-px">
-                {['envios', 'inventario', 'transportistas', 'rutas'].map((tab) => (
+                {['envios', 'transportistas', 'rutas'].map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`py-4 px-6 text-center border-b-2 font-medium text-sm capitalize ${
-                      activeTab === tab
-                        ? 'border-indigo-500 text-indigo-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
+                    className={`py-4 px-6 text-center border-b-2 font-medium text-sm capitalize ${activeTab === tab ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+                      }`}
                   >
-                    {tab === 'envios' && '🚚 Gestión de Envíos'}
-                    {tab === 'inventario' && '📊 Control de Inventario'}
-                    {tab === 'transportistas' && '🏢 Transportistas'}
-                    {tab === 'rutas' && '🛣️ Rutas de Distribución'}
+                    {tab === 'envios' ? '🚚 Envíos' : tab === 'transportistas' ? '🏢 Transportistas' : '🛣️ Rutas'}
                   </button>
                 ))}
               </nav>
             </div>
           </div>
 
-          {/* Barra de Búsqueda */}
           <div className="mb-6">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder={`Buscar en ${activeTab}...`}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full"
-              />
-              <div className="absolute left-3 top-2.5 text-gray-400">
-                🔍
-              </div>
-            </div>
+            <input
+              type="text"
+              placeholder={`Buscar en ${activeTab}...`}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
           </div>
 
-          {/* Contenido de Pestañas */}
           {activeTab === 'envios' && (
             <div className="space-y-6">
-              {/* Formulario de Nuevo Envío */}
               <div className="bg-white rounded-xl shadow-md p-6">
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-2xl font-semibold text-gray-800">Nuevo Envío</h2>
-                  <button
-                    onClick={() => setShowForm(!showForm)}
-                    className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition duration-200"
-                  >
+                  <button onClick={() => setShowForm(!showForm)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">
                     {showForm ? 'Cancelar' : '+ Programar Envío'}
                   </button>
                 </div>
-                
+
                 {showForm && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
-                    <input
-                      type="text"
-                      placeholder="ID del Pedido"
-                      value={nuevoEnvio.pedidoId}
-                      onChange={(e) => setNuevoEnvio({...nuevoEnvio, pedidoId: e.target.value})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Cliente"
-                      value={nuevoEnvio.cliente}
-                      onChange={(e) => setNuevoEnvio({...nuevoEnvio, cliente: e.target.value})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Dirección"
-                      value={nuevoEnvio.direccion}
-                      onChange={(e) => setNuevoEnvio({...nuevoEnvio, direccion: e.target.value})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                    <select
-                      value={nuevoEnvio.transportista}
-                      onChange={(e) => setNuevoEnvio({...nuevoEnvio, transportista: e.target.value})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    >
-                      <option key="default-transportista" value="">Seleccionar transportista</option>
-                      {transportistas.filter(t => t.estado === 'Activo').map(trans => (
-                        <option key={trans._id || trans.id || `trans-${trans.nombre}`} value={trans.nombre}>
-                          {trans.nombre} - {trans.tipo}
-                        </option>
-                      ))}
+                    <div className="relative">
+                      <input
+                        type="text" placeholder="ID del Pedido" value={nuevoEnvio.pedidoId}
+                        onChange={(e) => {
+                          setNuevoEnvio({ ...nuevoEnvio, pedidoId: e.target.value });
+                          buscarPedidos(e.target.value);
+                        }}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                      />
+                      {mostrarDropdownPedidos && pedidosEncontrados.length > 0 && (
+                        <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto mt-1">
+                          {pedidosEncontrados.map((p) => (
+                            <div key={p._id} onClick={() => seleccionarPedido(p)} className="px-4 py-2 hover:bg-gray-100 cursor-pointer">
+                              Pedido #{p.pedidoNumero} - {p.cliente?.nombre}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Lista de productos del pedido seleccionado */}
+                    {nuevoEnvio.productos && nuevoEnvio.productos.length > 0 && (
+                      <div className="md:col-span-2 bg-indigo-50 p-4 rounded-lg border border-indigo-100">
+                        <h4 className="text-sm font-semibold text-indigo-800 mb-2">Productos en este pedido:</h4>
+                        <ul className="space-y-1">
+                          {nuevoEnvio.productos.map((p, idx) => (
+                            <li key={idx} className="text-sm text-indigo-700 flex justify-between">
+                              <span>• {p.producto?.nombre || 'Producto'}</span>
+                              <span className="font-medium">Cant: {p.cantidad}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    <input type="text" placeholder="Cliente" value={nuevoEnvio.cliente} onChange={(e) => setNuevoEnvio({ ...nuevoEnvio, cliente: e.target.value })} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                    <input type="text" placeholder="Calle" value={nuevoEnvio.calle} onChange={(e) => setNuevoEnvio({ ...nuevoEnvio, calle: e.target.value })} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                    <input type="text" placeholder="Ciudad" value={nuevoEnvio.ciudad} onChange={(e) => setNuevoEnvio({ ...nuevoEnvio, ciudad: e.target.value })} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                    <input type="text" placeholder="Departamento" value={nuevoEnvio.departamento} onChange={(e) => setNuevoEnvio({ ...nuevoEnvio, departamento: e.target.value })} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                    <select value={nuevoEnvio.tipoTransporte} onChange={(e) => setNuevoEnvio({ ...nuevoEnvio, tipoTransporte: e.target.value })} className="px-4 py-2 border border-gray-300 rounded-lg">
+                      <option value="Terrestre">Terrestre</option>
+                      <option value="Aéreo">Aéreo</option>
                     </select>
+                    <select value={nuevoEnvio.transportista} onChange={(e) => setNuevoEnvio({ ...nuevoEnvio, transportista: e.target.value })} className="px-4 py-2 border border-gray-300 rounded-lg">
+                      <option value="">Transportista (Interno)</option>
+                      {transportistas.map(t => <option key={t._id} value={t.nombre}>{t.nombre}</option>)}
+                    </select>
+                    <input type="text" placeholder="Empresa de Envío (Externa)" value={nuevoEnvio.empresaEnvio} onChange={(e) => setNuevoEnvio({ ...nuevoEnvio, empresaEnvio: e.target.value })} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                    <select value={nuevoEnvio.metodoEntrega} onChange={(e) => setNuevoEnvio({ ...nuevoEnvio, metodoEntrega: e.target.value })} className="px-4 py-2 border border-gray-300 rounded-lg">
+                      <option value="Envio Domicilio">Envio Domicilio</option>
+                      <option value="Recojo en Tienda">Recojo en Tienda</option>
+                      <option value="Recojo en Almacen">Recojo en Almacen</option>
+                      <option value="Envio Nacional">Envio Nacional</option>
+                    </select>
+                    <input type="number" placeholder="Costo Envío" value={nuevoEnvio.costoEnvio} onChange={(e) => setNuevoEnvio({ ...nuevoEnvio, costoEnvio: e.target.value })} className="px-4 py-2 border border-gray-300 rounded-lg" />
+
                     <div className="md:col-span-2 flex space-x-4">
-                      <button
-                        onClick={agregarEnvio}
-                        className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition duration-200"
-                      >
-                        Programar Envío
-                      </button>
-                      <button
-                        onClick={() => setShowForm(false)}
-                        className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition duration-200"
-                      >
-                        Cancelar
-                      </button>
+                      <button onClick={agregarEnvio} className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">Programar Envío</button>
                     </div>
                   </div>
                 )}
 
-                {/* Lista de Envíos */}
-                <h3 className="text-xl font-semibold text-gray-800 mb-4">Envíos Programados</h3>
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
                       <tr className="bg-gray-50">
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pedido ID</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tracking</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tiempo Estimado</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ubicación</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transportista</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tracking</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Método</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Empresa / Transportista</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Costo</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {enviosFiltrados.map((envio) => (
                         <tr key={envio.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {envio.pedidoId}
+                          <td className="px-4 py-3 text-sm text-blue-600 font-mono">{envio.tracking}</td>
+                          <td className="px-4 py-3 text-sm text-gray-500">{envio.cliente}</td>
+                          <td className="px-4 py-3"><span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100">{envio.estado}</span></td>
+                          <td className="px-4 py-3 text-sm text-gray-500">{envio.metodoEntrega}</td>
+                          <td className="px-4 py-3 text-sm text-gray-500">
+                            {envio.empresaEnvio ? <span className="font-semibold text-indigo-600">{envio.empresaEnvio}</span> : envio.transportista}
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                            {envio.cliente}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-blue-600 font-mono">
-                            {envio.tracking}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                              envio.estado === 'Entregado' ? 'bg-green-100 text-green-800' :
-                              envio.estado === 'En tránsito' ? 'bg-blue-100 text-blue-800' :
-                              envio.estado === 'En reparto' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
-                              {envio.estado}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                            {envio.tiempoEstimado}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                            {envio.ubicacionActual}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                            {envio.transportista}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900">
-                            ${envio.costoEnvio}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
-                            <div className="flex space-x-2">
-                              {envio.estado !== 'Entregado' && (
-                                <button
-                                  onClick={() => cambiarEstadoEnvioAPI(envio.id,
-                                    envio.estado === 'En almacén' ? 'En tránsito' :
-                                    envio.estado === 'En tránsito' ? 'En reparto' : 'Entregado'
-                                  )}
-                                  className="text-indigo-600 hover:text-indigo-900 text-xs"
-                                >
-                                  {envio.estado === 'En almacén' ? 'Despachar' :
-                                   envio.estado === 'En tránsito' ? 'En Reparto' : 'Entregar'}
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'inventario' && (
-            <div className="space-y-6">
-              {/* Métricas de Inventario */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-green-500">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-600">Disponibles</h3>
-                      <p className="text-2xl font-bold text-gray-800">{productosDisponibles}</p>
-                    </div>
-                    <div className="bg-green-100 p-3 rounded-lg">
-                      <span className="text-green-600 text-xl">✅</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-yellow-500">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-600">Stock Bajo</h3>
-                      <p className="text-2xl font-bold text-gray-800">{productosStockBajo}</p>
-                    </div>
-                    <div className="bg-yellow-100 p-3 rounded-lg">
-                      <span className="text-yellow-600 text-xl">⚠️</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-red-500">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-600">Agotados</h3>
-                      <p className="text-2xl font-bold text-gray-800">{productosAgotados}</p>
-                    </div>
-                    <div className="bg-red-100 p-3 rounded-lg">
-                      <span className="text-red-600 text-xl">❌</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Lista de Inventario */}
-              <div className="bg-white rounded-xl shadow-md p-6">
-                <h2 className="text-2xl font-semibold text-gray-800 mb-6">Control de Inventario</h2>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKU</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ubicación</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {inventarioFiltrado.map((item) => (
-                        <tr key={item.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {item.producto}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 font-mono">
-                            {item.sku}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                            {item.categoria}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                            <span className={`font-semibold ${
-                              item.cantidad <= item.nivelMinimo ? 'text-red-600' : 'text-green-600'
-                            }`}>
-                              {item.cantidad}
-                            </span>
-                            <span className="text-xs text-gray-500 ml-1">/ min: {item.nivelMinimo}</span>
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                            {item.ubicacion}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                              item.estado === 'Disponible' ? 'bg-green-100 text-green-800' :
-                              item.estado === 'Stock Bajo' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-red-100 text-red-800'
-                            }`}>
-                              {item.estado}
-                            </span>
+                          <td className="px-4 py-3 text-sm font-semibold">${envio.costoEnvio}</td>
+                          <td className="px-4 py-3 text-sm">
+                            {envio.estado !== 'Entregado' && (
+                              <button onClick={() => cambiarEstadoEnvioAPI(envio.id, 'Entregado')} className="text-indigo-600 hover:text-indigo-900 text-xs">
+                                Actualizar
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -872,279 +616,89 @@ return (
           )}
 
           {activeTab === 'transportistas' && (
-            <div className="space-y-6">
-              {/* Formulario de Nuevo Transportista */}
-              <div className="bg-white rounded-xl shadow-md p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-semibold text-gray-800">Transportistas</h2>
-                  <button
-                    onClick={() => setShowTransportistaForm(!showTransportistaForm)}
-                    className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition duration-200"
-                  >
-                    {showTransportistaForm ? 'Cancelar' : '+ Agregar Transportista'}
-                  </button>
-                </div>
+            <div className="bg-white rounded-xl shadow-md p-6">
+              <h2 className="text-2xl font-semibold mb-4">Transportistas</h2>
+              <button onClick={() => {
+                setShowTransportistaForm(!showTransportistaForm);
+                setEditingTransportistaId(null);
+                setNuevoTransportista({ nombre: '', nit: '', contacto: '', telefono: '', tipo: 'Terrestre', costoBase: 0, cobertura: [], tiempoEntrega: '', observaciones: '' });
+              }} className="bg-indigo-600 text-white px-4 py-2 rounded-lg mb-4">
+                {showTransportistaForm ? 'Cancelar' : '+ Agregar'}
+              </button>
+              {showTransportistaForm && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  <input type="text" placeholder="Nombre Empresa" value={nuevoTransportista.nombre} onChange={(e) => setNuevoTransportista({ ...nuevoTransportista, nombre: e.target.value })} className="px-4 py-2 border rounded-lg" />
+                  <input type="text" placeholder="NIT / Carnet" value={nuevoTransportista.nit} onChange={(e) => setNuevoTransportista({ ...nuevoTransportista, nit: e.target.value })} className="px-4 py-2 border rounded-lg" />
+                  <input type="text" placeholder="Nombre Contacto" value={nuevoTransportista.contacto} onChange={(e) => setNuevoTransportista({ ...nuevoTransportista, contacto: e.target.value })} className="px-4 py-2 border rounded-lg" />
+                  <input type="text" placeholder="Teléfono" value={nuevoTransportista.telefono} onChange={(e) => setNuevoTransportista({ ...nuevoTransportista, telefono: e.target.value })} className="px-4 py-2 border rounded-lg" />
+                  <select value={nuevoTransportista.tipo} onChange={(e) => setNuevoTransportista({ ...nuevoTransportista, tipo: e.target.value })} className="px-4 py-2 border rounded-lg">
+                    <option value="Terrestre">Terrestre</option>
+                    <option value="Aéreo">Aéreo</option>
+                    <option value="Marítimo">Marítimo</option>
+                    <option value="Mixto">Mixto</option>
+                  </select>
+                  <input type="number" placeholder="Costo Estimado" value={nuevoTransportista.costoBase} onChange={(e) => setNuevoTransportista({ ...nuevoTransportista, costoBase: e.target.value })} className="px-4 py-2 border rounded-lg" />
+                  <input type="text" placeholder="Tiempo Entrega (ej: 2-3 días)" value={nuevoTransportista.tiempoEntrega} onChange={(e) => setNuevoTransportista({ ...nuevoTransportista, tiempoEntrega: e.target.value })} className="px-4 py-2 border rounded-lg" />
 
-                {showTransportistaForm && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
-                    <input
-                      type="text"
-                      placeholder="Nombre del transportista"
-                      value={nuevoTransportista.nombre}
-                      onChange={(e) => setNuevoTransportista({...nuevoTransportista, nombre: e.target.value})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Contacto"
-                      value={nuevoTransportista.contacto}
-                      onChange={(e) => setNuevoTransportista({...nuevoTransportista, contacto: e.target.value})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Teléfono"
-                      value={nuevoTransportista.telefono}
-                      onChange={(e) => setNuevoTransportista({...nuevoTransportista, telefono: e.target.value})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                    <input
-                      type="email"
-                      placeholder="Email"
-                      value={nuevoTransportista.email}
-                      onChange={(e) => setNuevoTransportista({...nuevoTransportista, email: e.target.value})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                    <select
-                      value={nuevoTransportista.tipo}
-                      onChange={(e) => setNuevoTransportista({...nuevoTransportista, tipo: e.target.value})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    >
-                      <option value="Terrestre">Terrestre</option>
-                      <option value="Aéreo">Aéreo</option>
-                      <option value="Marítimo">Marítimo</option>
-                      <option value="Mixto">Mixto</option>
-                    </select>
-                    <input
-                      type="number"
-                      placeholder="Costo base"
-                      value={nuevoTransportista.costoBase}
-                      onChange={(e) => setNuevoTransportista({...nuevoTransportista, costoBase: parseFloat(e.target.value) || 0})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Tiempo de entrega (ej: 2-3 días)"
-                      value={nuevoTransportista.tiempoEntrega}
-                      onChange={(e) => setNuevoTransportista({...nuevoTransportista, tiempoEntrega: e.target.value})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                    <textarea
-                      placeholder="Observaciones"
-                      value={nuevoTransportista.observaciones}
-                      onChange={(e) => setNuevoTransportista({...nuevoTransportista, observaciones: e.target.value})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 md:col-span-2"
-                      rows="3"
-                    />
-                    <div className="md:col-span-2 flex space-x-4">
-                      <button
-                        onClick={agregarTransportista}
-                        className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition duration-200"
-                      >
-                        Crear Transportista
-                      </button>
-                      <button
-                        onClick={() => setShowTransportistaForm(false)}
-                        className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition duration-200"
-                      >
-                        Cancelar
-                      </button>
+                  <div className="md:col-span-2">
+                    <button onClick={agregarTransportista} className="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+                      {editingTransportistaId ? 'Actualizar Transportista' : 'Guardar Transportista'}
+                    </button>
+                  </div>
+                </div>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {transportistasFiltrados.map(t => (
+                  <div key={t._id} className="border p-4 rounded-lg relative">
+                    <h3 className="font-semibold text-lg">{t.nombre}</h3>
+                    <p className="text-sm text-gray-600 mb-1">NIT: {t.nit}</p>
+                    <p className="text-sm text-gray-600 mb-1">Contacto: {t.contacto}</p>
+                    <p className="text-sm text-gray-600 mb-1">Tel: {t.telefono}</p>
+                    <p className="text-sm text-gray-500 italic mb-2">{t.tipo}</p>
+                    <p className="text-sm text-gray-600 mb-2">Costo Est.: ${t.costoBase}</p>
+
+                    <div className="flex space-x-2 mt-2">
+                      <button onClick={() => editarTransportista(t)} className="bg-blue-100 text-blue-600 px-3 py-1 rounded text-sm hover:bg-blue-200">Editar</button>
+                      <button onClick={() => eliminarTransportista(t._id)} className="bg-red-100 text-red-600 px-3 py-1 rounded text-sm hover:bg-red-200">Eliminar</button>
                     </div>
                   </div>
-                )}
-
-                {/* Lista de Transportistas */}
-                <h3 className="text-xl font-semibold text-gray-800 mb-4">Transportistas Registrados</h3>
-                {loadingTransportistas ? (
-                  <div className="text-center py-8">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-                    <p className="mt-2 text-gray-600">Cargando transportistas...</p>
-                  </div>
-                ) : transportistasFiltrados.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-gray-500">No hay transportistas registrados aún.</p>
-                    <p className="text-sm text-gray-400 mt-1">Haz clic en "Agregar Transportista" para comenzar.</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {transportistasFiltrados.map((trans) => (
-                      <div key={trans._id || trans.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">
-                        <div className="flex items-center justify-between mb-3">
-                          <h3 className="font-semibold text-gray-800">{trans.nombre}</h3>
-                          <span className={`text-xs px-2 py-1 rounded-full ${
-                            trans.estado === 'Activo' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                          }`}>
-                            {trans.estado}
-                          </span>
-                        </div>
-                        <div className="space-y-2 text-sm text-gray-600">
-                          <p>📧 {trans.contacto}</p>
-                          <p>📞 {trans.telefono}</p>
-                          <p>🚛 {trans.tipo}</p>
-                          <p>💰 Costo base: ${trans.costoBase}</p>
-                          <p>🌍 Cobertura: {trans.cobertura?.join(', ') || 'No especificada'}</p>
-                          <p>⏱️ Tiempo: {trans.tiempoEntrega}</p>
-                          {trans.rating > 0 && (
-                            <div className="flex items-center">
-                              <span className="text-yellow-500">⭐</span>
-                              <span className="ml-1">{trans.rating}/5.0</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                ))}
               </div>
             </div>
           )}
 
           {activeTab === 'rutas' && (
-            <div className="space-y-6">
-              {/* Formulario de Nueva Ruta */}
-              <div className="bg-white rounded-xl shadow-md p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-semibold text-gray-800">Rutas de Distribución</h2>
-                  <button
-                    onClick={() => setShowForm(!showForm)}
-                    className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition duration-200"
-                  >
-                    {showForm ? 'Cancelar' : '+ Nueva Ruta'}
-                  </button>
-                </div>
-                
-                {showForm && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
-                    <input
-                      type="text"
-                      placeholder="Nombre de la ruta"
-                      value={nuevaRuta.nombre}
-                      onChange={(e) => setNuevaRuta({...nuevaRuta, nombre: e.target.value})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Origen"
-                      value={nuevaRuta.origen}
-                      onChange={(e) => setNuevaRuta({...nuevaRuta, origen: e.target.value})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Destino"
-                      value={nuevaRuta.destino}
-                      onChange={(e) => setNuevaRuta({...nuevaRuta, destino: e.target.value})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Distancia (km)"
-                      value={nuevaRuta.distancia}
-                      onChange={(e) => setNuevaRuta({...nuevaRuta, distancia: parseInt(e.target.value) || 0})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <select
-                      value={nuevaRuta.transportista}
-                      onChange={(e) => setNuevaRuta({...nuevaRuta, transportista: e.target.value})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    >
-                      <option key="default-ruta-transportista" value="">Seleccionar transportista</option>
-                      {transportistas.filter(t => t.estado === 'Activo').map(trans => (
-                        <option key={trans._id || trans.id || `ruta-trans-${trans.nombre}`} value={trans.nombre}>
-                          {trans.nombre}
-                        </option>
-                      ))}
-                    </select>
-                    <select
-                      value={nuevaRuta.frecuencia}
-                      onChange={(e) => setNuevaRuta({...nuevaRuta, frecuencia: e.target.value})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    >
-                      <option value="Diaria">Diaria</option>
-                      <option value="Semanal">Semanal</option>
-                      <option value="Quincenal">Quincenal</option>
-                      <option value="Mensual">Mensual</option>
-                    </select>
-                    <div className="md:col-span-2 flex space-x-4">
-                      <button
-                        onClick={agregarRuta}
-                        className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition duration-200"
-                      >
-                        Crear Ruta
-                      </button>
-                      <button
-                        onClick={() => setShowForm(false)}
-                        className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition duration-200"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
+            <div className="bg-white rounded-xl shadow-md p-6">
+              <h2 className="text-2xl font-semibold mb-4">Rutas</h2>
+              <button onClick={() => setShowForm(!showForm)} className="bg-green-600 text-white px-4 py-2 rounded-lg mb-4">
+                {showForm ? 'Cancelar' : '+ Nueva Ruta'}
+              </button>
+              {showForm && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  <input type="text" placeholder="Nombre" value={nuevaRuta.nombre} onChange={(e) => setNuevaRuta({ ...nuevaRuta, nombre: e.target.value })} className="px-4 py-2 border rounded-lg" />
+                  <select value={nuevaRuta.transportista} onChange={(e) => setNuevaRuta({ ...nuevaRuta, transportista: e.target.value })} className="px-4 py-2 border rounded-lg">
+                    <option value="">Seleccionar Transportista</option>
+                    {transportistas.map(t => <option key={t._id} value={t._id}>{t.nombre}</option>)}
+                  </select>
+                  <input type="text" placeholder="Origen (Punto de Partida)" value={nuevaRuta.origen} onChange={(e) => setNuevaRuta({ ...nuevaRuta, origen: e.target.value })} className="px-4 py-2 border rounded-lg" />
+                  <input type="text" placeholder="Destino (Punto de Entrega)" value={nuevaRuta.destino} onChange={(e) => setNuevaRuta({ ...nuevaRuta, destino: e.target.value })} className="px-4 py-2 border rounded-lg" />
+                  <div className="md:col-span-2">
+                    <button onClick={agregarRuta} className="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Guardar Ruta</button>
                   </div>
-                )}
-
-                {/* Lista de Rutas */}
-                <h3 className="text-xl font-semibold text-gray-800 mb-4">Rutas Activas</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {rutasFiltradas.map((ruta) => (
-                    <div key={ruta.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">
-                      <div className="flex items-center justify-between mb-3">
-                        <h3 className="font-semibold text-gray-800">{ruta.nombre}</h3>
-                        <span className={`text-xs px-2 py-1 rounded-full ${
-                          ruta.estado === 'Activa' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                        }`}>
-                          {ruta.estado}
-                        </span>
-                      </div>
-                      <div className="space-y-2 text-sm text-gray-600">
-                        <p className="flex items-center">
-                          <span className="font-medium mr-2">📍 Origen:</span>
-                          {ruta.origen}
-                        </p>
-                        <p className="flex items-center">
-                          <span className="font-medium mr-2">🎯 Destino:</span>
-                          {ruta.destino}
-                        </p>
-                        <p className="flex items-center">
-                          <span className="font-medium mr-2">📏 Distancia:</span>
-                          {ruta.distancia} km
-                        </p>
-                        <p className="flex items-center">
-                          <span className="font-medium mr-2">⏱️ Duración:</span>
-                          {ruta.duracion}
-                        </p>
-                        <p className="flex items-center">
-                          <span className="font-medium mr-2">🚛 Transportista:</span>
-                          {ruta.transportista}
-                        </p>
-                        <p className="flex items-center">
-                          <span className="font-medium mr-2">🔄 Frecuencia:</span>
-                          {ruta.frecuencia}
-                        </p>
-                      </div>
-                      <div className="mt-4 flex space-x-2">
-                        <button className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded hover:bg-blue-200">
-                          Editar
-                        </button>
-                        <button 
-                          onClick={() => setRutas(rutas.filter(r => r.id !== ruta.id))}
-                          className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded hover:bg-red-200"
-                        >
-                          Eliminar
-                        </button>
-                      </div>
-                    </div>
-                  ))}
                 </div>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {rutasFiltradas.map(r => (
+                  <div key={r._id} className="border p-4 rounded-lg relative">
+                    <h3 className="font-semibold">{r.nombre}</h3>
+                    <p className="text-sm">Origen: {r.origen}</p>
+                    <p className="text-sm">Destino: {r.destino}</p>
+                    <p className="text-sm text-gray-500 mt-1">Transportista: {r.transportista?.nombre || 'Desconocido'}</p>
+                    <button onClick={() => eliminarRuta(r._id)} className="absolute top-2 right-2 text-red-500 hover:text-red-700">
+                      🗑️
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
           )}

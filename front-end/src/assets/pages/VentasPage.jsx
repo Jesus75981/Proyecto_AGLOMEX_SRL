@@ -31,7 +31,7 @@ const apiFetch = async (endpoint, options = {}) => {
 
 const VentasPage = ({ userRole }) => {
   const navigate = useNavigate();
-  
+
   // ✅ CORREGIDO: Volver al HOME (menú principal)
   const volverAlHome = () => {
     navigate('/home');
@@ -42,7 +42,6 @@ const VentasPage = ({ userRole }) => {
   const [ventas, setVentas] = useState([]);
   const [productos, setProductos] = useState([]);
   const [clientes, setClientes] = useState([]);
-  const [expandedVentas, setExpandedVentas] = useState(new Set());
 
   // Estados para búsqueda de productos
   const [productoSearchTerm, setProductoSearchTerm] = useState('');
@@ -65,8 +64,6 @@ const VentasPage = ({ userRole }) => {
   useEffect(() => {
     const cargarDatos = async () => {
       try {
-        setLoading(true);
-
         // Cargar productos
         const productosData = await apiFetch('/productos');
         setProductos(productosData);
@@ -82,8 +79,6 @@ const VentasPage = ({ userRole }) => {
       } catch (error) {
         console.error('Error al cargar datos:', error);
         alert('Error al cargar datos desde el servidor');
-      } finally {
-        setLoading(false);
       }
     };
 
@@ -105,6 +100,9 @@ const VentasPage = ({ userRole }) => {
     productos: [], // Array de productos en la venta (carrito)
     fecha: new Date().toISOString().split('T')[0],
     metodoPago: 'Efectivo',
+    metodoPago: 'Efectivo',
+    metodoEntrega: 'Recojo en Tienda', // ✅ Default delivery method
+    numFactura: generarNumFactura(),
     numFactura: generarNumFactura(),
     observaciones: ''
   });
@@ -120,7 +118,6 @@ const VentasPage = ({ userRole }) => {
   const [errors, setErrors] = useState({});
   const [clienteErrors, setClienteErrors] = useState({});
   const [showForm, setShowForm] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [showCreateClientForm, setShowCreateClientForm] = useState(false);
   const [nuevoCliente, setNuevoCliente] = useState({
     nombre: '',
@@ -197,14 +194,14 @@ const VentasPage = ({ userRole }) => {
       const productosActualizados = nuevaVenta.productos.map(p =>
         p.producto === productoSeleccionado._id
           ? {
-              ...p,
-              cantidad: p.cantidad + productoTemporal.cantidad,
-              precioUnitario: productoTemporal.precioUnitario,
-              precioTotal: (p.cantidad + productoTemporal.cantidad) * productoTemporal.precioUnitario
-            }
+            ...p,
+            cantidad: p.cantidad + productoTemporal.cantidad,
+            precioUnitario: productoTemporal.precioUnitario,
+            precioTotal: (p.cantidad + productoTemporal.cantidad) * productoTemporal.precioUnitario
+          }
           : p
       );
-      setNuevaVenta({...nuevaVenta, productos: productosActualizados});
+      setNuevaVenta({ ...nuevaVenta, productos: productosActualizados });
     } else {
       // Añadir nuevo producto al carrito
       const nuevoProducto = {
@@ -214,7 +211,7 @@ const VentasPage = ({ userRole }) => {
         precioUnitario: productoTemporal.precioUnitario,
         precioTotal: productoTemporal.cantidad * productoTemporal.precioUnitario
       };
-      setNuevaVenta({...nuevaVenta, productos: [...nuevaVenta.productos, nuevoProducto]});
+      setNuevaVenta({ ...nuevaVenta, productos: [...nuevaVenta.productos, nuevoProducto] });
     }
 
     // Limpiar formulario de producto
@@ -230,7 +227,7 @@ const VentasPage = ({ userRole }) => {
   // Función para quitar producto de la venta
   const quitarProducto = (index) => {
     const productosActualizados = nuevaVenta.productos.filter((_, i) => i !== index);
-    setNuevaVenta({...nuevaVenta, productos: productosActualizados});
+    setNuevaVenta({ ...nuevaVenta, productos: productosActualizados });
   };
 
   // Calcular total de la venta
@@ -381,15 +378,24 @@ const VentasPage = ({ userRole }) => {
         }
       }
 
+      const totalVenta = nuevaVenta.productos.reduce((sum, p) => sum + p.precioTotal, 0);
+
       const ventaData = {
         numVenta: Date.now(), // Generar número único de venta
         cliente: clienteSeleccionado ? clienteSeleccionado._id : null, // ID del cliente o null si no hay cliente
         productos: nuevaVenta.productos, // Usar el array de productos
         fecha: nuevaVenta.fecha,
-        metodoPago: nuevaVenta.metodoPago,
+        // metodoPago: nuevaVenta.metodoPago, // DEPRECADO: Se usa metodosPago ahora
+        metodosPago: [
+          {
+            tipo: nuevaVenta.metodoPago,
+            monto: totalVenta // Por ahora asumimos pago único por el total
+          }
+        ],
+        metodoEntrega: nuevaVenta.metodoEntrega, // ✅ Send delivery method
         numFactura: nuevaVenta.numFactura,
         observaciones: nuevaVenta.observaciones,
-        estado: 'Pendiente',
+        estado: nuevaVenta.metodoPago === 'Crédito' ? 'Pendiente' : 'Pagada', // Estado inicial depende del pago
         vendedor: userRole || 'usuario'
       };
 
@@ -408,6 +414,7 @@ const VentasPage = ({ userRole }) => {
         productos: [], // Limpiar productos
         fecha: new Date().toISOString().split('T')[0],
         metodoPago: 'Efectivo',
+        metodoEntrega: 'Recojo en Tienda',
         numFactura: generarNumFactura(),
         observaciones: ''
       });
@@ -417,6 +424,13 @@ const VentasPage = ({ userRole }) => {
 
       // Mostrar mensaje de éxito
       alert('✅ Venta registrada exitosamente');
+
+      // ✅ REDIRECCIÓN A LOGÍSTICA SI ES ENVÍO
+      if (ventaData.metodoEntrega.includes('Envio')) {
+        alert('📦 Redirigiendo a módulo de Logística para programar el envío...');
+        navigate(`/logistica?action=create&pedidoNumero=${nuevaVentaGuardada.numVenta}`);
+      }
+
     } catch (error) {
       console.error('Error al registrar venta:', error);
       alert(`Error al registrar la venta: ${error.message}`);
@@ -439,22 +453,22 @@ const VentasPage = ({ userRole }) => {
   };
 
   // Eliminar venta (solo admin)
-  const eliminarVenta = (id) => {
+  const eliminarVenta = async (id) => {
     if (window.confirm('¿Estás seguro de eliminar esta venta?')) {
-      setVentas(ventas.filter(venta => venta.id !== id));
-      alert('🗑️ Venta eliminada correctamente');
+      try {
+        await apiFetch(`/ventas/${id}`, {
+          method: 'DELETE',
+        });
+        setVentas(ventas.filter(venta => venta._id !== id));
+        alert('🗑️ Venta eliminada correctamente');
+      } catch (error) {
+        console.error('Error al eliminar venta:', error);
+        alert(`Error al eliminar la venta: ${error.message}`);
+      }
     }
   };
 
-  // Calcular totales
-  const totalVentas = ventas.reduce((sum, venta) => {
-    if (venta.productos && venta.productos.length > 0) {
-      return sum + venta.productos.reduce((subSum, producto) => subSum + (producto.precioTotal || 0), 0);
-    }
-    return sum;
-  }, 0);
-  const ventasCompletadas = ventas.filter(v => v.estado === 'Completada').length;
-  const ventasPendientes = ventas.filter(v => v.estado === 'Pendiente').length;
+
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -491,56 +505,7 @@ const VentasPage = ({ userRole }) => {
             <p className="text-gray-600 text-lg">Gestión completa de ventas y clientes</p>
           </div>
 
-          {/* Métricas */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-green-500">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-600">Total Ventas</h3>
-                  <p className="text-2xl font-bold text-gray-800">Bs. {totalVentas.toLocaleString()}</p>
-                </div>
-                <div className="bg-green-100 p-3 rounded-lg">
-                  <span className="text-green-600 text-xl">💰</span>
-                </div>
-              </div>
-            </div>
 
-            <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-blue-500">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-600">Ventas Totales</h3>
-                  <p className="text-2xl font-bold text-gray-800">{ventas.length}</p>
-                </div>
-                <div className="bg-blue-100 p-3 rounded-lg">
-                  <span className="text-blue-600 text-xl">📊</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-purple-500">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-600">Completadas</h3>
-                  <p className="text-2xl font-bold text-gray-800">{ventasCompletadas}</p>
-                </div>
-                <div className="bg-purple-100 p-3 rounded-lg">
-                  <span className="text-purple-600 text-xl">✅</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-yellow-500">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-600">Pendientes</h3>
-                  <p className="text-2xl font-bold text-gray-800">{ventasPendientes}</p>
-                </div>
-                <div className="bg-yellow-100 p-3 rounded-lg">
-                  <span className="text-yellow-600 text-xl">⏳</span>
-                </div>
-              </div>
-            </div>
-          </div>
 
           {/* Controles Superiores */}
           <div className="flex justify-between items-center mb-6">
@@ -584,10 +549,9 @@ const VentasPage = ({ userRole }) => {
                   <input
                     type="text"
                     value={nuevoCliente.nombre}
-                    onChange={(e) => setNuevoCliente({...nuevoCliente, nombre: e.target.value})}
-                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
-                      clienteErrors.nombre ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    onChange={(e) => setNuevoCliente({ ...nuevoCliente, nombre: e.target.value })}
+                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${clienteErrors.nombre ? 'border-red-500' : 'border-gray-300'
+                      }`}
                     placeholder="Nombre completo del cliente"
                   />
                   {clienteErrors.nombre && <p className="text-red-500 text-sm mt-1">{clienteErrors.nombre}</p>}
@@ -598,7 +562,7 @@ const VentasPage = ({ userRole }) => {
                   <input
                     type="text"
                     value={nuevoCliente.empresa}
-                    onChange={(e) => setNuevoCliente({...nuevoCliente, empresa: e.target.value})}
+                    onChange={(e) => setNuevoCliente({ ...nuevoCliente, empresa: e.target.value })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                     placeholder="Nombre de la empresa (opcional)"
                   />
@@ -609,10 +573,9 @@ const VentasPage = ({ userRole }) => {
                   <input
                     type="text"
                     value={nuevoCliente.direccion}
-                    onChange={(e) => setNuevoCliente({...nuevoCliente, direccion: e.target.value})}
-                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
-                      clienteErrors.direccion ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    onChange={(e) => setNuevoCliente({ ...nuevoCliente, direccion: e.target.value })}
+                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${clienteErrors.direccion ? 'border-red-500' : 'border-gray-300'
+                      }`}
                     placeholder="Dirección completa"
                   />
                   {clienteErrors.direccion && <p className="text-red-500 text-sm mt-1">{clienteErrors.direccion}</p>}
@@ -623,10 +586,9 @@ const VentasPage = ({ userRole }) => {
                   <input
                     type="text"
                     value={nuevoCliente.telefono}
-                    onChange={(e) => setNuevoCliente({...nuevoCliente, telefono: e.target.value})}
-                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
-                      clienteErrors.telefono ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    onChange={(e) => setNuevoCliente({ ...nuevoCliente, telefono: e.target.value })}
+                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${clienteErrors.telefono ? 'border-red-500' : 'border-gray-300'
+                      }`}
                     placeholder="Número de teléfono"
                   />
                   {clienteErrors.telefono && <p className="text-red-500 text-sm mt-1">{clienteErrors.telefono}</p>}
@@ -637,10 +599,9 @@ const VentasPage = ({ userRole }) => {
                   <input
                     type="email"
                     value={nuevoCliente.email}
-                    onChange={(e) => setNuevoCliente({...nuevoCliente, email: e.target.value})}
-                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
-                      clienteErrors.email ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    onChange={(e) => setNuevoCliente({ ...nuevoCliente, email: e.target.value })}
+                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${clienteErrors.email ? 'border-red-500' : 'border-gray-300'
+                      }`}
                     placeholder="correo@ejemplo.com"
                   />
                   {clienteErrors.email && <p className="text-red-500 text-sm mt-1">{clienteErrors.email}</p>}
@@ -651,10 +612,9 @@ const VentasPage = ({ userRole }) => {
                   <input
                     type="text"
                     value={nuevoCliente.nit}
-                    onChange={(e) => setNuevoCliente({...nuevoCliente, nit: e.target.value})}
-                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
-                      clienteErrors.nit ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    onChange={(e) => setNuevoCliente({ ...nuevoCliente, nit: e.target.value })}
+                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${clienteErrors.nit ? 'border-red-500' : 'border-gray-300'
+                      }`}
                     placeholder="Número de NIT"
                   />
                   {clienteErrors.nit && <p className="text-red-500 text-sm mt-1">{clienteErrors.nit}</p>}
@@ -665,10 +625,9 @@ const VentasPage = ({ userRole }) => {
                   <input
                     type="text"
                     value={nuevoCliente.ci}
-                    onChange={(e) => setNuevoCliente({...nuevoCliente, ci: e.target.value})}
-                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
-                      clienteErrors.ci ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    onChange={(e) => setNuevoCliente({ ...nuevoCliente, ci: e.target.value })}
+                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${clienteErrors.ci ? 'border-red-500' : 'border-gray-300'
+                      }`}
                     placeholder="Número de CI"
                   />
                   {clienteErrors.ci && <p className="text-red-500 text-sm mt-1">{clienteErrors.ci}</p>}
@@ -679,7 +638,7 @@ const VentasPage = ({ userRole }) => {
                   <input
                     type="text"
                     value={nuevoCliente.ubicacion}
-                    onChange={(e) => setNuevoCliente({...nuevoCliente, ubicacion: e.target.value})}
+                    onChange={(e) => setNuevoCliente({ ...nuevoCliente, ubicacion: e.target.value })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                     placeholder="Ubicación del cliente (opcional)"
                   />
@@ -722,10 +681,9 @@ const VentasPage = ({ userRole }) => {
                   <input
                     type="text"
                     value={nuevaVenta.cliente}
-                    onChange={(e) => setNuevaVenta({...nuevaVenta, cliente: e.target.value})}
-                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
-                      errors.cliente ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    onChange={(e) => setNuevaVenta({ ...nuevaVenta, cliente: e.target.value })}
+                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${errors.cliente ? 'border-red-500' : 'border-gray-300'
+                      }`}
                     placeholder="Nombre completo del cliente (opcional)"
                   />
                   {errors.cliente && <p className="text-red-500 text-sm mt-1">{errors.cliente}</p>}
@@ -736,13 +694,27 @@ const VentasPage = ({ userRole }) => {
                   <input
                     type="date"
                     value={nuevaVenta.fecha}
-                    onChange={(e) => setNuevaVenta({...nuevaVenta, fecha: e.target.value})}
-                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
-                      errors.fecha ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    onChange={(e) => setNuevaVenta({ ...nuevaVenta, fecha: e.target.value })}
+                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${errors.fecha ? 'border-red-500' : 'border-gray-300'
+                      }`}
                     max={new Date().toISOString().split('T')[0]}
                   />
                   {errors.fecha && <p className="text-red-500 text-sm mt-1">{errors.fecha}</p>}
+                </div>
+
+                {/* Método de Entrega */}
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Método de Entrega</label>
+                  <select
+                    value={nuevaVenta.metodoEntrega}
+                    onChange={(e) => setNuevaVenta({ ...nuevaVenta, metodoEntrega: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="Recojo en Tienda">Recojo en Tienda</option>
+                    <option value="Recojo en Almacen">Recojo en Almacen</option>
+                    <option value="Envio Domicilio">Envío a Domicilio</option>
+                    <option value="Envio Nacional">Envío Nacional</option>
+                  </select>
                 </div>
               </div>
 
@@ -799,7 +771,7 @@ const VentasPage = ({ userRole }) => {
                       min="1"
                       max="100"
                       value={productoTemporal.cantidad}
-                      onChange={(e) => setProductoTemporal({...productoTemporal, cantidad: parseInt(e.target.value) || 1})}
+                      onChange={(e) => setProductoTemporal({ ...productoTemporal, cantidad: parseInt(e.target.value) || 1 })}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
                   </div>
@@ -811,7 +783,7 @@ const VentasPage = ({ userRole }) => {
                       min="0"
                       step="0.01"
                       value={productoTemporal.precioUnitario}
-                      onChange={(e) => setProductoTemporal({...productoTemporal, precioUnitario: parseFloat(e.target.value) || 0})}
+                      onChange={(e) => setProductoTemporal({ ...productoTemporal, precioUnitario: parseFloat(e.target.value) || 0 })}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
                   </div>
@@ -891,13 +863,14 @@ const VentasPage = ({ userRole }) => {
                   <label className="block text-sm font-medium text-gray-700 mb-2">Método de Pago</label>
                   <select
                     value={nuevaVenta.metodoPago}
-                    onChange={(e) => setNuevaVenta({...nuevaVenta, metodoPago: e.target.value})}
+                    onChange={(e) => setNuevaVenta({ ...nuevaVenta, metodoPago: e.target.value })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                   >
                     <option value="Efectivo">Efectivo</option>
                     <option value="Tarjeta">Tarjeta</option>
                     <option value="Transferencia">Transferencia</option>
                     <option value="Cheque">Cheque</option>
+                    <option value="Crédito">Crédito</option>
                   </select>
                 </div>
 
@@ -905,7 +878,7 @@ const VentasPage = ({ userRole }) => {
                   <label className="block text-sm font-medium text-gray-700 mb-2">Observaciones</label>
                   <textarea
                     value={nuevaVenta.observaciones}
-                    onChange={(e) => setNuevaVenta({...nuevaVenta, observaciones: e.target.value})}
+                    onChange={(e) => setNuevaVenta({ ...nuevaVenta, observaciones: e.target.value })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                     rows="2"
                     placeholder="Observaciones adicionales (opcional)"
@@ -919,11 +892,10 @@ const VentasPage = ({ userRole }) => {
                 <button
                   onClick={agregarVenta}
                   disabled={nuevaVenta.productos.length === 0}
-                  className={`py-3 px-6 rounded-lg transition duration-200 font-semibold shadow-md ${
-                    nuevaVenta.productos.length === 0
-                      ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
-                      : 'bg-green-600 text-white hover:bg-green-700'
-                  }`}
+                  className={`py-3 px-6 rounded-lg transition duration-200 font-semibold shadow-md ${nuevaVenta.productos.length === 0
+                    ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                    : 'bg-green-600 text-white hover:bg-green-700'
+                    }`}
                 >
                   Registrar Venta ({nuevaVenta.productos.length} productos)
                 </button>
@@ -967,6 +939,7 @@ const VentasPage = ({ userRole }) => {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Productos</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Saldo Pendiente</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
@@ -987,15 +960,17 @@ const VentasPage = ({ userRole }) => {
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-green-600">
                         Bs. {(venta.productos?.reduce((sum, p) => sum + (p.precioTotal || 0), 0) || 0).toFixed(2)}
                       </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-red-600">
+                        {venta.saldoPendiente > 0 ? `Bs. ${venta.saldoPendiente.toFixed(2)}` : '-'}
+                      </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                         {new Date(venta.fecha).toLocaleDateString('es-ES')}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          venta.estado === 'Completada'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}>
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${venta.estado === 'Completada' || venta.estado === 'Pagada'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-yellow-100 text-yellow-800'
+                          }`}>
                           {venta.estado}
                         </span>
                       </td>
@@ -1023,7 +998,7 @@ const VentasPage = ({ userRole }) => {
                   ))}
                 </tbody>
               </table>
-              
+
               {ventasFiltradas.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
                   {searchTerm ? 'No se encontraron ventas que coincidan con la búsqueda' : 'No hay ventas registradas'}
@@ -1033,7 +1008,7 @@ const VentasPage = ({ userRole }) => {
           </div>
         </div>
       </div>
-    </div>
+    </div >
   );
 };
 

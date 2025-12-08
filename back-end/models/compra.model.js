@@ -4,7 +4,7 @@ const pagoSchema = new mongoose.Schema({
     tipo: {
         type: String,
         // ENUM ACTUALIZADO: Incluye los 4 métodos de pago solicitados
-        enum: ["Efectivo", "Transferencia", "Cheque"],
+        enum: ["Efectivo", "Transferencia", "Cheque", "Crédito"],
         required: true,
     },
     monto: { // Monto específico pagado con este método
@@ -20,31 +20,31 @@ const pagoSchema = new mongoose.Schema({
     }
 }, { _id: false });
 const compraSchema = new mongoose.Schema({
-  numCompra: {
-    type: String,
-    required: true,
-    unique: true
-  },
-  fecha: {
-    type: Date,
-    default: Date.now
-  },
-  
-  tipoCompra: {
-    type: String,
-    enum: ["Materia Prima", "Producto Terminado"],
-    required: true,
-  },
-  proveedor: {
+    numCompra: {
+        type: String,
+        required: true,
+        unique: true
+    },
+    fecha: {
+        type: Date,
+        default: Date.now
+    },
+
+    tipoCompra: {
+        type: String,
+        enum: ["Materia Prima", "Producto Terminado"],
+        required: true,
+    },
+    proveedor: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Proveedor", // Solo un proveedor por compra
         required: true,
     },
     productos: [ // <--- ¡ESTE ES EL ARRAY CLAVE!
         {
-            producto: { 
+            producto: {
                 type: mongoose.Schema.Types.ObjectId,
-                ref: "ProductoTienda", 
+                ref: "ProductoTienda",
                 required: true,
             },
             precioUnitario: { type: Number, required: true },
@@ -59,17 +59,17 @@ const compraSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
-   metodosPago: {
+    metodosPago: {
         type: [pagoSchema], // Un array de los pagos realizados
         required: true,
         validate: { // Validación personalizada para asegurar que el array no esté vacío
-            validator: function(v) {
+            validator: function (v) {
                 return v.length > 0;
             },
             message: 'Debe especificar al menos un método de pago.'
         }
     },
-    
+
     estado: {
         type: String,
         enum: ["Pendiente", "Pagada", "Parcialmente Pagada", "Cancelada"]
@@ -79,4 +79,3 @@ const compraSchema = new mongoose.Schema({
 
 
 export default mongoose.model("Compra", compraSchema);
-                                       

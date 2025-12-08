@@ -1,6 +1,8 @@
 import Compra from "../models/compra.model.js";
 import ProductoTienda from "../models/productoTienda.model.js";
 import DeudaCompra from "../models/deudaCompra.model.js"; // Importar el modelo de deudas
+import BankAccount from "../models/bankAccount.model.js";
+import BankTransaction from "../models/bankTransaction.model.js";
 import { registrarTransaccionFinanciera } from './finanzas.controller.js';
 
 /**
@@ -36,7 +38,7 @@ const encontrarOCrearProducto = async (itemData) => {
     if (!producto) {
         // Validamos que los datos mínimos estén presentes
         if (!nombreProducto || !colorProducto || !categoriaProducto) {
-             throw new Error("Datos insuficientes para crear un nuevo producto. Se requiere nombre, color y categoría.");
+            throw new Error("Datos insuficientes para crear un nuevo producto. Se requiere nombre, color y categoría.");
         }
 
         // Generar código automático usando la función del productoTienda.controller.js
@@ -56,6 +58,7 @@ const encontrarOCrearProducto = async (itemData) => {
             categoria: categoriaProducto,
             dimensiones: dimensiones || {},
             imagen: imagenProducto || "",
+            tipo: itemData.tipo || 'Producto Terminado' // Asignar tipo correcto
         });
 
         producto = await nuevoProducto.save();
@@ -72,8 +75,8 @@ export const registrarCompra = async (req, res) => {
         // --- GENERAR NÚMERO DE COMPRA CORRELATIVO ---
         const today = new Date();
         const dateStr = today.getFullYear().toString() +
-                        (today.getMonth() + 1).toString().padStart(2, '0') +
-                        today.getDate().toString().padStart(2, '0');
+            (today.getMonth() + 1).toString().padStart(2, '0') +
+            today.getDate().toString().padStart(2, '0');
         const prefix = `COMP-${dateStr}-`;
 
         const ultimaCompraDelDia = await Compra.findOne({
@@ -121,14 +124,10 @@ export const registrarCompra = async (req, res) => {
             });
         }
 
-        // --- VALIDACIÓN Y CÁLCULO DE PAGOS (LÓGICA MODIFICADA PARA CRÉDITO) ---
+        // --- VALIDACIÓN Y CÁLCULO DE PAGOS (LÓGICA AUTOMÁTICA DE SALDO PENDIENTE) ---
         const pagosReales = [];
-        let montoCredito = 0;
 
-        if (!datosCompra.metodosPago || !Array.isArray(datosCompra.metodosPago) || datosCompra.metodosPago.length === 0) {
-            // Si no hay métodos de pago, se asume que toda la compra es a crédito.
-            montoCredito = datosCompra.totalCompra;
-        } else {
+        if (datosCompra.metodosPago && Array.isArray(datosCompra.metodosPago)) {
             for (const pago of datosCompra.metodosPago) {
                 if (!pago.tipo || !["Efectivo", "Transferencia", "Cheque", "Crédito"].includes(pago.tipo)) {
                     return res.status(400).json({ message: "Cada método de pago debe tener un tipo válido: Efectivo, Transferencia, Cheque o Crédito." });
@@ -137,28 +136,53 @@ export const registrarCompra = async (req, res) => {
                     return res.status(400).json({ message: "El monto de cada pago debe ser un número positivo." });
                 }
 
-                if (pago.tipo === "Crédito") {
-                    montoCredito += pago.monto;
-                } else {
-                    pagosReales.push(pago);
+                // Validación específica para Transferencia
+                if (pago.tipo === 'Transferencia') {
+                    if (!pago.cuentaId) {
+                        return res.status(400).json({ message: "Para transferencias, debe seleccionar una cuenta bancaria." });
+                    }
+                    const bankAccount = await BankAccount.findById(pago.cuentaId);
+                    if (!bankAccount) {
+                        return res.status(400).json({ message: "La cuenta bancaria seleccionada no existe." });
+                    }
+                    if (bankAccount.saldo < pago.monto) {
+                        return res.status(400).json({ message: `Fondos insuficientes en la cuenta ${bankAccount.nombreBanco}. Saldo actual: ${bankAccount.saldo}` });
+                    }
+                    // Guardamos referencia para usarla después
+                    pago._bankAccount = bankAccount;
                 }
+
+                pagosReales.push(pago);
             }
         }
 
-        const totalPagadoDirectamente = pagosReales.reduce((sum, pago) => sum + pago.monto, 0);
-        const totalComprometido = totalPagadoDirectamente + montoCredito;
+        // Calcular total pagado directamente (excluyendo Crédito)
+        const totalPagadoDirectamente = pagosReales.reduce((sum, pago) => {
+            return pago.tipo === 'Crédito' ? sum : sum + pago.monto;
+        }, 0);
 
-        if (Math.abs(datosCompra.totalCompra - totalComprometido) > 0.01) {
+        // Calcular saldo pendiente automáticamente
+        let saldoPendiente = datosCompra.totalCompra - totalPagadoDirectamente;
+
+        // Manejo de redondeo para evitar decimales flotantes
+        saldoPendiente = Math.round(saldoPendiente * 100) / 100;
+
+        if (saldoPendiente < 0) {
             return res.status(400).json({
-                message: `La suma de los pagos (${totalPagadoDirectamente.toFixed(2)}) y el crédito (${montoCredito.toFixed(2)}) no coincide con el total de la compra (${datosCompra.totalCompra.toFixed(2)}).`
+                message: `El monto pagado (${totalPagadoDirectamente.toFixed(2)}) excede el total de la compra (${datosCompra.totalCompra.toFixed(2)}).`
             });
         }
 
-        // La compra se considera 'Pagada' o 'Cerrada' porque el crédito está documentado en DeudaCompra.
-        // El saldo pendiente en la COMPRA ahora es CERO.
-        datosCompra.saldoPendiente = 0;
-        datosCompra.estado = "Pagada";
-        datosCompra.metodosPago = pagosReales; // Guardar solo los pagos reales en la compra.
+        // Determinar estado y asignar valores
+        datosCompra.saldoPendiente = saldoPendiente;
+        datosCompra.metodosPago = pagosReales;
+
+        if (saldoPendiente > 0) {
+            datosCompra.estado = "Pendiente";
+        } else {
+            datosCompra.estado = "Pagada";
+            datosCompra.saldoPendiente = 0; // Asegurar que sea 0 si es negativo por milésimas
+        }
 
         // --- 1. PRE-PROCESAMIENTO: IDENTIFICAR O CREAR PRODUCTOS NUEVOS ---
         const preProcessPromises = datosCompra.productos.map(async (item) => {
@@ -168,7 +192,8 @@ export const registrarCompra = async (req, res) => {
                 colorProducto: item.colorProducto,
                 categoriaProducto: item.categoriaProducto,
                 dimensiones: item.dimensiones,
-                imagenProducto: item.imagenProducto
+                imagenProducto: item.imagenProducto,
+                tipo: datosCompra.tipoCompra // Pasar el tipo de compra
             });
             return { ...item, producto: productoObjectId };
         });
@@ -191,22 +216,44 @@ export const registrarCompra = async (req, res) => {
         });
         const inventarioActualizado = await Promise.all(updatePromises);
 
-        // --- 4. GESTIONAR DEUDA SI HAY MONTO A CRÉDITO ---
-        if (montoCredito > 0) {
+        // --- 4. GESTIONAR DEUDA SI HAY SALDO PENDIENTE ---
+        if (datosCompra.saldoPendiente > 0) {
             const nuevaDeuda = new DeudaCompra({
                 compraId: compraGuardada._id,
                 proveedor: compraGuardada.proveedor,
-                montoOriginal: montoCredito,
+                montoOriginal: datosCompra.saldoPendiente,
                 montoPagado: 0,
-                saldoActual: montoCredito,
+                saldoActual: datosCompra.saldoPendiente,
                 estado: 'Pendiente'
             });
             await nuevaDeuda.save();
-            console.log(`[DEUDA]: Se registró deuda por la compra ${compraGuardada.numCompra}. Saldo: ${montoCredito}`);
+            console.log(`[DEUDA]: Se registró deuda por la compra ${compraGuardada.numCompra}. Saldo: ${datosCompra.saldoPendiente}`);
         }
 
-        // --- 5. REGISTRAR TRANSACCIÓN FINANCIERA (SOLO EGRESO REAL) ---
+        // --- 5. REGISTRAR TRANSACCIÓN FINANCIERA Y ACTUALIZAR BANCOS ---
         if (totalPagadoDirectamente > 0) {
+            // Procesar pagos bancarios (Transferencias)
+            for (const pago of pagosReales) {
+                if (pago.tipo === 'Transferencia' && pago._bankAccount) {
+                    const bankAccount = pago._bankAccount;
+
+                    // Descontar saldo
+                    bankAccount.saldo -= pago.monto;
+                    await bankAccount.save();
+
+                    // Registrar transacción bancaria
+                    const bankTx = new BankTransaction({
+                        cuentaId: bankAccount._id,
+                        tipo: 'Compra',
+                        monto: pago.monto,
+                        descripcion: `Compra #${compraGuardada.numCompra}`,
+                        referenciaId: compraGuardada._id,
+                        fecha: new Date()
+                    });
+                    await bankTx.save();
+                }
+            }
+
             await registrarTransaccionFinanciera(
                 'egreso',
                 datosCompra.tipoCompra === 'Materia Prima' ? 'compra_materias' : 'compra_productos',
@@ -217,7 +264,11 @@ export const registrarCompra = async (req, res) => {
                 {
                     numCompra: compraGuardada.numCompra,
                     tipoCompra: datosCompra.tipoCompra,
-                    metodosPago: pagosReales
+                    metodosPago: pagosReales.map(p => ({
+                        tipo: p.tipo,
+                        monto: p.monto,
+                        cuenta: p._bankAccount ? p._bankAccount.nombreBanco : null
+                    }))
                 },
                 'BOB',
                 1
@@ -261,10 +312,10 @@ export const registrarCompra = async (req, res) => {
 export const listarCompras = async (req, res) => {
     try {
         const historial = await Compra.find()
-                                        .populate('productos.producto') // Traer información del producto
-                                        .populate('proveedor')         // Traer información del proveedor
-                                        .limit(50)
-                                        .sort({ fecha: -1 });
+            .populate('productos.producto') // Traer información del producto
+            .populate('proveedor')         // Traer información del proveedor
+            .limit(50)
+            .sort({ fecha: -1 });
         res.status(200).json(historial);
     } catch (error) {
         res.status(500).json({ message: "Error al listar compras", error: error.message });
@@ -280,10 +331,210 @@ export const listarComprasConSaldo = async (req, res) => {
             saldoPendiente: { $gt: 0 },
             estado: { $in: ["Pendiente", "Parcialmente Pagada"] }
         })
-        .populate('proveedor')
-        .sort({ fecha: -1 });
+            .populate('proveedor')
+            .sort({ fecha: -1 });
         res.status(200).json(comprasConSaldo);
     } catch (error) {
         res.status(500).json({ message: "Error al listar las compras con saldo.", error: error.message });
+    }
+};
+
+// Reporte avanzado de compras
+export const generarReporteCompras = async (req, res) => {
+    try {
+        const { fechaInicio, fechaFin, proveedorId } = req.body;
+
+        let query = {};
+
+        if (fechaInicio && fechaFin) {
+            const start = new Date(fechaInicio);
+            start.setHours(0, 0, 0, 0);
+            const end = new Date(fechaFin);
+            end.setHours(23, 59, 59, 999);
+            query.fecha = { $gte: start, $lte: end };
+        }
+
+        if (proveedorId) {
+            query.proveedor = proveedorId;
+        }
+
+        const compras = await Compra.find(query)
+            .populate('proveedor', 'nombre nit')
+            .populate('productos.producto', 'nombre codigo')
+            .sort({ fecha: -1 });
+
+        // Calcular totales
+        const totalCompras = compras.length;
+        const totalGastos = compras.reduce((sum, compra) => sum + compra.totalCompra, 0);
+        const totalSaldoPendiente = compras.reduce((sum, compra) => sum + (compra.saldoPendiente || 0), 0);
+
+        res.json({
+            resumen: {
+                totalCompras,
+                totalGastos,
+                totalSaldoPendiente
+            },
+            detalles: compras
+        });
+
+    } catch (error) {
+        console.error("Error al generar reporte de compras:", error);
+        res.status(500).json({ message: "Error al generar reporte", error: error.message });
+    }
+};
+
+/**
+ * Obtener estadísticas de compras para el dashboard
+ */
+export const obtenerEstadisticas = async (req, res) => {
+    try {
+        // 1. Filtros de Fecha
+        const { year, period, month, date } = req.query;
+        let matchStage = {};
+
+        if (period === 'day' && date) {
+            const startOfDay = new Date(date);
+            startOfDay.setHours(0, 0, 0, 0);
+            const endOfDay = new Date(date);
+            endOfDay.setHours(23, 59, 59, 999);
+            matchStage.fecha = { $gte: startOfDay, $lte: endOfDay };
+        } else if (period === 'month' && year && month) {
+            const startDate = new Date(`${year}-${month.toString().padStart(2, '0')}-01`);
+            const endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0, 23, 59, 59);
+            matchStage.fecha = { $gte: startDate, $lte: endDate };
+        } else if (year) {
+            const currentYear = parseInt(year);
+            matchStage.fecha = {
+                $gte: new Date(`${currentYear}-01-01`),
+                $lte: new Date(`${currentYear}-12-31`)
+            };
+        } else {
+            // Default to current year if nothing specified
+            const currentYear = new Date().getFullYear();
+            matchStage.fecha = {
+                $gte: new Date(`${currentYear}-01-01`),
+                $lte: new Date(`${currentYear}-12-31`)
+            };
+        }
+
+
+        // 1. Compras Grafica (Agrupadas por periodo)
+        let groupId;
+        if (period === 'day') {
+            groupId = { hour: { $hour: "$fecha" } };
+        } else if (period === 'month') {
+            groupId = { day: { $dayOfMonth: "$fecha" } };
+        } else {
+            groupId = { month: { $month: "$fecha" } };
+        }
+
+        const comprasAgrupadas = await Compra.aggregate([
+            { $match: matchStage },
+            {
+                $group: {
+                    _id: groupId,
+                    totalGasto: { $sum: "$totalCompra" },
+                    totalPendiente: { $sum: "$saldoPendiente" }
+                }
+            },
+            { $sort: { "_id": 1 } }
+        ]);
+
+        const comprasGrafica = comprasAgrupadas.map(item => {
+            const totalGasto = item.totalGasto || 0;
+            const totalPendiente = item.totalPendiente || 0;
+            return {
+                period: item._id,
+                totalPagado: totalGasto - totalPendiente,
+                totalPendiente: totalPendiente,
+                totalGasto: totalGasto
+            };
+        });
+
+        // 2. Totales Generales
+        const totalesAnuales = await Compra.aggregate([
+            { $match: matchStage },
+            {
+                $group: {
+                    _id: null,
+                    totalCompras: { $sum: 1 },
+                    totalGasto: { $sum: "$totalCompra" },
+                    promedioCompra: { $avg: "$totalCompra" },
+                    totalPendiente: { $sum: "$saldoPendiente" }
+                }
+            }
+        ]);
+
+        // 3. Compras Recientes
+        const comprasRecientes = await Compra.find(matchStage)
+            .sort({ fecha: -1 })
+            .limit(5)
+            .populate('proveedor', 'nombre');
+
+        // 4. Compras por Tipo
+        const comprasPorTipo = await Compra.aggregate([
+            { $match: matchStage },
+            {
+                $group: {
+                    _id: "$tipoCompra",
+                    count: { $sum: 1 },
+                    total: { $sum: "$totalCompra" }
+                }
+            }
+        ]);
+
+        // 5. Compras por Estado
+        const comprasPorEstado = await Compra.aggregate([
+            { $match: matchStage },
+            {
+                $group: {
+                    _id: "$estado",
+                    count: { $sum: 1 },
+                    total: { $sum: "$totalCompra" }
+                }
+            }
+        ]);
+
+
+        res.json({
+            comprasMensuales: comprasGrafica, // Send processed data
+            estadisticasGenerales: totalesAnuales[0] || { totalCompras: 0, totalGasto: 0, promedioCompra: 0 },
+            comprasRecientes,
+            comprasPorTipo,
+            comprasPorEstado
+        });
+
+    } catch (error) {
+        console.error("Error al obtener estadísticas de compras:", error);
+        res.status(500).json({ message: "Error al obtener estadísticas de compras" });
+    }
+};
+/**
+ * Obtiene el siguiente número de compra correlativo.
+ */
+export const obtenerSiguienteNumeroCompra = async (req, res) => {
+    try {
+        const today = new Date();
+        const dateStr = today.getFullYear().toString() +
+            (today.getMonth() + 1).toString().padStart(2, '0') +
+            today.getDate().toString().padStart(2, '0');
+        const prefix = `COMP-${dateStr}-`;
+
+        const ultimaCompraDelDia = await Compra.findOne({
+            numCompra: { $regex: `^${prefix}` }
+        }).sort({ numCompra: -1 });
+
+        let nextNum = 1;
+        if (ultimaCompraDelDia && ultimaCompraDelDia.numCompra) {
+            const lastNumStr = ultimaCompraDelDia.numCompra.split('-')[2];
+            const lastNum = parseInt(lastNumStr, 10);
+            nextNum = lastNum + 1;
+        }
+        const siguienteNumero = `${prefix}${nextNum.toString().padStart(4, '0')}`;
+
+        res.status(200).json({ siguienteNumero });
+    } catch (error) {
+        console.error("Error al obtener siguiente número de compra:", error);
+        res.status(500).json({ message: "Error al generar el número de compra", error: error.message });
     }
 };

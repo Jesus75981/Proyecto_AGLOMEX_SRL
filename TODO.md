@@ -1,24 +1,29 @@
-# TODO: Implementar módulo de crear/buscar producto con categoría dinámica, cajas y ubicación
+# TODO: Confirmación de Recepción de Pedido con Logística
 
-## Tareas Pendientes
+## Información Recopilada
+- El sistema ya tiene una función `confirmarRecepcionPedido` en `pedidos.controller.js`.
+- Modelo Pedido tiene `pedidoNumero`, `estado`, `fechaEntrega`.
+- Modelo Logistica tiene `pedido` (ref a Pedido), `estado` (pendiente, en_camino, entregado), `fechaEntregaEstimada`.
+- Necesita verificar estado 'entregado' en logística.
+- Verificar fechaEntrega del pedido <= fecha actual.
+- Incluir historial de logística (todos los envíos relacionados).
 
-### Backend
-- [ ] Actualizar modelo productoTienda.model.js: Cambiar categoria de enum a string para permitir categorías dinámicas
-- [ ] Agregar endpoint en productos.routes.js para obtener categorías únicas existentes
-- [ ] Actualizar controlador productoTienda.controller.js si es necesario para manejar categorías nuevas
+## Plan
+- [] Modificar `confirmarRecepcionPedido` en `pedidos.controller.js`:
+  - Buscar pedido por `pedidoNumero`.
+  - Buscar logística por `pedido: pedido._id` y verificar `estado: 'entregado'`.
+  - Verificar `pedido.fechaEntrega <= new Date()`.
+  - Si ok, actualizar pedido a 'entregado'.
+  - Devolver pedido, logística, y historial (todas las logisticas del pedido).
+- [] Corregir búsqueda en `obtenerPedidoPorNumero` si necesario (busca pedidoNumero en Logistica, pero Logistica no lo tiene).
+- [] Probar la funcionalidad.
 
-### Frontend
-- [ ] Implementar AdminCatalogPage.jsx con formulario completo para crear productos
-  - [ ] Campo categoría: dropdown con opciones existentes + opción para crear nueva
-  - [ ] Campos cajas y ubicación
-  - [ ] Otros campos del producto (nombre, color, etc.)
-  - [ ] Funcionalidad de búsqueda/listado de productos
-- [ ] Integrar con API para crear productos y obtener categorías
+## Archivos Dependientes
+- back-end/controllers/pedidos.controller.js
+- back-end/models/pedido.model.js
+- back-end/models/logistica.model.js
 
-### Testing
-- [ ] Probar creación de productos con categorías nuevas y existentes
-- [ ] Verificar que cajas y ubicación se guarden correctamente
-- [ ] Probar búsqueda y listado en AdminCatalogPage
-
-### Adicional (mencionado por usuario)
-- [ ] Revisar lógica de pagos a crédito: mostrar pendientes, proceder compra aunque falte pago, mostrar en inventario
+## Seguimiento
+- [] Implementar cambios.
+- [] Verificar integración con rutas.
+- [] Probar endpoint.

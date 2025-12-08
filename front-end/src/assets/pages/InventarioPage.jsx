@@ -54,6 +54,37 @@ const InventarioPage = ({ userRole }) => {
   const [showProveedorDropdown, setShowProveedorDropdown] = useState(false);
   const [showProductoDropdown, setShowProductoDropdown] = useState(false);
 
+  // Estado para nuevo producto
+  const [nuevoProducto, setNuevoProducto] = useState({
+    producto: '',
+    sku: '',
+    codigo: '',
+    color: '',
+    descripcion: '',
+    categoria: '',
+    proveedor: '',
+    cantidad: '',
+    cantidadMinima: '',
+    cantidadMaxima: '',
+    ubicacion: '',
+    precioCosto: '',
+    precioVenta: ''
+  });
+  const [erroresProducto, setErroresProducto] = useState({});
+  const [productoEditando, setProductoEditando] = useState(null);
+
+
+  // Estado para nuevo movimiento
+  const [nuevoMovimiento, setNuevoMovimiento] = useState({
+    productoId: '',
+    tipo: 'Entrada',
+    cantidad: '',
+    motivo: '',
+    referencia: '',
+    usuario: ''
+  });
+  const [erroresMovimiento, setErroresMovimiento] = useState({});
+
   // Estados para modificar producto
   const [modificarProducto, setModificarProducto] = useState({
     nombre: '',
@@ -70,243 +101,138 @@ const InventarioPage = ({ userRole }) => {
     cantidad: '',
     imagen: ''
   });
-  const [showModificarForm, setShowModificarForm] = useState(false);
-  const [productoEditando, setProductoEditando] = useState(null);
 
-  // Estado para formulario de movimiento
-  const [showMovimientoForm, setShowMovimientoForm] = useState(false);
-
-  // Datos de API - Inventario
+  // Estados faltantes
   const [inventario, setInventario] = useState([]);
-  const [productosAPI, setProductosAPI] = useState([]);
+  const [movimientos, setMovimientos] = useState([]);
+  const [categorias, setCategorias] = useState([]);
+  const [proveedores, setProveedores] = useState([]);
+  const [showEditarProductoForm, setShowEditarProductoForm] = useState(false);
+  const [showMovimientoForm, setShowMovimientoForm] = useState(false);
+  const [showModificarForm, setShowModificarForm] = useState(false);
+  const [productoSeleccionadoParaEditar, setProductoSeleccionadoParaEditar] = useState('');
 
-  // Movimientos de inventario
-  const [movimientos, setMovimientos] = useState([
-    {
-      id: 1,
-      producto: 'Silla Ejecutiva Ergonomica',
-      sku: 'SCH-EXEC-001',
-      tipo: 'Salida',
-      cantidad: 5,
-      motivo: 'Venta a cliente',
-      referencia: 'PED-001',
-      usuario: 'Juan Pérez',
-      fecha: '2024-01-15 10:30:00',
-      stockAnterior: 155,
-      stockActual: 150
-    },
-    {
-      id: 2,
-      producto: 'Mesa de Centro Moderna',
-      sku: 'MES-CENT-002',
-      tipo: 'Entrada',
-      cantidad: 20,
-      motivo: 'Compra a proveedor',
-      referencia: 'COMP-001',
-      usuario: 'María García',
-      fecha: '2024-01-14 14:15:00',
-      stockAnterior: 55,
-      stockActual: 75
-    },
-    {
-      id: 3,
-      producto: 'Sofá 3 Plazas Cuero',
-      sku: 'SOF-3PL-003',
-      tipo: 'Salida',
-      cantidad: 2,
-      motivo: 'Venta a cliente',
-      referencia: 'PED-002',
-      usuario: 'Carlos López',
-      fecha: '2024-01-16 09:45:00',
-      stockAnterior: 10,
-      stockActual: 8
-    },
-    {
-      id: 4,
-      producto: 'Escritorio Oficina Profesional',
-      sku: 'ESC-OFI-005',
-      tipo: 'Ajuste',
-      cantidad: 3,
-      motivo: 'Ajuste por inventario físico',
-      referencia: 'AJUST-001',
-      usuario: 'Ana Martínez',
-      fecha: '2024-01-13 16:20:00',
-      stockAnterior: 22,
-      stockActual: 25
+  // Cargar productos y movimientos
+  const cargarProductos = async () => {
+    try {
+      setLoading(true);
+      // Filtrar solo productos terminados (no materias primas)
+      const dataProductos = await apiFetch('/productos?tipo=Producto Terminado');
+      const dataMovimientos = await apiFetch('/movimientos');
+
+      setInventario(dataProductos);
+      setMovimientos(dataMovimientos);
+
+      // Extraer categorías y proveedores únicos
+      const uniqueCategorias = [...new Set(dataProductos.map(p => p.categoria).filter(Boolean))];
+      const uniqueProveedores = [...new Set(dataProductos.map(p => p.proveedor).filter(Boolean))];
+      setCategorias(uniqueCategorias);
+      setProveedores(uniqueProveedores);
+    } catch (err) {
+      console.error('Error cargando datos:', err);
+      setError('Error al cargar el inventario');
+    } finally {
+      setLoading(false);
     }
-  ]);
-
-  // Cuentas por pagar
-  const [deudas, setDeudas] = useState([]);
-
-  // Categorías
-  const categorias = ['Sillas', 'Mesas', 'Sofás', 'Estanterías', 'Escritorios', 'Iluminación', 'Accesorios'];
-
-  // Proveedores
-  const proveedores = [
-    'Muebles Premium SA',
-    'Diseño Contemporáneo SL',
-    'Confort Hogar SA',
-    'Maderas Nobles SL',
-    'Oficina Moderna SA',
-    'Iluminación Creativa SL'
-  ];
-
-  // Formularios
-  const [nuevoProducto, setNuevoProducto] = useState({
-    producto: '',
-    sku: '',
-    categoria: '',
-    proveedor: '',
-    cantidad: '',
-    cantidadMinima: '',
-    cantidadMaxima: '',
-    ubicacion: '',
-    precioCosto: '',
-    precioVenta: ''
-  });
-
-  const [erroresProducto, setErroresProducto] = useState({});
-
-  const [nuevoMovimiento, setNuevoMovimiento] = useState({
-    productoId: '',
-    tipo: 'Entrada',
-    cantidad: '',
-    motivo: '',
-    referencia: '',
-    usuario: ''
-  });
-
-  const [erroresMovimiento, setErroresMovimiento] = useState({});
-
-  // Filtrar datos
-  const inventarioFiltrado = inventario.filter(item =>
-    item.producto.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.categoria.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.proveedor.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.ubicacion.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.estado.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const movimientosFiltrados = movimientos.filter(mov =>
-    mov.producto.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    mov.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    mov.tipo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    mov.motivo.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // Validaciones para productos
-  const validarProducto = () => {
-    const errores = {};
-
-    if (!nuevoProducto.producto.trim()) {
-      errores.producto = 'El nombre del producto es obligatorio';
-    }
-
-    if (!nuevoProducto.sku.trim()) {
-      errores.sku = 'El SKU es obligatorio';
-    }
-
-    if (!nuevoProducto.categoria) {
-      errores.categoria = 'Debe seleccionar una categoría';
-    }
-
-    if (!nuevoProducto.proveedor) {
-      errores.proveedor = 'Debe seleccionar un proveedor';
-    }
-
-    // Validaciones numéricas
-    if (nuevoProducto.cantidad === '' || isNaN(nuevoProducto.cantidad) || parseInt(nuevoProducto.cantidad) < 0) {
-      errores.cantidad = 'La cantidad debe ser un número entero positivo o cero';
-    }
-
-    if (nuevoProducto.cantidadMinima === '' || isNaN(nuevoProducto.cantidadMinima) || parseInt(nuevoProducto.cantidadMinima) < 0) {
-      errores.cantidadMinima = 'El stock mínimo debe ser un número entero positivo o cero';
-    }
-
-    if (nuevoProducto.cantidadMaxima === '' || isNaN(nuevoProducto.cantidadMaxima) || parseInt(nuevoProducto.cantidadMaxima) < 0) {
-      errores.cantidadMaxima = 'El stock máximo debe ser un número entero positivo';
-    }
-
-    if (nuevoProducto.precioCosto === '' || isNaN(nuevoProducto.precioCosto) || parseFloat(nuevoProducto.precioCosto) < 0) {
-      errores.precioCosto = 'El precio de costo debe ser un número positivo';
-    }
-
-    if (nuevoProducto.precioVenta === '' || isNaN(nuevoProducto.precioVenta) || parseFloat(nuevoProducto.precioVenta) < 0) {
-      errores.precioVenta = 'El precio de venta debe ser un número positivo';
-    }
-
-    // Validar que precio venta sea mayor que precio costo
-    if (!errores.precioCosto && !errores.precioVenta && parseFloat(nuevoProducto.precioVenta) < parseFloat(nuevoProducto.precioCosto)) {
-      errores.precioVenta = 'El precio de venta debe ser mayor o igual al precio de costo';
-    }
-
-    setErroresProducto(errores);
-    return Object.keys(errores).length === 0;
   };
 
-  // Funciones para productos
-  const agregarProducto = () => {
-    if (!validarProducto()) return;
+  useEffect(() => {
+    cargarProductos();
+  }, []);
 
-    const producto = {
-      id: inventario.length + 1,
-      ...nuevoProducto,
-      cantidad: parseInt(nuevoProducto.cantidad),
-      cantidadMinima: parseInt(nuevoProducto.cantidadMinima),
-      cantidadMaxima: parseInt(nuevoProducto.cantidadMaxima),
-      precioCosto: parseFloat(nuevoProducto.precioCosto),
-      precioVenta: parseFloat(nuevoProducto.precioVenta),
-      estado: parseInt(nuevoProducto.cantidad) <= 0 ? 'Agotado' :
-              parseInt(nuevoProducto.cantidad) <= parseInt(nuevoProducto.cantidadMinima) ? 'Stock Bajo' : 'Disponible',
-      fechaIngreso: new Date().toISOString().split('T')[0],
-      ultimaActualizacion: new Date().toISOString().split('T')[0]
-    };
+  // Agregar Producto
+  const agregarProducto = async () => {
+    try {
+      // Validaciones básicas
+      if (!nuevoProducto.producto || !nuevoProducto.sku || !nuevoProducto.precioVenta) {
+        alert('Por favor complete los campos obligatorios');
+        return;
+      }
 
-    setInventario([...inventario, producto]);
-    setNuevoProducto({
-      producto: '',
-      sku: '',
-      categoria: '',
-      proveedor: '',
-      cantidad: '',
-      cantidadMinima: '',
-      cantidadMaxima: '',
-      ubicacion: '',
-      precioCosto: '',
-      precioVenta: ''
-    });
-    setErroresProducto({});
-    setShowForm(false);
-  };
-
-  const eliminarProducto = (id) => {
-    setInventario(inventario.filter(item => item.id !== id));
-  };
-
-  // Función para iniciar edición de producto
-  const iniciarEdicion = (item) => {
-    const productoCompleto = productosAPI.find(p => p._id === item.id);
-    if (productoCompleto) {
-      setModificarProducto({
-        nombre: productoCompleto.nombre || '',
-        descripcion: productoCompleto.descripcion || '',
-        color: productoCompleto.color || '',
-        categoria: productoCompleto.categoria || '',
-        marca: productoCompleto.marca || '',
-        cajas: productoCompleto.cajas || '',
-        ubicacion: productoCompleto.ubicacion || '',
-        tamano: productoCompleto.tamano || '',
-        codigo: productoCompleto.idProductoTienda || '',
-        precioCompra: productoCompleto.precioCompra || '',
-        precioVenta: productoCompleto.precioVenta || '',
-        cantidad: productoCompleto.cantidad || '',
-        imagen: productoCompleto.imagen || ''
+      const token = getAuthToken();
+      const response = await fetch(`${API_URL}/productos`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : undefined,
+        },
+        body: JSON.stringify(nuevoProducto)
       });
-      setProductoEditando(productoCompleto);
-      setShowModificarForm(true);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || errorData.error || 'Error en la petición a la API');
+      }
+
+      await cargarProductos();
+      setShowForm(false);
+      setNuevoProducto({
+        producto: '', sku: '', codigo: '', color: '', descripcion: '',
+        categoria: '', proveedor: '', cantidad: '', cantidadMinima: '',
+        cantidadMaxima: '', ubicacion: '', precioCosto: '', precioVenta: ''
+      });
+    } catch (err) {
+      console.error('Error agregando producto:', err);
+      alert('Error al agregar producto: ' + err.message);
     }
+  };
+
+  // Eliminar Producto
+  const eliminarProducto = async (id) => {
+    if (!window.confirm('¿Está seguro de eliminar este producto?')) return;
+    try {
+      await apiFetch(`/productos/${id}`, { method: 'DELETE' });
+      await cargarProductos();
+    } catch (err) {
+      console.error('Error eliminando producto:', err);
+      alert('Error al eliminar producto');
+    }
+  };
+
+  // Iniciar Edición
+  const iniciarEdicion = (producto) => {
+    prepararModificacion(producto);
+  };
+
+  // Agregar Movimiento
+  const agregarMovimiento = async () => {
+    if (!validarMovimiento()) return;
+    try {
+      await apiFetch('/movimientos', {
+        method: 'POST',
+        body: JSON.stringify(nuevoMovimiento)
+      });
+
+      await cargarProductos(); // Recargar para actualizar stock
+      setShowMovimientoForm(false);
+      setNuevoMovimiento({
+        productoId: '', tipo: 'Entrada', cantidad: '',
+        motivo: '', referencia: '', usuario: ''
+      });
+    } catch (err) {
+      console.error('Error registrando movimiento:', err);
+      alert('Error al registrar movimiento');
+    }
+  };
+
+  const prepararModificacion = (productoCompleto) => {
+    setModificarProducto({
+      nombre: productoCompleto.nombre || '',
+      descripcion: productoCompleto.descripcion || '',
+      color: productoCompleto.color || '',
+      categoria: productoCompleto.categoria || '',
+      marca: productoCompleto.marca || '',
+      cajas: productoCompleto.cajas || '',
+      ubicacion: productoCompleto.ubicacion || '',
+      tamano: productoCompleto.tamano || '',
+      codigo: productoCompleto.idProductoTienda || '',
+      precioCompra: productoCompleto.precioCompra || '',
+      precioVenta: productoCompleto.precioVenta || '',
+      cantidad: productoCompleto.cantidad || '',
+      imagen: productoCompleto.imagen || ''
+    });
+    setProductoEditando(productoCompleto);
+    setShowModificarForm(true);
   };
 
   // Validación para modificar producto
@@ -338,48 +264,65 @@ const InventarioPage = ({ userRole }) => {
   const modificarProductoFunc = async () => {
     if (!validarModificarProducto()) return;
     try {
-      const updatedProduct = {
-        nombre: modificarProducto.nombre,
-        descripcion: modificarProducto.descripcion,
-        color: modificarProducto.color,
-        categoria: modificarProducto.categoria,
-        marca: modificarProducto.marca,
-        cajas: modificarProducto.cajas,
-        ubicacion: modificarProducto.ubicacion,
-        tamano: modificarProducto.tamano,
-        idProductoTienda: modificarProducto.codigo,
-        precioCompra: parseFloat(modificarProducto.precioCompra),
-        precioVenta: parseFloat(modificarProducto.precioVenta),
-        cantidad: parseInt(modificarProducto.cantidad),
-        imagen: modificarProducto.imagen
-      };
-      await apiFetch(`/productos/${productoEditando._id}`, {
-        method: 'PUT',
-        body: JSON.stringify(updatedProduct)
-      });
-      // Recargar productos
-      const productos = await apiFetch('/productos');
-      setProductosAPI(productos);
-      const inventarioMapeado = productos.map((prod) => ({
-        id: prod._id,
-        producto: prod.nombre,
-        sku: prod.idProductoTienda,
-        categoria: prod.categoria,
-        proveedor: prod.proveedor?.nombre || 'Sin proveedor',
-        cantidad: prod.cantidad || 0,
-        cantidadMinima: 5,
-        cantidadMaxima: 100,
-        ubicacion: prod.ubicacion || '',
-        precioCosto: prod.precioCompra || 0,
-        precioVenta: prod.precioVenta || 0,
-        estado: (prod.cantidad || 0) <= 0 ? 'Agotado' :
-                (prod.cantidad || 0) <= 5 ? 'Stock Bajo' : 'Disponible',
-        fechaIngreso: prod.createdAt ? new Date(prod.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-        ultimaActualizacion: prod.updatedAt ? new Date(prod.updatedAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
-      }));
-      setInventario(inventarioMapeado);
+      let response;
+
+      if (selectedImageFile) {
+        // Si hay imagen nueva, usar FormData
+        const formData = new FormData();
+        formData.append('nombre', modificarProducto.nombre);
+        formData.append('descripcion', modificarProducto.descripcion);
+        formData.append('color', modificarProducto.color);
+        formData.append('categoria', modificarProducto.categoria);
+        formData.append('marca', modificarProducto.marca);
+        formData.append('cajas', modificarProducto.cajas);
+        formData.append('ubicacion', modificarProducto.ubicacion);
+        formData.append('tamano', modificarProducto.tamano);
+        formData.append('idProductoTienda', modificarProducto.codigo);
+        formData.append('precioCompra', parseFloat(modificarProducto.precioCompra));
+        formData.append('precioVenta', parseFloat(modificarProducto.precioVenta));
+        formData.append('cantidad', parseInt(modificarProducto.cantidad));
+        formData.append('imagen', selectedImageFile);
+
+        const token = getAuthToken();
+        response = await fetch(`${API_URL}/productos/${productoEditando._id}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': token ? `Bearer ${token}` : undefined,
+          },
+          body: formData
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || errorData.error || 'Error en la petición a la API');
+        }
+      } else {
+        // Si no hay imagen nueva, usar JSON normal
+        const updatedProduct = {
+          nombre: modificarProducto.nombre,
+          descripcion: modificarProducto.descripcion,
+          color: modificarProducto.color,
+          categoria: modificarProducto.categoria,
+          marca: modificarProducto.marca,
+          cajas: modificarProducto.cajas,
+          ubicacion: modificarProducto.ubicacion,
+          tamano: modificarProducto.tamano,
+          idProductoTienda: modificarProducto.codigo,
+          precioCompra: parseFloat(modificarProducto.precioCompra),
+          precioVenta: parseFloat(modificarProducto.precioVenta),
+          cantidad: parseInt(modificarProducto.cantidad)
+        };
+
+        response = await apiFetch(`/productos/${productoEditando._id}`, {
+          method: 'PUT',
+          body: JSON.stringify(updatedProduct)
+        });
+      }
+
+      await cargarProductos();
       setShowModificarForm(false);
       setProductoEditando(null);
+      setSelectedImageFile(null);
     } catch (err) {
       console.error('Error modificando producto:', err);
       setError('Error al modificar el producto');
@@ -409,112 +352,9 @@ const InventarioPage = ({ userRole }) => {
         errores.cantidad = `No hay suficiente stock. Disponible: ${producto.cantidad}`;
       }
     }
-
     setErroresMovimiento(errores);
     return Object.keys(errores).length === 0;
   };
-
-  // Funciones para movimientos
-  const agregarMovimiento = () => {
-    if (!validarMovimiento()) return;
-
-    const producto = inventario.find(p => p.id === parseInt(nuevoMovimiento.productoId));
-    if (!producto) return;
-
-    const stockAnterior = producto.cantidad;
-    let stockActual = stockAnterior;
-
-    if (nuevoMovimiento.tipo === 'Entrada') {
-      stockActual = stockAnterior + parseInt(nuevoMovimiento.cantidad);
-    } else if (nuevoMovimiento.tipo === 'Salida') {
-      stockActual = stockAnterior - parseInt(nuevoMovimiento.cantidad);
-    } else {
-      stockActual = parseInt(nuevoMovimiento.cantidad);
-    }
-
-    // Actualizar inventario
-    setInventario(inventario.map(item =>
-      item.id === parseInt(nuevoMovimiento.productoId)
-        ? {
-            ...item,
-            cantidad: stockActual,
-            estado: stockActual <= 0 ? 'Agotado' :
-                    stockActual <= item.cantidadMinima ? 'Stock Bajo' : 'Disponible',
-            ultimaActualizacion: new Date().toISOString().split('T')[0]
-          }
-        : item
-    ));
-
-    // Agregar movimiento
-    const movimiento = {
-      id: movimientos.length + 1,
-      producto: producto.producto,
-      sku: producto.sku,
-      tipo: nuevoMovimiento.tipo,
-      cantidad: parseInt(nuevoMovimiento.cantidad),
-      motivo: nuevoMovimiento.motivo,
-      referencia: nuevoMovimiento.referencia,
-      usuario: nuevoMovimiento.usuario || 'Usuario Actual',
-      fecha: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      stockAnterior,
-      stockActual
-    };
-
-    setMovimientos([movimiento, ...movimientos]);
-    setNuevoMovimiento({
-      productoId: '',
-      tipo: 'Entrada',
-      cantidad: '',
-      motivo: '',
-      referencia: '',
-      usuario: ''
-    });
-    setErroresMovimiento({});
-    setShowMovimientoForm(false);
-  };
-
-  // Cargar productos desde API
-  useEffect(() => {
-    const cargarProductos = async () => {
-      try {
-        const productos = await apiFetch('/productos');
-        setProductosAPI(productos);
-
-        // Mapear productos de API al formato del inventario
-        const inventarioMapeado = productos.map((prod, index) => ({
-          id: prod._id,
-          producto: prod.nombre,
-          sku: prod.idProductoTienda,
-          categoria: prod.categoria,
-          proveedor: prod.proveedor?.nombre || 'Sin proveedor',
-          cantidad: prod.cantidad || 0,
-          cantidadMinima: 5, // Valor por defecto, podría venir de la API
-          cantidadMaxima: 100, // Valor por defecto
-          ubicacion: prod.ubicacion || '',
-          precioCosto: prod.precioCompra || 0,
-          precioVenta: prod.precioVenta || 0,
-          estado: (prod.cantidad || 0) <= 0 ? 'Agotado' :
-                  (prod.cantidad || 0) <= 5 ? 'Stock Bajo' : 'Disponible',
-          fechaIngreso: prod.createdAt ? new Date(prod.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-          ultimaActualizacion: prod.updatedAt ? new Date(prod.updatedAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
-        }));
-
-        setInventario(inventarioMapeado);
-        setLoading(false);
-      } catch (err) {
-        console.error('Error cargando productos:', err);
-        setError('Error al cargar los productos');
-        setLoading(false);
-      }
-    };
-
-    cargarProductos();
-  }, []);
-
-  // Cálculos de métricas
-  const totalProductos = inventario.length;
-  const productosDisponibles = inventario.filter(p => p.estado === 'Disponible').length;
-  const productosStockBajo = inventario.filter(p => p.estado === 'Stock Bajo').length;
   const productosAgotados = inventario.filter(p => p.estado === 'Agotado').length;
 
   const valorTotalInventario = inventario.reduce((sum, item) =>
@@ -529,10 +369,30 @@ const InventarioPage = ({ userRole }) => {
     item.cantidad <= item.cantidadMinima
   ).length;
 
+  // Filtrado
+  const inventarioFiltrado = inventario.filter(item =>
+    String(item.nombre || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    String(item.idProductoTienda || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    String(item.codigo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    String(item.color || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    String(item.descripcion || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    String(item.categoria || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    String(item.proveedor || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    String(item.ubicacion || '').toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const movimientosFiltrados = movimientos.filter(mov =>
+    String(mov.producto?.nombre || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    String(mov.producto?.idProductoTienda || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    String(mov.tipo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    String(mov.motivo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    String(mov.usuario || '').toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50" >
       {/* Navbar de Navegación */}
-      <nav className="bg-white shadow-sm border-b border-gray-200">
+      < nav className="bg-white shadow-sm border-b border-gray-200" >
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-4">
@@ -553,66 +413,15 @@ const InventarioPage = ({ userRole }) => {
             </div>
           </div>
         </div>
-      </nav>
+      </nav >
 
       {/* Contenido Principal */}
-      <div className="p-6">
+      < div className="p-6" >
         <div className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-4xl font-bold text-green-600 mb-2">Módulo de Inventario</h1>
             <p className="text-gray-600 text-lg">Gestión completa de stock y productos</p>
-          </div>
-
-          {/* Métricas */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-green-500">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-600">Total Productos</h3>
-                  <p className="text-2xl font-bold text-gray-800">{totalProductos}</p>
-                </div>
-                <div className="bg-green-100 p-3 rounded-lg">
-                  <span className="text-green-600 text-xl">📦</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-blue-500">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-600">Valor Inventario</h3>
-                  <p className="text-2xl font-bold text-gray-800">Bs {valorTotalInventario.toFixed(2)}</p>
-                </div>
-                <div className="bg-blue-100 p-3 rounded-lg">
-                  <span className="text-blue-600 text-xl">💰</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-yellow-500">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-600">Stock Bajo</h3>
-                  <p className="text-2xl font-bold text-gray-800">{productosStockBajo}</p>
-                </div>
-                <div className="bg-yellow-100 p-3 rounded-lg">
-                  <span className="text-yellow-600 text-xl">⚠️</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-red-500">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-600">Necesitan Reorden</h3>
-                  <p className="text-2xl font-bold text-gray-800">{productosReorden}</p>
-                </div>
-                <div className="bg-red-100 p-3 rounded-lg">
-                  <span className="text-red-600 text-xl">🔄</span>
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* Pestañas */}
@@ -623,11 +432,10 @@ const InventarioPage = ({ userRole }) => {
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`py-4 px-6 text-center border-b-2 font-medium text-sm capitalize ${
-                      activeTab === tab
-                        ? 'border-green-500 text-green-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
+                    className={`py-4 px-6 text-center border-b-2 font-medium text-sm capitalize ${activeTab === tab
+                      ? 'border-green-500 text-green-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      }`}
                   >
                     {tab === 'productos' && '📦 Gestión de Productos'}
                     {tab === 'movimientos' && '🔄 Movimientos'}
@@ -662,20 +470,14 @@ const InventarioPage = ({ userRole }) => {
                   <h2 className="text-2xl font-semibold text-gray-800">Gestión de Productos</h2>
                   <div className="flex space-x-3">
                     <button
-                      onClick={() => setShowMovimientoForm(!showMovimientoForm)}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition duration-200"
+                      onClick={() => setShowEditarProductoForm(!showEditarProductoForm)}
+                      className="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition duration-200"
                     >
-                      {showMovimientoForm ? 'Cancelar Movimiento' : '+ Movimiento'}
-                    </button>
-                    <button
-                      onClick={() => setShowForm(!showForm)}
-                      className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition duration-200"
-                    >
-                      {showForm ? 'Cancelar' : '+ Nuevo Producto'}
+                      {showEditarProductoForm ? 'Cancelar Editar' : 'Editar Producto'}
                     </button>
                   </div>
                 </div>
-                
+
                 {/* Formulario Nuevo Producto */}
                 {showForm && (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
@@ -683,14 +485,28 @@ const InventarioPage = ({ userRole }) => {
                       type="text"
                       placeholder="Nombre del producto"
                       value={nuevoProducto.producto}
-                      onChange={(e) => setNuevoProducto({...nuevoProducto, producto: e.target.value})}
+                      onChange={(e) => setNuevoProducto({ ...nuevoProducto, producto: e.target.value })}
                       className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
                     <input
                       type="text"
-                      placeholder="SKU"
+                      placeholder="SKU (Interno)"
                       value={nuevoProducto.sku}
-                      onChange={(e) => setNuevoProducto({...nuevoProducto, sku: e.target.value})}
+                      onChange={(e) => setNuevoProducto({ ...nuevoProducto, sku: e.target.value })}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Código Correlativo (Ej: PROD-001)"
+                      value={nuevoProducto.codigo}
+                      onChange={(e) => setNuevoProducto({ ...nuevoProducto, codigo: e.target.value })}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Color"
+                      value={nuevoProducto.color}
+                      onChange={(e) => setNuevoProducto({ ...nuevoProducto, color: e.target.value })}
                       className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
                     <div className="relative">
@@ -699,7 +515,7 @@ const InventarioPage = ({ userRole }) => {
                         placeholder="Buscar categoría"
                         value={nuevoProducto.categoria}
                         onChange={(e) => {
-                          setNuevoProducto({...nuevoProducto, categoria: e.target.value});
+                          setNuevoProducto({ ...nuevoProducto, categoria: e.target.value });
                           setShowCategoriaDropdown(true);
                         }}
                         onFocus={() => setShowCategoriaDropdown(true)}
@@ -712,7 +528,7 @@ const InventarioPage = ({ userRole }) => {
                             <div
                               key={cat}
                               onClick={() => {
-                                setNuevoProducto({...nuevoProducto, categoria: cat});
+                                setNuevoProducto({ ...nuevoProducto, categoria: cat });
                                 setShowCategoriaDropdown(false);
                               }}
                               className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
@@ -729,7 +545,7 @@ const InventarioPage = ({ userRole }) => {
                         placeholder="Buscar proveedor"
                         value={nuevoProducto.proveedor}
                         onChange={(e) => {
-                          setNuevoProducto({...nuevoProducto, proveedor: e.target.value});
+                          setNuevoProducto({ ...nuevoProducto, proveedor: e.target.value });
                           setShowProveedorDropdown(true);
                         }}
                         onFocus={() => setShowProveedorDropdown(true)}
@@ -742,7 +558,7 @@ const InventarioPage = ({ userRole }) => {
                             <div
                               key={prov}
                               onClick={() => {
-                                setNuevoProducto({...nuevoProducto, proveedor: prov});
+                                setNuevoProducto({ ...nuevoProducto, proveedor: prov });
                                 setShowProveedorDropdown(false);
                               }}
                               className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
@@ -757,28 +573,28 @@ const InventarioPage = ({ userRole }) => {
                       type="number"
                       placeholder="Cantidad inicial"
                       value={nuevoProducto.cantidad}
-                      onChange={(e) => setNuevoProducto({...nuevoProducto, cantidad: parseInt(e.target.value) || 0})}
+                      onChange={(e) => setNuevoProducto({ ...nuevoProducto, cantidad: parseInt(e.target.value) || 0 })}
                       className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
                     <input
                       type="number"
                       placeholder="Stock mínimo"
                       value={nuevoProducto.cantidadMinima}
-                      onChange={(e) => setNuevoProducto({...nuevoProducto, cantidadMinima: parseInt(e.target.value) || 0})}
+                      onChange={(e) => setNuevoProducto({ ...nuevoProducto, cantidadMinima: parseInt(e.target.value) || 0 })}
                       className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
                     <input
                       type="number"
                       placeholder="Stock máximo"
                       value={nuevoProducto.cantidadMaxima}
-                      onChange={(e) => setNuevoProducto({...nuevoProducto, cantidadMaxima: parseInt(e.target.value) || 0})}
+                      onChange={(e) => setNuevoProducto({ ...nuevoProducto, cantidadMaxima: parseInt(e.target.value) || 0 })}
                       className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
                     <input
                       type="text"
                       placeholder="Ubicación en almacén"
                       value={nuevoProducto.ubicacion}
-                      onChange={(e) => setNuevoProducto({...nuevoProducto, ubicacion: e.target.value})}
+                      onChange={(e) => setNuevoProducto({ ...nuevoProducto, ubicacion: e.target.value })}
                       className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
                     <input
@@ -786,7 +602,7 @@ const InventarioPage = ({ userRole }) => {
                       step="0.01"
                       placeholder="Precio costo"
                       value={nuevoProducto.precioCosto}
-                      onChange={(e) => setNuevoProducto({...nuevoProducto, precioCosto: parseFloat(e.target.value) || 0})}
+                      onChange={(e) => setNuevoProducto({ ...nuevoProducto, precioCosto: parseFloat(e.target.value) || 0 })}
                       className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
                     <input
@@ -794,9 +610,10 @@ const InventarioPage = ({ userRole }) => {
                       step="0.01"
                       placeholder="Precio venta"
                       value={nuevoProducto.precioVenta}
-                      onChange={(e) => setNuevoProducto({...nuevoProducto, precioVenta: parseFloat(e.target.value) || 0})}
+                      onChange={(e) => setNuevoProducto({ ...nuevoProducto, precioVenta: parseFloat(e.target.value) || 0 })}
                       className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
+
                     <div className="md:col-span-3 flex space-x-4">
                       <button
                         onClick={agregarProducto}
@@ -823,7 +640,7 @@ const InventarioPage = ({ userRole }) => {
                         placeholder="Buscar producto"
                         value={nuevoMovimiento.productoId ? inventario.find(p => p.id === parseInt(nuevoMovimiento.productoId))?.producto || '' : ''}
                         onChange={(e) => {
-                          setNuevoMovimiento({...nuevoMovimiento, productoId: ''});
+                          setNuevoMovimiento({ ...nuevoMovimiento, productoId: '' });
                           setProductoSearch(e.target.value);
                           setShowProductoDropdown(true);
                         }}
@@ -837,7 +654,7 @@ const InventarioPage = ({ userRole }) => {
                             <div
                               key={prod.id}
                               onClick={() => {
-                                setNuevoMovimiento({...nuevoMovimiento, productoId: prod.id.toString()});
+                                setNuevoMovimiento({ ...nuevoMovimiento, productoId: prod.id.toString() });
                                 setProductoSearch(prod.producto);
                                 setShowProductoDropdown(false);
                               }}
@@ -851,7 +668,7 @@ const InventarioPage = ({ userRole }) => {
                     </div>
                     <select
                       value={nuevoMovimiento.tipo}
-                      onChange={(e) => setNuevoMovimiento({...nuevoMovimiento, tipo: e.target.value})}
+                      onChange={(e) => setNuevoMovimiento({ ...nuevoMovimiento, tipo: e.target.value })}
                       className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="Entrada">Entrada</option>
@@ -862,28 +679,28 @@ const InventarioPage = ({ userRole }) => {
                       type="number"
                       placeholder="Cantidad"
                       value={nuevoMovimiento.cantidad}
-                      onChange={(e) => setNuevoMovimiento({...nuevoMovimiento, cantidad: parseInt(e.target.value) || 0})}
+                      onChange={(e) => setNuevoMovimiento({ ...nuevoMovimiento, cantidad: parseInt(e.target.value) || 0 })}
                       className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <input
                       type="text"
                       placeholder="Motivo"
                       value={nuevoMovimiento.motivo}
-                      onChange={(e) => setNuevoMovimiento({...nuevoMovimiento, motivo: e.target.value})}
+                      onChange={(e) => setNuevoMovimiento({ ...nuevoMovimiento, motivo: e.target.value })}
                       className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <input
                       type="text"
                       placeholder="Referencia (OPCIONAL)"
                       value={nuevoMovimiento.referencia}
-                      onChange={(e) => setNuevoMovimiento({...nuevoMovimiento, referencia: e.target.value})}
+                      onChange={(e) => setNuevoMovimiento({ ...nuevoMovimiento, referencia: e.target.value })}
                       className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <input
                       type="text"
                       placeholder="Usuario"
                       value={nuevoMovimiento.usuario}
-                      onChange={(e) => setNuevoMovimiento({...nuevoMovimiento, usuario: e.target.value})}
+                      onChange={(e) => setNuevoMovimiento({ ...nuevoMovimiento, usuario: e.target.value })}
                       className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <div className="md:col-span-2 flex space-x-4">
@@ -903,112 +720,43 @@ const InventarioPage = ({ userRole }) => {
                   </div>
                 )}
 
-                {/* Formulario Modificar Producto */}
-                {showModificarForm && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 p-4 bg-green-50 rounded-lg">
-                    <h3 className="md:col-span-3 text-lg font-semibold text-gray-800 mb-2">Editar Producto</h3>
-                    <input
-                      type="text"
-                      placeholder="Nombre del producto"
-                      value={modificarProducto.nombre}
-                      onChange={(e) => setModificarProducto({...modificarProducto, nombre: e.target.value})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Descripción"
-                      value={modificarProducto.descripcion}
-                      onChange={(e) => setModificarProducto({...modificarProducto, descripcion: e.target.value})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Color"
-                      value={modificarProducto.color}
-                      onChange={(e) => setModificarProducto({...modificarProducto, color: e.target.value})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Categoría"
-                      value={modificarProducto.categoria}
-                      onChange={(e) => setModificarProducto({...modificarProducto, categoria: e.target.value})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Marca"
-                      value={modificarProducto.marca}
-                      onChange={(e) => setModificarProducto({...modificarProducto, marca: e.target.value})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Cajas"
-                      value={modificarProducto.cajas}
-                      onChange={(e) => setModificarProducto({...modificarProducto, cajas: e.target.value})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Ubicación"
-                      value={modificarProducto.ubicacion}
-                      onChange={(e) => setModificarProducto({...modificarProducto, ubicacion: e.target.value})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Tamaño"
-                      value={modificarProducto.tamano}
-                      onChange={(e) => setModificarProducto({...modificarProducto, tamano: e.target.value})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Código"
-                      value={modificarProducto.codigo}
-                      onChange={(e) => setModificarProducto({...modificarProducto, codigo: e.target.value})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <input
-                      type="number"
-                      step="0.01"
-                      placeholder="Precio Compra"
-                      value={modificarProducto.precioCompra}
-                      onChange={(e) => setModificarProducto({...modificarProducto, precioCompra: parseFloat(e.target.value) || 0})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <input
-                      type="number"
-                      step="0.01"
-                      placeholder="Precio Venta"
-                      value={modificarProducto.precioVenta}
-                      onChange={(e) => setModificarProducto({...modificarProducto, precioVenta: parseFloat(e.target.value) || 0})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Cantidad"
-                      value={modificarProducto.cantidad}
-                      onChange={(e) => setModificarProducto({...modificarProducto, cantidad: parseInt(e.target.value) || 0})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Imagen URL"
-                      value={modificarProducto.imagen}
-                      onChange={(e) => setModificarProducto({...modificarProducto, imagen: e.target.value})}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <div className="md:col-span-3 flex space-x-4">
+                {/* Formulario Editar Producto */}
+                {showEditarProductoForm && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-green-50 rounded-lg">
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Buscar producto a editar"
+                        value={productoSeleccionadoParaEditar}
+                        onChange={(e) => {
+                          setProductoSeleccionadoParaEditar(e.target.value);
+                          setShowProductoDropdown(true);
+                        }}
+                        onFocus={() => setShowProductoDropdown(true)}
+                        onBlur={() => setTimeout(() => setShowProductoDropdown(false), 200)}
+                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 w-full"
+                      />
+                      {showProductoDropdown && (
+                        <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                          {inventario.filter(prod => prod.producto && prod.producto.toLowerCase().includes(productoSeleccionadoParaEditar.toLowerCase())).map(prod => (
+                            <div
+                              key={prod.id}
+                              onClick={() => {
+                                setProductoSeleccionadoParaEditar(prod.producto);
+                                iniciarEdicion(prod);
+                                setShowEditarProductoForm(false);
+                              }}
+                              className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                            >
+                              {prod.producto} - SKU: {prod.sku}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex space-x-4">
                       <button
-                        onClick={modificarProductoFunc}
-                        className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition duration-200"
-                      >
-                        Guardar Cambios
-                      </button>
-                      <button
-                        onClick={() => setShowModificarForm(false)}
+                        onClick={() => setShowEditarProductoForm(false)}
                         className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition duration-200"
                       >
                         Cancelar
@@ -1017,98 +765,198 @@ const InventarioPage = ({ userRole }) => {
                   </div>
                 )}
 
-                {/* Lista de Productos */}
-                <h3 className="text-xl font-semibold text-gray-800 mb-4">Inventario Actual</h3>
+                {/* Formulario Modificar Producto */}
+                {showModificarForm && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 p-4 bg-green-50 rounded-lg">
+                    <h3 className="md:col-span-3 text-lg font-semibold text-gray-800 mb-2">Editar Producto</h3>
+                    <input
+                      type="text"
+                      placeholder="Nombre del producto"
+                      value={modificarProducto.nombre}
+                      onChange={(e) => setModificarProducto({ ...modificarProducto, nombre: e.target.value })}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Descripción"
+                      value={modificarProducto.descripcion}
+                      onChange={(e) => setModificarProducto({ ...modificarProducto, descripcion: e.target.value })}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Color"
+                      value={modificarProducto.color}
+                      onChange={(e) => setModificarProducto({ ...modificarProducto, color: e.target.value })}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Categoría"
+                      value={modificarProducto.categoria}
+                      onChange={(e) => setModificarProducto({ ...modificarProducto, categoria: e.target.value })}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Marca"
+                      value={modificarProducto.marca}
+                      onChange={(e) => setModificarProducto({ ...modificarProducto, marca: e.target.value })}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Cajas"
+                      value={modificarProducto.cajas}
+                      onChange={(e) => setModificarProducto({ ...modificarProducto, cajas: e.target.value })}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Ubicación"
+                      value={modificarProducto.ubicacion}
+                      onChange={(e) => setModificarProducto({ ...modificarProducto, ubicacion: e.target.value })}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Tamaño"
+                      value={modificarProducto.tamano}
+                      onChange={(e) => setModificarProducto({ ...modificarProducto, tamano: e.target.value })}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Código"
+                      value={modificarProducto.codigo}
+                      onChange={(e) => setModificarProducto({ ...modificarProducto, codigo: e.target.value })}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Precio Compra"
+                      value={modificarProducto.precioCompra}
+                      onChange={(e) => setModificarProducto({ ...modificarProducto, precioCompra: e.target.value })}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Precio Venta"
+                      value={modificarProducto.precioVenta}
+                      onChange={(e) => setModificarProducto({ ...modificarProducto, precioVenta: e.target.value })}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Cantidad"
+                      value={modificarProducto.cantidad}
+                      onChange={(e) => setModificarProducto({ ...modificarProducto, cantidad: e.target.value })}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <div className="md:col-span-3">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Imagen del Producto</label>
+                      <input
+                        type="file"
+                        onChange={(e) => setSelectedImageFile(e.target.files[0])}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                      />
+                    </div>
+                    {erroresProducto.nombre && <p className="text-red-500 text-xs">{erroresProducto.nombre}</p>}
+                    {erroresProducto.categoria && <p className="text-red-500 text-xs">{erroresProducto.categoria}</p>}
+                    {erroresProducto.cantidad && <p className="text-red-500 text-xs">{erroresProducto.cantidad}</p>}
+                    {erroresProducto.precioCompra && <p className="text-red-500 text-xs">{erroresProducto.precioCompra}</p>}
+                    {erroresProducto.precioVenta && <p className="text-red-500 text-xs">{erroresProducto.precioVenta}</p>}
+
+                    <div className="md:col-span-3 flex space-x-4 mt-4">
+                      <button
+                        onClick={modificarProductoFunc}
+                        className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition duration-200"
+                      >
+                        Guardar Cambios
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowModificarForm(false);
+                          setProductoEditando(null);
+                        }}
+                        className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition duration-200"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tabla de Productos */}
                 <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKU</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proveedor</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ubicación</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKU</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Color</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio Venta</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {inventarioFiltrado.map((item) => (
-                        <tr key={item.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {item.producto}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 font-mono">
-                            {item.sku}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                            {item.categoria}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                            {item.proveedor}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                            <div>
-                              <span className={`font-semibold ${
-                                item.cantidad <= item.cantidadMinima ? 'text-red-600' : 'text-green-600'
-                              }`}>
-                                {item.cantidad}
-                              </span>
-                              <div className="text-xs text-gray-500">
-                                Min: {item.cantidadMinima} | Max: {item.cantidadMaxima}
+                      {inventarioFiltrado.map((item) => {
+                        // Calcular estado dinámicamente
+                        let estado = 'Disponible';
+                        let estadoColor = 'bg-green-100 text-green-800';
+
+                        if (item.cantidad <= 0) {
+                          estado = 'Agotado';
+                          estadoColor = 'bg-red-100 text-red-800';
+                        } else if (item.cantidad <= (item.cantidadMinima || 5)) {
+                          estado = 'Stock Bajo';
+                          estadoColor = 'bg-yellow-100 text-yellow-800';
+                        }
+
+                        return (
+                          <tr key={item._id}>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <div className="h-10 w-10 flex-shrink-0">
+                                  {item.imagen ? (
+                                    <img className="h-10 w-10 rounded-full object-cover cursor-pointer" src={`http://localhost:5000${item.imagen}`} alt="" onClick={() => setSelectedImage(`http://localhost:5000${item.imagen}`)} />
+                                  ) : (
+                                    <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
+                                      📷
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="ml-4">
+                                  <div className="text-sm font-medium text-gray-900">{item.nombre}</div>
+                                  <div className="text-sm text-gray-500">{item.descripcion}</div>
+                                </div>
                               </div>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                            {item.ubicacion}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                              item.estado === 'Disponible' ? 'bg-green-100 text-green-800' :
-                              item.estado === 'Stock Bajo' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-red-100 text-red-800'
-                            }`}>
-                              {item.estado}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                            <div className="font-semibold">Bs {(item.cantidad * item.precioCosto).toFixed(2)}</div>
-                            <div className="text-xs text-gray-500">
-                              Costo: Bs {item.precioCosto}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
-                            <div className="flex space-x-2">
-                              <button
-                                onClick={() => iniciarEdicion(item)}
-                                className="text-green-600 hover:text-green-900 text-xs"
-                              >
-                                Editar
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setNuevoMovimiento({
-                                    ...nuevoMovimiento,
-                                    productoId: item.id.toString()
-                                  });
-                                  setShowMovimientoForm(true);
-                                }}
-                                className="text-blue-600 hover:text-blue-900 text-xs"
-                              >
-                                Movimiento
-                              </button>
-                              <button
-                                onClick={() => eliminarProducto(item.id)}
-                                className="text-red-600 hover:text-red-900 text-xs"
-                              >
-                                Eliminar
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.idProductoTienda}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.categoria}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.color || '-'}</td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">{item.cantidad}</div>
+                              <div className="text-xs text-gray-500">Min: {item.cantidadMinima || 5}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Bs. {item.precioCompra || 0}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Bs. {item.precioVenta || 0}</td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${estadoColor}`}>
+                                {estado}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              <button onClick={() => iniciarEdicion(item)} className="text-indigo-600 hover:text-indigo-900 mr-4">Editar</button>
+                              <button onClick={() => eliminarProducto(item._id)} className="text-red-600 hover:text-red-900">Eliminar</button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -1116,83 +964,41 @@ const InventarioPage = ({ userRole }) => {
             </div>
           )}
 
+          {/* Contenido de Movimientos */}
           {activeTab === 'movimientos' && (
             <div className="space-y-6">
               <div className="bg-white rounded-xl shadow-md p-6">
                 <h2 className="text-2xl font-semibold text-gray-800 mb-6">Historial de Movimientos</h2>
-                
-                {/* Métricas de Movimientos */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                  <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                    <h3 className="text-sm font-semibold text-green-800">Entradas Hoy</h3>
-                    <p className="text-2xl font-bold text-green-600">
-                      {movimientos.filter(m => m.tipo === 'Entrada' && m.fecha.startsWith(new Date().toISOString().split('T')[0])).length}
-                    </p>
-                  </div>
-                  <div className="bg-red-50 p-4 rounded-lg border border-red-200">
-                    <h3 className="text-sm font-semibold text-red-800">Salidas Hoy</h3>
-                    <p className="text-2xl font-bold text-red-600">
-                      {movimientos.filter(m => m.tipo === 'Salida' && m.fecha.startsWith(new Date().toISOString().split('T')[0])).length}
-                    </p>
-                  </div>
-                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                    <h3 className="text-sm font-semibold text-blue-800">Total Movimientos</h3>
-                    <p className="text-2xl font-bold text-blue-600">{movimientos.length}</p>
-                  </div>
-                </div>
-
-                {/* Lista de Movimientos */}
                 <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Motivo</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuario</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Motivo</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuario</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {movimientosFiltrados.map((mov) => (
-                        <tr key={mov.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                            {mov.fecha}
+                        <tr key={mov._id || mov.id}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {new Date(mov.fecha).toLocaleDateString()}
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {mov.producto}
-                            <div className="text-xs text-gray-500">{mov.sku}</div>
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                              mov.tipo === 'Entrada' ? 'bg-green-100 text-green-800' :
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{mov.producto?.nombre || 'Producto desconocido'}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${mov.tipo === 'Entrada' ? 'bg-green-100 text-green-800' :
                               mov.tipo === 'Salida' ? 'bg-red-100 text-red-800' :
-                              'bg-blue-100 text-blue-800'
-                            }`}>
+                                'bg-blue-100 text-blue-800'
+                              }`}>
                               {mov.tipo}
                             </span>
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900">
-                            {mov.tipo === 'Entrada' ? '+' : '-'}{mov.cantidad}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                            {mov.motivo}
-                            {mov.referencia && (
-                              <div className="text-xs text-blue-600">Ref: {mov.referencia}</div>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                            {mov.usuario}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                            <div className="text-xs">
-                              <span className="text-gray-400">{mov.stockAnterior}</span>
-                              <span className="mx-1">→</span>
-                              <span className="font-semibold">{mov.stockActual}</span>
-                            </div>
-                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{mov.cantidad}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{mov.motivo}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{mov.usuario}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1201,10 +1007,17 @@ const InventarioPage = ({ userRole }) => {
               </div>
             </div>
           )}
-
-
         </div>
       </div>
+
+      {/* Modal de Imagen */}
+      {selectedImage && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" onClick={() => setSelectedImage(null)}>
+          <div className="max-w-3xl max-h-full p-4">
+            <img src={selectedImage} alt="Producto grande" className="max-w-full max-h-[90vh] rounded-lg shadow-xl" />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -81,7 +81,30 @@ export const obtenerMetricasInventario = async (req, res) => {
             productosSinPrecioVenta: productos.filter(p => !p.precioVenta || p.precioVenta === 0).length
         };
 
-        res.status(200).json(metricas);
+        // Agregación: Valor y Stock por Categoría
+        const metricasPorCategoria = await ProductoTienda.aggregate([
+            {
+                $group: {
+                    _id: "$categoria",
+                    totalStock: { $sum: "$cantidad" },
+                    valorTotal: { $sum: { $multiply: ["$cantidad", "$precioCompra"] } },
+                    count: { $sum: 1 }
+                }
+            },
+            { $sort: { valorTotal: -1 } }
+        ]);
+
+        // Top 5 Productos con mayor stock
+        const topProductosStock = await ProductoTienda.find()
+            .sort({ cantidad: -1 })
+            .limit(5)
+            .select('nombre cantidad categoria');
+
+        res.status(200).json({
+            ...metricas,
+            metricasPorCategoria,
+            topProductosStock
+        });
 
     } catch (error) {
         console.error('Error al obtener métricas del inventario:', error);

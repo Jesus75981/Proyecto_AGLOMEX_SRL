@@ -12,6 +12,7 @@ const historialPagoSchema = new mongoose.Schema({
         required: true
     },
     referencia: String, // Ej: número de transacción, número de cheque
+    cuenta: String, // Cuenta de banco o detalle de origen
     fechaPago: {
         type: Date,
         default: Date.now
@@ -63,7 +64,7 @@ const deudaCompraSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Middleware para actualizar ultimaActualizacion antes de guardar
-deudaCompraSchema.pre('save', function(next) {
+deudaCompraSchema.pre('save', function (next) {
     this.ultimaActualizacion = Date.now();
     next();
 });

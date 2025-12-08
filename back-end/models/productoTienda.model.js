@@ -1,9 +1,9 @@
 import mongoose from "mongoose";
-import crypto from 'crypto'; 
+import crypto from 'crypto';
 
 
 const productoTiendaSchema = new mongoose.Schema({
- idProductoTienda: {
+  idProductoTienda: {
     type: String,
     required: true
   },
@@ -16,40 +16,62 @@ const productoTiendaSchema = new mongoose.Schema({
     type: String,
     default: ""
   },
+  precioCompra: {
+    type: Number,
+    default: 0
+  },
   precioVenta: {
     type: Number,
-    // required: true <--- Eliminado: Se define posteriormente o se inicializa
+    default: 0
+  },
+  cantidad: {
+    type: Number,
+    default: 0
+  },
+  cantidadMinima: {
+    type: Number,
+    default: 5
+  },
+  cantidadMaxima: {
+    type: Number,
+    default: 100
+  },
+  tipo: { // <-- NUEVO CAMPO: Materia Prima o Producto Terminado
+    type: String,
+    enum: ['Materia Prima', 'Producto Terminado'],
+    default: 'Producto Terminado',
+    required: true
   },
   // -----------------------------------------------------------
   color: { // <-- NUEVO CAMPO REQUERIDO
-        type: String,
-        required: true
-    },
-    categoria: { // <-- CAMPO REQUERIDO - Ahora permite categorías dinámicas
-        type: String,
-        required: true
-    },
-    marca: {
-        type: String,
-        default: ""
-    },
-    cajas: {
-        type: Number,
-        default: 0
-    },
-    ubicacion: {
-        type: String,
-        default: ""
-    },
-    tamano: {
-        type: String,
-        default: ""
-    },
-    codigo: {
-        type: String,
-        required: true,
-        trim: true
-    },
+    type: String,
+    required: true
+  },
+  categoria: { // <-- CAMPO REQUERIDO - Ahora permite categorías dinámicas
+    type: String,
+    required: true
+  },
+  marca: {
+    type: String,
+    default: ""
+  },
+  cajas: {
+    type: String,
+    default: ""
+  },
+  ubicacion: {
+    type: String,
+    default: ""
+  },
+  tamano: {
+    type: String,
+    default: ""
+  },
+  codigo: {
+    type: String,
+    required: true,
+    trim: true
+  },
   proveedor: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Proveedor"
@@ -68,9 +90,9 @@ const productoTiendaSchema = new mongoose.Schema({
     ref: "Objeto3D" // para vincular con el modelo 3D en RA
   },
   ventasAcumuladas: { // <-- ¡NUEVO CAMPO REQUERIDO PARA "MÁS VENDIDOS"!
-    type: Number,
-    default: 0
-  },
+    type: Number,
+    default: 0
+  },
   // ... (tus campos existentes)
   activo: {
     type: Boolean,
@@ -79,12 +101,12 @@ const productoTiendaSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // HOOK DE MANTENIMIENTO: Genera automáticamente el idProductoTienda (SKU interno)
-productoTiendaSchema.pre('save', function(next) {
-    // Solo si el documento es nuevo y el idProductoTienda no está asignado
-    if (this.isNew && !this.idProductoTienda) {
-        // Genera un Identificador Único Universal
-        this.idProductoTienda = crypto.randomUUID(); 
-    }
-    next();
+productoTiendaSchema.pre('save', function (next) {
+  // Solo si el documento es nuevo y el idProductoTienda no está asignado
+  if (this.isNew && !this.idProductoTienda) {
+    // Genera un Identificador Único Universal
+    this.idProductoTienda = crypto.randomUUID();
+  }
+  next();
 });
 export default mongoose.model("ProductoTienda", productoTiendaSchema);
