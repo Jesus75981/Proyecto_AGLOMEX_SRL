@@ -71,6 +71,10 @@ const productoTiendaSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  cantidad: { // <-- NUEVO CAMPO PARA INVENTARIO
+    type: Number,
+    default: 0
+  },
   // ... (tus campos existentes)
   activo: {
     type: Boolean,

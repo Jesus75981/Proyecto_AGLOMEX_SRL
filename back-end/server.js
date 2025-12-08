@@ -21,12 +21,17 @@ import proveedoresRoutes from './routes/proveedores.routes.js';
 import ventasRoutes from './routes/ventas.routes.js';
 import User from './models/user.model.js';
 import productosRoutes from './routes/productos.routes.js';
+import { listarProductos } from './controllers/productoTienda.controller.js';
 import anticiposRoutes from './routes/anticipos.routes.js';
 import transportistasRoutes from './routes/transportistas.routes.js';
 import pedidosPublicRoutes from './routes/pedidos.public.routes.js';
 import alertasRoutes from './routes/alertas.routes.js';
+import materiaPrimaRoutes from './routes/materiaPrima.routes.js';
+import uploadRoutes from './routes/upload.routes.js';
 import { actualizarProgresoAutomatico, verificarRetrasos } from './controllers/produccion.controller.js';
 import { enviarRecordatoriosPagosPendientes } from './services/notifications.service.js';
+import Objeto3D from './models/objetos3d.model.js';
+import * as tripoService from './services/tripo.service.js';
 
 // Inicialización del servidor
 const app = express();
@@ -36,6 +41,7 @@ const jwtSecret = process.env.JWT_SECRET || 'tu_secreto_super_seguro';
 // Middlewares
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static('public/uploads'));
 
 // Conexión a MongoDB
 mongoose.connect('mongodb://localhost:27017/mueblesDB')
@@ -81,7 +87,7 @@ app.post('/api/create-test-users', async (req, res) => {
 // Login (RUTA PÚBLICA)
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
-    
+
     if (!username || !password) {
         return res.status(400).json({ message: 'Username y password son requeridos' });
     }
@@ -94,18 +100,32 @@ app.post('/api/login', async (req, res) => {
         if (!isMatch) return res.status(400).json({ message: 'Usuario o contraseña incorrectos.' });
 
         const token = jwt.sign({ id: user._id, rol: user.rol }, jwtSecret, { expiresIn: '1h' });
-        res.json({ 
-            token, 
-            user: { 
-                id: user._id, 
-                username: user.username, 
-                nombre: user.nombre, 
-                rol: user.rol 
-            } 
+        res.json({
+            token,
+            user: {
+                id: user._id,
+                username: user.username,
+                nombre: user.nombre,
+                rol: user.rol
+            }
         });
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: ' Error en el servidor.' });
+    }
+});
+
+// Ruta pública para catálogo de productos (antes de las rutas protegidas)
+app.get('/api/public/productos', listarProductos);
+app.get('/api/productos', listarProductos);
+
+// Ruta pública para categorías de productos
+app.get('/api/public/productos/categorias', async (req, res) => {
+    try {
+        const categorias = await ProductoTienda.distinct('categoria', { activo: true });
+        res.json(categorias);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 });
 
@@ -126,11 +146,13 @@ app.use('/api/finanzas', authMiddleware, finanzasRoutes);
 app.use('/api/anticipos', authMiddleware, anticiposRoutes);
 app.use('/api/transportistas', authMiddleware, transportistasRoutes);
 app.use('/api/alertas', authMiddleware, alertasRoutes);
+app.use('/api/materiaPrima', authMiddleware, materiaPrimaRoutes);
+app.use('/api/upload', authMiddleware, uploadRoutes);
 
 // Ruta de salud pública
 app.get('/api/health', (req, res) => {
-    res.json({ 
-        status: 'OK', 
+    res.json({
+        status: 'OK',
         database: mongoose.connection.readyState === 1 ? 'Conectado' : 'Desconectado',
         timestamp: new Date().toISOString()
     });
@@ -182,6 +204,61 @@ cron.schedule('0 9 * * *', async () => {
         console.log('✅ Recordatorios enviados exitosamente');
     } catch (error) {
         console.error('❌ Error en recordatorios automáticos:', error);
+    }
+});
+
+// === SISTEMA DE GENERACIÓN 3D (TRIPO AI) ===
+// Ejecutar cada minuto para verificar tareas pendientes
+cron.schedule('* * * * *', async () => {
+    try {
+        // Buscar objetos en estado 'queued' o 'processing' que tengan un tripoTaskId
+        const objetosPendientes = await Objeto3D.find({
+            status: { $in: ['queued', 'processing'] },
+            tripoTaskId: { $exists: true, $ne: "" }
+        });
+
+        if (objetosPendientes.length > 0) {
+            console.log(`[TRIPO] Verificando ${objetosPendientes.length} tareas pendientes...`);
+
+            for (const obj of objetosPendientes) {
+                try {
+                    const statusData = await tripoService.getTaskStatus(obj.tripoTaskId);
+
+                    // Mapear estado de Tripo a nuestro modelo
+                    // Tripo status: 'queued', 'running', 'success', 'failed', 'cancelled'
+                    let nuevoStatus = obj.status;
+
+                    if (statusData.status === 'success') {
+                        nuevoStatus = 'done';
+                        // Guardar URL del modelo (glb)
+                        // Tripo API v2 structure: output.pbr_model (string) or result.pbr_model.url
+                        if (statusData.output && statusData.output.pbr_model) {
+                            obj.glbUrl = statusData.output.pbr_model;
+                        } else if (statusData.result && statusData.result.pbr_model && statusData.result.pbr_model.url) {
+                            obj.glbUrl = statusData.result.pbr_model.url;
+                        } else if (statusData.output && statusData.output.model) {
+                            // Fallback for older structure
+                            obj.glbUrl = statusData.output.model;
+                        }
+                    } else if (statusData.status === 'failed' || statusData.status === 'cancelled') {
+                        nuevoStatus = 'failed';
+                        obj.error = "Fallo en Tripo AI";
+                    } else if (statusData.status === 'running') {
+                        nuevoStatus = 'processing';
+                    }
+
+                    if (nuevoStatus !== obj.status) {
+                        obj.status = nuevoStatus;
+                        await obj.save();
+                        console.log(`[TRIPO] Tarea ${obj.tripoTaskId} actualizada a: ${nuevoStatus}`);
+                    }
+                } catch (error) {
+                    console.error(`[TRIPO] Error verificando tarea ${obj.tripoTaskId}:`, error.message);
+                }
+            }
+        }
+    } catch (error) {
+        console.error('[TRIPO] Error en cron job:', error);
     }
 });
 

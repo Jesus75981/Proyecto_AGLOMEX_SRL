@@ -1,0 +1,32 @@
+{
+  "product": {
+    "id": "6931947e111761f9f9c0403d",
+    "name": "asd",
+    "objeto3D": {
+      "dimensions": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "_id": "693429a387b99dea96f04fe6",
+      "producto": "6931947e111761f9f9c0403d",
+      "sourceImage": "http://localhost:5000/uploads/1764856954823-842718771.jpeg",
+      "prompt": "",
+      "tripoTaskId": "1011964d-568d-4fc3-8de9-7192366ded43",
+      "status": "done",
+      "error": "",
+      "glbUrl": "",
+      "usdzUrl": "",
+      "previewUrl": "",
+      "scale": 1,
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "createdAt": "2025-12-06T13:03:31.554Z",
+      "updatedAt": "2025-12-06T13:05:02.313Z",
+      "__v": 0
+    }
+  }
+}

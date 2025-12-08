@@ -119,7 +119,7 @@ const RecepcionPedidosPage = () => {
           </div>
           <div className="flex space-x-4">
             <button
-              onClick={() => window.open('/catalogo', '_blank')}
+              onClick={() => navigate('/catalogo')}
               className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300"
             >
               Catálogo

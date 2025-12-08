@@ -1,24 +1,31 @@
-# TODO: Implementar módulo de crear/buscar producto con categoría dinámica, cajas y ubicación
+# TODO: Add Shopping Cart Functionality with WhatsApp Checkout and Update Prices to Bs
 
-## Tareas Pendientes
+## Steps to Complete
 
-### Backend
-- [ ] Actualizar modelo productoTienda.model.js: Cambiar categoria de enum a string para permitir categorías dinámicas
-- [ ] Agregar endpoint en productos.routes.js para obtener categorías únicas existentes
-- [ ] Actualizar controlador productoTienda.controller.js si es necesario para manejar categorías nuevas
+1. **Update price display in ProductCard component**  
+   - Change `${product.precioVenta.toFixed(2)}` to `Bs ${product.precioVenta.toFixed(2)}` in the inline ProductCard in CatalogPage.jsx.  
+   - ✅ Completed: Updated to `Bs ${product.precioVenta.toFixed(2)}` in ProductCard component.
 
-### Frontend
-- [ ] Implementar AdminCatalogPage.jsx con formulario completo para crear productos
-  - [ ] Campo categoría: dropdown con opciones existentes + opción para crear nueva
-  - [ ] Campos cajas y ubicación
-  - [ ] Otros campos del producto (nombre, color, etc.)
-  - [ ] Funcionalidad de búsqueda/listado de productos
-- [ ] Integrar con API para crear productos y obtener categorías
+2. **Add cart state to CatalogPage.jsx**  
+   - Import useState for cart (array of {product, quantity}).  
+   - ✅ Completed: Added cart state and isCartOpen state.
 
-### Testing
-- [ ] Probar creación de productos con categorías nuevas y existentes
-- [ ] Verificar que cajas y ubicación se guarden correctamente
-- [ ] Probar búsqueda y listado en AdminCatalogPage
+3. **Modify ProductCard to include "Add to Cart" button**  
+   - Add button in ProductCard that calls a function to add product to cart (increment if exists).  
+   - ✅ Completed: Added "Agregar al Carrito" button with onAddToCart prop.
 
-### Adicional (mencionado por usuario)
-- [ ] Revisar lógica de pagos a crédito: mostrar pendientes, proceder compra aunque falte pago, mostrar en inventario
+4. **Add cart icon/button in Navbar**  
+   - Add a cart icon/button in Navbar to toggle cart modal, show cart item count.  
+   - ✅ Completed: Added cart button with count badge and onCartClick prop.
+
+5. **Create CartModal component**  
+   - Create CartModal component within CatalogPage.jsx to display cart items, quantities, subtotals, total in Bs, remove items.  
+   - ✅ Completed: Created CartModal with all required features.
+
+6. **Implement WhatsApp checkout**  
+   - Add "Checkout via WhatsApp" button in CartModal that generates WhatsApp URL with order details and opens it.  
+   - ✅ Completed: Implemented handleWhatsAppCheckout function with proper message formatting.
+
+7. **Test functionality**  
+   - Run the app locally, test adding to cart, viewing cart, removing items, WhatsApp checkout.  
+   - Ensure prices display correctly in Bs.

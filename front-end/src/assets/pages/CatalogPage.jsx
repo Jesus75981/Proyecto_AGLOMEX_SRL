@@ -1,78 +1,148 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-// --- Función para simular la activación de Realidad Aumentada ---
-const handleARView = (productName) => {
-    alert(`Activando Realidad Aumentada para: ${productName}. ¡Mira a tu alrededor!`);
-    console.log(`[RA ACTIVA]: Solicitando cámara para visualizar ${productName} en Realidad Aumentada.`);
+// --- Cart Modal Component ---
+const CartModal = ({ cart, setCart, isOpen, setIsOpen }) => {
+  const total = cart.reduce((sum, item) => sum + (item.product.precioVenta || 0) * item.quantity, 0);
+
+  const removeFromCart = (productId) => {
+    setCart(cart.filter(item => item.product._id !== productId));
+  };
+
+  const updateQuantity = (productId, newQuantity) => {
+    if (newQuantity <= 0) {
+      removeFromCart(productId);
+      return;
+    }
+    setCart(cart.map(item =>
+      item.product._id === productId ? { ...item, quantity: newQuantity } : item
+    ));
+  };
+
+  const handleWhatsAppCheckout = () => {
+    const orderDetails = cart.map(item =>
+      `${item.product.nombre} x${item.quantity} - Bs ${((item.product.precioVenta || 0) * item.quantity).toFixed(2)}`
+    ).join('\n');
+
+    const message = `Hola, me gustaría hacer un pedido:\n\n${orderDetails}\n\nTotal: Bs ${total.toFixed(2)}\n\nPor favor, confirma la disponibilidad y detalles de entrega.`;
+
+    const whatsappUrl = `https://wa.me/59172876225?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md max-h-[80vh] overflow-y-auto">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold text-orange-400">Carrito de Compras</h2>
+          <button
+            onClick={() => setIsOpen(false)}
+            className="text-gray-400 hover:text-white text-2xl"
+          >
+            ×
+          </button>
+        </div>
+
+        {cart.length === 0 ? (
+          <p className="text-gray-400 text-center">Tu carrito está vacío</p>
+        ) : (
+          <>
+            {cart.map(item => (
+              <div key={item.product._id} className="flex items-center justify-between mb-4 p-3 bg-gray-700 rounded">
+                <div className="flex-1">
+                  <h3 className="text-white font-semibold">{item.product.nombre}</h3>
+                  <p className="text-gray-400">Bs {(item.product.precioVenta || 0).toFixed(2)} c/u</p>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => updateQuantity(item.product._id, item.quantity - 1)}
+                    className="bg-gray-600 hover:bg-gray-500 text-white px-2 py-1 rounded"
+                  >
+                    -
+                  </button>
+                  <span className="text-white">{item.quantity}</span>
+                  <button
+                    onClick={() => updateQuantity(item.product._id, item.quantity + 1)}
+                    className="bg-gray-600 hover:bg-gray-500 text-white px-2 py-1 rounded"
+                  >
+                    +
+                  </button>
+                  <button
+                    onClick={() => removeFromCart(item.product._id)}
+                    className="bg-red-600 hover:bg-red-500 text-white px-2 py-1 rounded ml-2"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            <div className="border-t border-gray-600 pt-4 mt-4">
+              <div className="flex justify-between text-xl font-bold text-white mb-4">
+                <span>Total:</span>
+                <span>Bs {total.toFixed(2)}</span>
+              </div>
+              <button
+                onClick={handleWhatsAppCheckout}
+                className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300"
+              >
+                Pedir por WhatsApp
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
 };
 
-// --- Mock Data ---
-const MOCK_PRODUCTS = [
-    { 
-        _id: 'mock1', 
-        nombre: "Sofá Modular 'Leda'", 
-        descripcion: "Diseño elegante y modular, con tapicería de terciopelo y patas de roble macizo. Tipo: Sofá.", 
-        precioVenta: 1299.99,
-        imagen: "https://placehold.co/400x300/f97316/ffffff?text=Sofá+Modular",
-        dimensiones: { alto: 240, ancho: 160, profundidad: 80 },
-        modelUrl: "sofa_leda.glb",
-        cantidad: 5,
-        activo: true, 
-        ventasAcumuladas: 250
-    },
-    { 
-        _id: 'mock2', 
-        nombre: "Mesa de Centro 'Orus'", 
-        descripcion: "Mesa de centro con tablero de mármol blanco y estructura geométrica de metal negro. Tipo: Mesa.", 
-        precioVenta: 450.00,
-        imagen: "https://placehold.co/400x300/ea580c/ffffff?text=Mesa+de+Centro",
-        dimensiones: { alto: 100, ancho: 50, profundidad: 45 },
-        modelUrl: "mesa_orus.glb",
-        cantidad: 0,
-        activo: true,
-        ventasAcumuladas: 50 
-    },
-    { 
-        _id: 'mock3', 
-        nombre: "Estantería 'Charon'", 
-        descripcion: "Estantería industrial abierta con cinco niveles, ideal para libros y decoración. Tipo: Estantería.", 
-        precioVenta: 320.50,
-        imagen: "https://placehold.co/400x300/fb923c/ffffff?text=Estantería+Industrial",
-        dimensiones: { alto: 180, ancho: 80, profundidad: 30 },
-        modelUrl: "estanteria_charon.glb",
-        cantidad: 12, 
-        activo: true,
-        ventasAcumuladas: 150
-    },
-    { 
-        _id: 'mock4', 
-        nombre: "Silla de Comedor 'Zephyr'", 
-        descripcion: "Silla de diseño escandinavo con asiento acolchado de tela gris y estructura de haya. Tipo: Silla.", 
-        precioVenta: 89.99,
-        imagen: "https://placehold.co/400x300/f97316/ffffff?text=Silla+Comedor",
-        dimensiones: { alto: 45, ancho: 55, profundidad: 90 },
-        modelUrl: "silla_zephyr.glb",
-        cantidad: 2, 
-        activo: true,
-        ventasAcumuladas: 200
-    },
-    { 
-        _id: 'mock5', 
-        nombre: "Cama King Size 'Nyx'", 
-        descripcion: "Cama tamaño king con cabecero tapizado y estructura de madera maciza. Tipo: Cama.", 
-        precioVenta: 899.99,
-        imagen: "https://placehold.co/400x300/ea580c/ffffff?text=Cama+King+Size",
-        dimensiones: { alto: 120, ancho: 200, profundidad: 220 },
-        modelUrl: "cama_nyx.glb",
-        cantidad: 3, 
-        activo: true,
-        ventasAcumuladas: 75
-    }
-];
+// --- Componente Modal AR ---
+const ARModal = ({ product, isOpen, onClose }) => {
+  if (!isOpen || !product || !product.objeto3D?.glbUrl) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-80 flex justify-center items-center z-50 p-4">
+      <div className="bg-gray-800 rounded-lg p-4 w-full max-w-4xl h-[80vh] relative flex flex-col shadow-2xl border border-gray-700">
+        <button
+          onClick={onClose}
+          className="absolute top-2 right-2 text-gray-400 hover:text-white text-3xl z-10 bg-gray-900/50 rounded-full w-10 h-10 flex items-center justify-center transition-colors"
+        >
+          ×
+        </button>
+        
+        <h2 className="text-2xl font-bold text-orange-400 mb-4 text-center pr-10">{product.nombre} en 3D</h2>
+        
+        <div className="flex-grow w-full h-full bg-gray-900 rounded-lg overflow-hidden relative border border-gray-700">
+          <model-viewer
+            src={product.objeto3D.glbUrl}
+            ios-src={product.objeto3D.usdzUrl || ''}
+            alt={`Modelo 3D de ${product.nombre}`}
+            ar
+            ar-modes="scene-viewer webxr quick-look"
+            camera-controls
+            auto-rotate
+            shadow-intensity="1"
+            style={{ width: '100%', height: '100%' }}
+            className="w-full h-full"
+          >
+             <button slot="ar-button" className="absolute bottom-6 right-6 bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-6 rounded-full shadow-lg z-20 flex items-center gap-2 transition-transform hover:scale-105">
+                <span>📱</span> Ver en tu espacio
+             </button>
+          </model-viewer>
+        </div>
+        
+        <p className="text-gray-400 text-center mt-4 text-sm">
+          Usa tu celular para ver este producto en realidad aumentada.
+        </p>
+      </div>
+    </div>
+  );
+};
 
 // --- Componente Navbar ---
-const Navbar = () => {
+const Navbar = ({ cartCount, onCartClick }) => {
   const navigate = useNavigate();
 
   return (
@@ -83,11 +153,23 @@ const Navbar = () => {
             Muebles 2025
           </span>
         </div>
-        
+
         <div className="flex space-x-4 items-center">
           <span className="text-orange-400 font-semibold text-sm sm:text-base">
             Catálogo Público
           </span>
+
+          <button
+            onClick={onCartClick}
+            className="relative bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300 shadow-md text-sm sm:text-base"
+          >
+            🛒 Carrito
+            {cartCount > 0 && (
+              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                {cartCount}
+              </span>
+            )}
+          </button>
 
           <button
             onClick={() => navigate('/recepcion-pedidos')}
@@ -109,74 +191,56 @@ const Navbar = () => {
 };
 
 // --- Componente de Tarjeta de Producto ---
-const ProductCard = ({ product }) => {
-    const formattedDimensions = product.dimensiones 
-        ? `${product.dimensiones.alto || 'N/D'}x${product.dimensiones.ancho || 'N/D'}x${product.dimensiones.profundidad || 'N/D'} cm` 
+const ProductCard = ({ product, onAddToCart, onViewAR }) => {
+    const formattedDimensions = product.dimensiones
+        ? `${product.dimensiones.alto || 'N/D'}x${product.dimensiones.ancho || 'N/D'}x${product.dimensiones.profundidad || 'N/D'} cm`
         : 'N/D';
 
     return (
         <div className="bg-gray-800 rounded-xl p-0 overflow-hidden shadow-2xl transition-all duration-300 hover:shadow-orange-500/30 hover:scale-[1.02] flex flex-col h-full">
-            
-            <img 
-                src={product.imagen} 
+
+            <img
+                src={product.imagen}
                 alt={product.nombre}
                 className="w-full h-48 object-cover rounded-t-xl"
-                onError={(e) => { 
-                    e.target.onerror = null; 
+                onError={(e) => {
+                    e.target.onerror = null;
                     e.target.src = "https://placehold.co/400x300/374151/ffffff?text=Imagen+No+Disp.";
                 }}
             />
-            
+
             <div className="p-5 flex flex-col flex-grow">
                 <h2 className="text-2xl font-bold text-orange-400 mb-2 truncate">
                     {product.nombre}
                 </h2>
-                
+
                 <p className="text-gray-400 text-sm mb-4 line-clamp-3 flex-grow">
                     {product.descripcion}
                 </p>
 
                 <div className="text-lg font-semibold text-white mb-3">
-                    ${product.precioVenta ? product.precioVenta.toFixed(2) : 'N/A'}
+                    Bs {product.precioVenta ? product.precioVenta.toFixed(2) : 'N/A'}
                 </div>
 
-                <div className="flex justify-between items-center text-xs text-gray-500 mb-3">
-                    <span>Dimensiones: {formattedDimensions}</span>
-                    <span className={`font-medium ${product.cantidad > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                        Stock: {product.cantidad !== undefined ? product.cantidad : 'N/D'}
-                    </span>
+                <div className="text-xs text-gray-500 mb-3">
+                    Dimensiones: {formattedDimensions}
                 </div>
 
-                {product.ventasAcumuladas !== undefined && (
-                    <div className="text-sm font-bold text-yellow-400 mb-2 text-center">
-                        Vendidas: {product.ventasAcumuladas} unidades
-                    </div>
+                {product.objeto3D?.glbUrl && (
+                    <button
+                        onClick={() => onViewAR(product)}
+                        className="w-full bg-blue-600/20 hover:bg-blue-600/40 text-blue-300 border border-blue-500/50 font-bold py-2 px-4 rounded-lg transition-all duration-300 mb-2 flex items-center justify-center gap-2 group"
+                    >
+                        <span className="group-hover:scale-110 transition-transform">🧊</span> Ver en 3D / AR
+                    </button>
                 )}
 
                 <button
-                    onClick={() => handleARView(product.nombre)}
-                    disabled={product.cantidad !== undefined && product.cantidad <= 0}
-                    className={`mt-auto font-bold py-2 px-4 rounded-lg transition-colors duration-300 w-full shadow-lg flex items-center justify-center space-x-2 
-                        ${product.cantidad !== undefined && product.cantidad <= 0 
-                            ? 'bg-gray-600 cursor-not-allowed opacity-50' 
-                            : 'bg-orange-600 hover:bg-orange-700 text-white'}`}
+                    onClick={() => onAddToCart(product)}
+                    className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300"
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-cube-with-ray">
-                        <rect width="16" height="16" x="4" y="4" rx="2" ry="2"/>
-                        <path d="M16 8H8a2 2 0 1 0 0 4h8a2 2 0 1 1 0 4H8"/>
-                        <path d="M12 4v16"/>
-                        <path d="M21 17h-3"/>
-                        <path d="M21 7h-3"/>
-                        <path d="M3 7h3"/>
-                        <path d="M3 17h3"/>
-                    </svg>
-                    <span>Ver en RA</span>
+                    Agregar al Carrito
                 </button>
-                {product.cantidad !== undefined && product.cantidad <= 0 && (
-                    <p className="text-center text-red-400 text-sm mt-2 font-semibold">
-                        ¡Agotado!
-                    </p>
-                )}
             </div>
         </div>
     );
@@ -184,20 +248,45 @@ const ProductCard = ({ product }) => {
 
 // --- Componente Principal CatalogPage ---
 const CatalogPage = () => {
-  const [allProducts, setAllProducts] = useState([]); 
-  const [products, setProducts] = useState([]); 
+  const [allProducts, setAllProducts] = useState([]);
+  const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState(''); 
-  const [topSellers, setTopSellers] = useState([]); 
+  const [searchTerm, setSearchTerm] = useState('');
+  const [cart, setCart] = useState([]);
+  const [isCartOpen, setIsCartOpen] = useState(false);
   
-  const API_URL = 'http://localhost:5000/api/productos'; 
+  // Estado para AR
+  const [isAROpen, setIsAROpen] = useState(false);
+  const [selectedARProduct, setSelectedARProduct] = useState(null);
+
+  const handleViewAR = (product) => {
+    setSelectedARProduct(product);
+    setIsAROpen(true);
+  };
+
+  const API_URL = 'http://localhost:5000/api/productos';
+
+  const addToCart = (product) => {
+    setCart(prevCart => {
+      const existingItem = prevCart.find(item => item.product._id === product._id);
+      if (existingItem) {
+        return prevCart.map(item =>
+          item.product._id === product._id
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      } else {
+        return [...prevCart, { product, quantity: 1 }];
+      }
+    });
+  };
 
   useEffect(() => {
     const fetchData = async () => {
         try {
             const response = await fetch(API_URL);
-            
+
             if (!response.ok) {
                 throw new Error(`Error HTTP: ${response.status}`);
             }
@@ -207,43 +296,33 @@ const CatalogPage = () => {
 
             setAllProducts(activeProducts);
             setLoading(false);
-            setError(null); 
-
-            if (activeProducts.length === 0) {
-                setAllProducts(MOCK_PRODUCTS.filter(p => p.activo !== false));
-                setError("Mostrando datos de ejemplo.");
-            }
+            setError(null);
 
         } catch (fetchError) {
             console.error("Fetch Error:", fetchError);
-            setError(`Error al conectar con la API. Mostrando datos de ejemplo.`);
-            setAllProducts(MOCK_PRODUCTS.filter(p => p.activo !== false));
+            setError(`Error al conectar con la API.`);
+            setAllProducts([]);
             setLoading(false);
         }
     };
 
     fetchData();
-  }, []); 
+  }, []);
 
   useEffect(() => {
     const availableProducts = allProducts.filter(p => p.cantidad === undefined || p.cantidad > 0);
-
-    const sortedBySales = [...availableProducts]
-        .sort((a, b) => (b.ventasAcumuladas || 0) - (a.ventasAcumuladas || 0));
-    
-    setTopSellers(sortedBySales.slice(0, 4));
 
     const lowerCaseSearchTerm = searchTerm.toLowerCase();
 
     const filteredAndSearchedProducts = availableProducts.filter(product => {
       const nameMatch = product.nombre?.toLowerCase().includes(lowerCaseSearchTerm);
       const descriptionMatch = product.descripcion?.toLowerCase().includes(lowerCaseSearchTerm);
-      
+
       return nameMatch || descriptionMatch;
     });
 
     setProducts(filteredAndSearchedProducts);
-  }, [allProducts, searchTerm]); 
+  }, [allProducts, searchTerm]);
 
   if (loading) {
     return (
@@ -256,21 +335,25 @@ const CatalogPage = () => {
     );
   }
 
+  const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+
   return (
     <div className="min-h-screen bg-gray-900 text-white p-4 sm:p-8 font-sans">
-      <Navbar />
+      <Navbar cartCount={cartCount} onCartClick={() => setIsCartOpen(true)} />
+      <CartModal cart={cart} setCart={setCart} isOpen={isCartOpen} setIsOpen={setIsCartOpen} />
+      <ARModal product={selectedARProduct} isOpen={isAROpen} onClose={() => setIsAROpen(false)} />
       <div className="container mx-auto">
-        
+
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-10">
           <div>
             <h1 className="text-5xl font-extrabold text-orange-500 mb-2">
-              Catálogo de Diseño 
+              Catálogo de Diseño
             </h1>
             <p className="text-gray-400 text-lg">
-              Explora nuestros modelos AR y especificaciones de fabricación.
+              Explora nuestros productos disponibles en inventario.
             </p>
           </div>
-          
+
           <input
             type="text"
             placeholder="Buscar por Silla, Sofá, Mesa..."
@@ -279,26 +362,14 @@ const CatalogPage = () => {
             className="mt-4 sm:mt-0 p-3 w-full sm:w-80 rounded-lg bg-gray-700 text-white border border-gray-600 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-all duration-300 placeholder-gray-400"
           />
         </div>
-        
+
         {error && (
           <div className="bg-yellow-900 border border-yellow-700 text-yellow-200 p-4 rounded-lg mb-6 text-center shadow-lg">
             {error}
           </div>
         )}
 
-        {/* --- SECCIÓN: PRODUCTOS MÁS VENDIDOS --- */}
-        {topSellers.length > 0 && (
-            <div className="mb-12">
-                <h2 className="text-4xl font-bold text-yellow-400 mb-6 border-b-2 border-yellow-500/50 pb-2">
-                    Lo más popular
-                </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {topSellers.map((product) => (
-                        <ProductCard key={product._id} product={product} />
-                    ))}
-                </div>
-            </div>
-        )}
+
 
         <div className="mb-8">
           <h2 className="text-4xl font-bold text-orange-500 mb-6 border-b-2 border-orange-500/50 pb-2">
@@ -308,7 +379,12 @@ const CatalogPage = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {products.length > 0 ? (
               products.map((product) => (
-                <ProductCard key={product._id} product={product} />
+                <ProductCard 
+                    key={product._id} 
+                    product={product} 
+                    onAddToCart={addToCart} 
+                    onViewAR={handleViewAR}
+                />
               ))
             ) : (
               <div className="col-span-full text-center p-10">

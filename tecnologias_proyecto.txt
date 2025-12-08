@@ -1,0 +1,270 @@
+INFORMACIÓN DETALLADA DE HERRAMIENTAS, LENGUAJES, PLATAFORMAS Y SERVICIOS UTILIZADOS EN EL PROYECTO AGLOMEX SRL
+
+Este documento describe las tecnologías seleccionadas para el desarrollo del sistema de gestión de muebles AGLOMEX SRL, un proyecto full-stack que incluye un back-end API REST y un front-end web responsivo.
+
+================================================================================
+LENGUAJES DE PROGRAMACIÓN
+================================================================================
+
+1. JavaScript (ES6+)
+   - Lenguaje principal utilizado en todo el proyecto
+   - Versión: ES Modules (type: "module" en package.json)
+   - Utilizado tanto en back-end como front-end
+
+2. JSX
+   - Extensión de JavaScript para React
+   - Utilizado exclusivamente en el front-end para definir componentes de interfaz
+
+================================================================================
+FRAMEWORKS Y BIBLIOTECAS
+================================================================================
+
+BACK-END:
+---------
+1. Node.js
+   - Plataforma de ejecución para JavaScript en servidor
+   - Versión: Compatible con ES Modules
+
+2. Express.js
+   - Framework web minimalista para Node.js
+   - Versión: ^5.1.0
+   - Utilizado para crear la API REST
+
+3. Mongoose
+   - ODM (Object Data Modeling) para MongoDB
+   - Versión: ^8.18.2
+   - Facilita la interacción con la base de datos MongoDB
+
+FRONT-END:
+-----------
+4. React
+   - Biblioteca para construir interfaces de usuario
+   - Versión: ^18.2.0
+   - Utilizado con React DOM (^18.2.0)
+
+5. React Router DOM
+   - Biblioteca para enrutamiento en aplicaciones React
+   - Versión: ^7.8.2
+   - Maneja la navegación entre páginas del front-end
+
+6. Tailwind CSS
+   - Framework CSS utility-first
+   - Versión: ^3.4.3
+   - Utilizado para el diseño y estilos responsivos
+
+================================================================================
+HERRAMIENTAS DE DESARROLLO
+================================================================================
+
+1. Vite
+   - Herramienta de construcción y servidor de desarrollo para front-end
+   - Versión: ^4.5.0
+   - Plugin: @vitejs/plugin-react (^4.7.0)
+   - Configurado con proxy para redirigir peticiones API al back-end
+
+2. Nodemon
+   - Herramienta que reinicia automáticamente el servidor Node.js durante desarrollo
+   - Versión: ^3.1.10
+
+3. ESLint
+   - Herramienta de linting para JavaScript
+   - Configuración presente en eslint.config.js
+
+4. PostCSS
+   - Herramienta para transformar CSS
+   - Versión: ^8.4.31
+   - Utilizado con Tailwind CSS
+
+5. Autoprefixer
+   - Plugin de PostCSS para añadir prefijos CSS automáticamente
+   - Versión: ^10.4.19
+
+================================================================================
+PLATAFORMAS Y SERVICIOS
+================================================================================
+
+1. MongoDB
+   - Base de datos NoSQL utilizada
+   - Conexión local: mongodb://localhost:27017/mueblesDB
+   - Puerto: 27017
+   - Nombre de base de datos: mueblesDB
+
+2. Sistema Operativo
+   - Desarrollo realizado en Windows 11
+   - Compatible con otros sistemas operativos
+
+================================================================================
+SERVICIOS Y LIBRERÍAS ADICIONALES
+================================================================================
+
+1. JSON Web Tokens (JWT)
+   - Para autenticación y autorización
+   - Versión: ^9.0.2
+   - Secreto configurado vía variables de entorno
+
+2. bcrypt / bcryptjs
+   - Para hashing de contraseñas
+   - bcrypt: ^6.0.0
+   - bcryptjs: ^3.0.2
+
+3. CORS
+   - Para habilitar Cross-Origin Resource Sharing
+   - Versión: ^2.8.5
+
+4. dotenv
+   - Para gestión de variables de entorno
+   - Versión: ^17.2.2
+
+5. Axios
+   - Cliente HTTP para peticiones desde el front-end
+   - Versión: ^1.11.0 (front-end) / ^1.12.2 (back-end)
+
+================================================================================
+ARQUITECTURA Y ESTRUCTURA DEL PROYECTO
+================================================================================
+
+- Arquitectura: Full-Stack con separación clara entre back-end y front-end
+- Patrón: MVC (Model-View-Controller) en back-end
+- Componentes: Arquitectura basada en componentes en React
+- API: RESTful API con endpoints protegidos por JWT
+- Estilos: Utility-first con Tailwind CSS
+- Enrutamiento: Cliente-side routing con React Router
+
+================================================================================
+CONFIGURACIONES ESPECÍFICAS
+================================================================================
+
+- Puerto del servidor back-end: 5000 (configurable vía PORT)
+- Proxy en Vite: Redirige /api a http://localhost:5000
+- Base de datos: MongoDB local con nombre 'mueblesDB'
+- Autenticación: Sistema de roles (admin, empleado_tienda, empleado_stock)
+- Sistema automático: Actualización de progreso de producción cada 5 minutos
+
+================================================================================
+GESTIÓN DE DEPENDENCIAS
+================================================================================
+
+- npm: Utilizado para gestión de paquetes
+- package.json: Define dependencias y scripts para ambos proyectos
+- Scripts disponibles:
+  - Back-end: "start" (node server.js), "dev" (nodemon server.js)
+  - Front-end: "dev" (vite), "build" (vite build), "preview" (vite preview)
+
+================================================================================
+REQUERIMIENTOS FUNCIONALES
+================================================================================
+
+El sistema de gestión de muebles AGLOMEX SRL debe cumplir con los siguientes requerimientos funcionales, basados en los módulos identificados en la estructura del proyecto:
+
+1. Gestión de Usuarios y Autenticación
+▪ El sistema debe permitir el registro e inicio de sesión de usuarios con roles (admin, empleado_tienda, empleado_stock).
+▪ El sistema debe implementar autenticación basada en JWT para proteger endpoints de la API.
+▪ El sistema debe controlar el acceso basado en roles para diferentes funcionalidades.
+
+2. Gestión de Clientes
+▪ El sistema debe permitir el registro, consulta, actualización y eliminación de información de clientes.
+▪ El sistema debe mantener un historial de compras por cliente.
+▪ El sistema debe gestionar los datos de contacto y preferencias de los clientes.
+
+3. Gestión de Proveedores
+▪ El sistema debe administrar proveedores de materiales y componentes.
+▪ El sistema debe registrar la información de contacto y términos de suministro de proveedores.
+▪ El sistema debe permitir el seguimiento de pedidos a proveedores.
+
+4. Gestión de Productos y Catálogo
+▪ El sistema debe mantener un catálogo de productos disponibles en tienda.
+▪ El sistema debe gestionar productos para fabricación.
+▪ El sistema debe proporcionar información detallada incluyendo precios, descripciones y especificaciones.
+▪ El sistema debe integrar objetos 3D para visualización de diseños.
+
+5. Gestión de Compras
+▪ El sistema debe registrar órdenes de compra a proveedores.
+▪ El sistema debe permitir el seguimiento del estado de las compras.
+▪ El sistema debe gestionar la recepción de materiales.
+
+6. Gestión de Ventas
+▪ El sistema debe procesar ventas en tienda.
+▪ El sistema debe generar reportes de ventas diarios.
+▪ El sistema debe gestionar pedidos de clientes.
+
+7. Gestión de Producción
+▪ El sistema debe permitir el seguimiento del progreso de fabricación de muebles.
+▪ El sistema debe actualizar automáticamente el estado de producción cada 5 minutos.
+▪ El sistema debe gestionar los materiales utilizados en producción.
+
+8. Gestión de Logística y Transportistas
+▪ El sistema debe coordinar entregas y transporte.
+▪ El sistema debe gestionar transportistas y rutas de entrega.
+▪ El sistema debe permitir el seguimiento de envíos.
+
+9. Gestión Financiera
+▪ El sistema debe controlar finanzas y contabilidad.
+▪ El sistema debe gestionar anticipos y pagos.
+▪ El sistema debe generar reportes financieros.
+
+10. Gestión de Inventario
+▪ El sistema debe controlar el stock de materiales y productos terminados.
+▪ El sistema debe generar alertas de niveles bajos de inventario.
+▪ El sistema debe actualizar automáticamente el inventario tras ventas y compras.
+
+11. Gestión de Pedidos
+▪ El sistema debe permitir la recepción y procesamiento de pedidos de clientes.
+▪ El sistema debe permitir el seguimiento del estado de los pedidos desde recepción hasta entrega.
+▪ El sistema debe integrar módulos de producción y logística para el manejo de pedidos.
+
+12. Interfaz de Usuario
+▪ El sistema debe proporcionar una página de inicio (Landing Page) para visitantes.
+▪ El sistema debe mostrar un catálogo público de productos.
+▪ El sistema debe ofrecer paneles de administración para diferentes roles.
+▪ El sistema debe incluir páginas específicas para compras, ventas, producción, logística, finanzas e inventario.
+
+================================================================================
+REQUERIMIENTOS NO FUNCIONALES
+================================================================================
+
+Además de las funcionalidades, el sistema debe cumplir con los siguientes requerimientos no funcionales:
+
+1. Rendimiento
+   - Tiempo de respuesta de la API inferior a 2 segundos para operaciones normales
+   - Capacidad para manejar al menos 100 usuarios concurrentes
+   - Optimización de consultas a base de datos para eficiencia
+
+2. Seguridad
+   - Autenticación robusta con hashing de contraseñas (bcrypt)
+   - Protección de endpoints sensibles con JWT
+   - Validación de entrada de datos para prevenir inyecciones
+   - Control de acceso basado en roles para proteger información sensible
+
+3. Usabilidad
+   - Interfaz responsiva compatible con dispositivos móviles y desktop
+   - Diseño intuitivo con navegación clara entre módulos
+   - Mensajes de error informativos en español
+   - Experiencia de usuario consistente en toda la aplicación
+
+4. Fiabilidad
+   - Disponibilidad del sistema del 99% durante horario laboral
+   - Manejo adecuado de errores sin caídas del sistema
+   - Backup automático de la base de datos
+
+5. Escalabilidad
+   - Arquitectura modular que permita añadir nuevos módulos
+   - Base de datos NoSQL (MongoDB) preparada para crecimiento de datos
+   - Separación clara entre back-end y front-end para escalado independiente
+
+6. Mantenibilidad
+   - Código estructurado siguiendo patrón MVC en back-end
+   - Componentes reutilizables en React para front-end
+   - Documentación clara de APIs y código
+   - Configuración centralizada de variables de entorno
+
+7. Compatibilidad
+   - Compatible con navegadores modernos (Chrome, Firefox, Safari, Edge)
+   - Sistema operativo Windows 11 (desarrollo), compatible con otros OS
+   - Integración con MongoDB local y potencialmente en la nube
+
+8. Eficiencia
+   - Optimización de recursos del servidor
+   - Compresión de respuestas HTTP
+   - Caché inteligente para mejorar rendimiento
+
+Esta selección de tecnologías proporciona una base sólida para un sistema de gestión empresarial escalable, mantenible y moderno.

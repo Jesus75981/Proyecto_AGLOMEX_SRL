@@ -7,6 +7,7 @@ const objeto3DSchema = new mongoose.Schema({
   // entrada
   sourceImage: { type: String, required: true }, // URL o base64
   prompt: { type: String, default: "" },
+  tripoTaskId: { type: String, default: "" }, // ID de la tarea en Tripo AI
 
   // estado del pipeline de Zero123
   status: { type: String, enum: ["queued", "processing", "done", "failed"], default: "queued" },

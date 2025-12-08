@@ -1,0 +1,18 @@
+[dotenv@17.2.3] injecting env (2) from .env -- tip: ΓÜÖ∩╕Å  override existing env vars with { override: true }
+≡ƒº¬ Iniciando prueba de integraci├│n con Tripo AI...
+≡ƒöæ API Key configurada: S├ì
+
+1∩╕ÅΓâú  Enviando imagen a Tripo: https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Duck/Screenshot/Duck.png
+Error al crear tarea en Tripo: {
+  code: 2010,
+  message: "You don't have enough credit to create this task",
+  suggestion: 'Please purchase more credit'
+}
+
+Γ¥î Error durante la prueba: Request failed with status code 403
+Detalles API: {
+  code: 2010,
+  message: "You don't have enough credit to create this task",
+  suggestion: 'Please purchase more credit'
+}
+≡ƒÅü Prueba finalizada.

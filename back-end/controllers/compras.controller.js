@@ -1,15 +1,19 @@
 import Compra from "../models/compra.model.js";
 import ProductoTienda from "../models/productoTienda.model.js";
+import MateriaPrima from "../models/materiaPrima.model.js";
 import DeudaCompra from "../models/deudaCompra.model.js"; // Importar el modelo de deudas
 import { registrarTransaccionFinanciera } from './finanzas.controller.js';
+import Objeto3D from "../models/objetos3d.model.js";
+import * as tripoService from "../services/tripo.service.js";
 
 /**
  * Función que encuentra un producto por ID o Nombre. Si no existe, lo crea automáticamente
  * con los datos mínimos requeridos (nombre, dimensiones, imagen).
  * @param {Object} itemData - Datos del producto proporcionados en el array de la compra.
+ * @param {string} tipoCompra - Tipo de compra: "Materia Prima" o "Producto Terminado"
  * @returns {Promise<string>} El ID de MongoDB (_id) del producto encontrado o creado.
  */
-const encontrarOCrearProducto = async (itemData) => {
+const encontrarOCrearProducto = async (itemData, tipoCompra) => {
     const {
         productoId,
         nombreProducto,
@@ -21,45 +25,105 @@ const encontrarOCrearProducto = async (itemData) => {
 
     let producto = null;
 
+    // Determinar el modelo según el tipo de compra
+    const Modelo = tipoCompra === "Materia Prima" ? MateriaPrima : ProductoTienda;
+
     // 1. Intentar buscar por ID (ObjectId) si se proporciona (para productos existentes)
     if (productoId) {
-        producto = await ProductoTienda.findById(productoId);
+        producto = await Modelo.findById(productoId);
     }
 
     // 2. Si no se encontró por ID, intentar buscar por Nombre
     if (!producto && nombreProducto) {
-        // Asumiendo que el nombre es suficiente para buscar si ya existe
-        producto = await ProductoTienda.findOne({ nombre: nombreProducto });
+        producto = await Modelo.findOne({ nombre: nombreProducto });
     }
 
     // 3. Si AÚN no se encuentra, crearlo automáticamente con los datos mínimos.
     if (!producto) {
         // Validamos que los datos mínimos estén presentes
-        if (!nombreProducto || !colorProducto || !categoriaProducto) {
-             throw new Error("Datos insuficientes para crear un nuevo producto. Se requiere nombre, color y categoría.");
+        if (!nombreProducto) {
+            throw new Error("Datos insuficientes para crear un nuevo producto. Se requiere nombre.");
         }
 
-        // Generar código automático usando la función del productoTienda.controller.js
-        const generarCodigoInterno = (nombre) => {
-            const prefix = nombre ? nombre.substring(0, 3).toUpperCase() : 'PRO';
-            const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-            return `${prefix}-${randomSuffix}`;
-        };
+        if (tipoCompra === "Producto Terminado" && (!colorProducto || !categoriaProducto)) {
+            throw new Error("Datos insuficientes para crear un nuevo producto terminado. Se requiere nombre, color y categoría.");
+        }
 
-        const idProductoTienda = generarCodigoInterno(nombreProducto);
+        if (tipoCompra === "Materia Prima") {
+            // Para materia prima, generar código interno
+            const generarCodigoInterno = (nombre) => {
+                const prefix = nombre ? nombre.substring(0, 3).toUpperCase() : 'MAT';
+                const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+                return `${prefix}-${randomSuffix}`;
+            };
 
-        // Creamos la nueva REFERENCIA en ProductoTienda.
-        const nuevoProducto = new ProductoTienda({
-            nombre: nombreProducto,
-            idProductoTienda: idProductoTienda,
-            color: colorProducto,
-            categoria: categoriaProducto,
-            dimensiones: dimensiones || {},
-            imagen: imagenProducto || "",
-        });
+            const idMateriaPrima = generarCodigoInterno(nombreProducto);
 
-        producto = await nuevoProducto.save();
-        console.log(`[INVENTARIO]: Nueva referencia de producto creada: ${producto.nombre} (${producto._id})`);
+            // Creamos la nueva materia prima
+            const nuevaMateriaPrima = new MateriaPrima({
+                nombre: nombreProducto,
+                idMateriaPrima: idMateriaPrima,
+                descripcion: itemData.descripcion || "",
+                precioCompra: itemData.precioUnitario,
+                precioVenta: itemData.precioVenta || 0,
+                categoria: itemData.categoria || "Otro",
+                ubicacion: itemData.ubicacion || "",
+                tamano: itemData.tamano || "",
+                codigo: itemData.codigo || "",
+            });
+
+            producto = await nuevaMateriaPrima.save();
+            console.log(`[INVENTARIO]: Nueva materia prima creada: ${producto.nombre} (${producto._id})`);
+        } else {
+            // Para producto terminado, generar código interno
+            const generarCodigoInterno = (nombre) => {
+                const prefix = nombre ? nombre.substring(0, 3).toUpperCase() : 'PRO';
+                const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+                return `${prefix}-${randomSuffix}`;
+            };
+
+            const idProductoTienda = generarCodigoInterno(nombreProducto);
+
+            // Creamos el nuevo producto terminado
+            const nuevoProducto = new ProductoTienda({
+                nombre: nombreProducto,
+                idProductoTienda: idProductoTienda,
+                color: colorProducto,
+                categoria: categoriaProducto,
+                dimensiones: dimensiones || {},
+                imagen: imagenProducto || "",
+                precioCompra: itemData.precioUnitario,
+                codigo: itemData.codigo || idProductoTienda, // Use provided codigo or fallback to idProductoTienda
+            });
+
+            producto = await nuevoProducto.save();
+            console.log(`[INVENTARIO]: Nuevo producto terminado creado: ${producto.nombre} (${producto._id})`);
+
+            // [NUEVO] Iniciar generación de modelo 3D si hay imagen (Lógica copiada de productoTienda.controller.js)
+            if (producto.imagen && producto.imagen.startsWith('http')) {
+                (async () => {
+                    try {
+                        console.log(`[TRIPO] Iniciando generación 3D para producto ${producto.nombre} (desde Compras)...`);
+                        const taskId = await tripoService.create3DTask(producto.imagen);
+
+                        const nuevoObjeto3D = new Objeto3D({
+                            producto: producto._id,
+                            sourceImage: producto.imagen,
+                            tripoTaskId: taskId,
+                            status: 'queued'
+                        });
+                        await nuevoObjeto3D.save();
+
+                        // Vincular al producto
+                        producto.objeto3D = nuevoObjeto3D._id;
+                        await producto.save();
+                        console.log(`[TRIPO] Tarea creada desde Compras: ${taskId}`);
+                    } catch (error) {
+                        console.error("[TRIPO] Error al iniciar generación desde Compras:", error.message);
+                    }
+                })();
+            }
+        }
     }
 
     return producto._id; // Retornamos el ID de MongoDB (_id) del producto
@@ -72,8 +136,8 @@ export const registrarCompra = async (req, res) => {
         // --- GENERAR NÚMERO DE COMPRA CORRELATIVO ---
         const today = new Date();
         const dateStr = today.getFullYear().toString() +
-                        (today.getMonth() + 1).toString().padStart(2, '0') +
-                        today.getDate().toString().padStart(2, '0');
+            (today.getMonth() + 1).toString().padStart(2, '0') +
+            today.getDate().toString().padStart(2, '0');
         const prefix = `COMP-${dateStr}-`;
 
         const ultimaCompraDelDia = await Compra.findOne({
@@ -168,9 +232,20 @@ export const registrarCompra = async (req, res) => {
                 colorProducto: item.colorProducto,
                 categoriaProducto: item.categoriaProducto,
                 dimensiones: item.dimensiones,
-                imagenProducto: item.imagenProducto
-            });
-            return { ...item, producto: productoObjectId };
+                imagenProducto: item.imagenProducto,
+                descripcion: item.descripcion,
+                categoria: item.categoria,
+                ubicacion: item.ubicacion,
+                tamano: item.tamano,
+                codigo: item.codigo,
+                precioUnitario: item.precioUnitario,
+                precioVenta: item.precioVenta
+            }, datosCompra.tipoCompra);
+            return {
+                ...item,
+                producto: productoObjectId,
+                onModel: datosCompra.tipoCompra === "Materia Prima" ? "MateriaPrima" : "ProductoTienda"
+            };
         });
         datosCompra.productos = await Promise.all(preProcessPromises);
 
@@ -180,14 +255,15 @@ export const registrarCompra = async (req, res) => {
 
         // --- 3. ACTUALIZAR EL INVENTARIO ---
         const updatePromises = datosCompra.productos.map(item => {
-            return ProductoTienda.findByIdAndUpdate(
+            const Modelo = datosCompra.tipoCompra === "Materia Prima" ? MateriaPrima : ProductoTienda;
+            return Modelo.findByIdAndUpdate(
                 item.producto,
                 {
                     $inc: { cantidad: item.cantidad },
                     $set: { precioCompra: item.precioUnitario }
                 },
                 { new: true }
-            ).orFail(new Error(`ProductoTienda con ID ${item.producto} no encontrado.`));
+            ).orFail(new Error(`${datosCompra.tipoCompra} con ID ${item.producto} no encontrado.`));
         });
         const inventarioActualizado = await Promise.all(updatePromises);
 
@@ -227,7 +303,8 @@ export const registrarCompra = async (req, res) => {
         // --- 6. VERIFICAR ALERTAS DE STOCK ---
         const alertasStockNormalizado = [];
         for (const item of datosCompra.productos) {
-            const productoActualizado = await ProductoTienda.findById(item.producto);
+            const Modelo = datosCompra.tipoCompra === "Materia Prima" ? MateriaPrima : ProductoTienda;
+            const productoActualizado = await Modelo.findById(item.producto);
             if (productoActualizado && productoActualizado.cantidad > 5) {
                 alertasStockNormalizado.push({
                     producto: productoActualizado.nombre,
@@ -261,10 +338,10 @@ export const registrarCompra = async (req, res) => {
 export const listarCompras = async (req, res) => {
     try {
         const historial = await Compra.find()
-                                        .populate('productos.producto') // Traer información del producto
-                                        .populate('proveedor')         // Traer información del proveedor
-                                        .limit(50)
-                                        .sort({ fecha: -1 });
+            .populate('productos.producto') // Traer información del producto
+            .populate('proveedor')         // Traer información del proveedor
+            .limit(50)
+            .sort({ fecha: -1 });
         res.status(200).json(historial);
     } catch (error) {
         res.status(500).json({ message: "Error al listar compras", error: error.message });
@@ -280,10 +357,93 @@ export const listarComprasConSaldo = async (req, res) => {
             saldoPendiente: { $gt: 0 },
             estado: { $in: ["Pendiente", "Parcialmente Pagada"] }
         })
-        .populate('proveedor')
-        .sort({ fecha: -1 });
+            .populate('proveedor')
+            .sort({ fecha: -1 });
         res.status(200).json(comprasConSaldo);
     } catch (error) {
         res.status(500).json({ message: "Error al listar las compras con saldo.", error: error.message });
+    }
+};
+
+/**
+ * Actualiza una compra existente.
+ */
+export const actualizarCompra = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const datosActualizados = req.body;
+
+        // Buscar la compra existente
+        const compraExistente = await Compra.findById(id);
+        if (!compraExistente) {
+            return res.status(404).json({ message: "Compra no encontrada." });
+        }
+
+        // Validaciones básicas
+        if (datosActualizados.tipoCompra && !["Materia Prima", "Producto Terminado"].includes(datosActualizados.tipoCompra)) {
+            return res.status(400).json({ message: "El tipo de compra debe ser 'Materia Prima' o 'Producto Terminado'." });
+        }
+
+        if (datosActualizados.proveedor) {
+            const Proveedor = (await import("../models/proveedores.model.js")).default;
+            const proveedorExistente = await Proveedor.findById(datosActualizados.proveedor);
+            if (!proveedorExistente) {
+                return res.status(400).json({ message: "El proveedor especificado no existe." });
+            }
+        }
+
+        if (datosActualizados.productos && Array.isArray(datosActualizados.productos)) {
+            for (const item of datosActualizados.productos) {
+                if (item.cantidad <= 0 || typeof item.cantidad !== 'number') {
+                    return res.status(400).json({ message: "La cantidad de cada producto debe ser un número positivo." });
+                }
+                if (item.precioUnitario <= 0 || typeof item.precioUnitario !== 'number') {
+                    return res.status(400).json({ message: "El precio unitario de cada producto debe ser un número positivo." });
+                }
+            }
+        }
+
+        // Calcular nuevo total si se actualizan productos
+        if (datosActualizados.productos && Array.isArray(datosActualizados.productos)) {
+            const nuevoTotal = datosActualizados.productos.reduce((sum, item) => sum + (item.cantidad * item.precioUnitario), 0);
+            datosActualizados.totalCompra = nuevoTotal;
+        }
+
+        // Actualizar la compra
+        const compraActualizada = await Compra.findByIdAndUpdate(
+            id,
+            datosActualizados,
+            { new: true, runValidators: true }
+        ).populate('productos.producto').populate('proveedor');
+
+        res.status(200).json({
+            message: "Compra actualizada exitosamente.",
+            compra: compraActualizada
+        });
+
+    } catch (error) {
+        console.error("Error al actualizar la compra:", error.message);
+        const statusCode = error.name === 'ValidationError' ? 400 : 500;
+        res.status(statusCode).json({ message: "Error al actualizar la compra.", error: error.message });
+    }
+};
+
+/**
+ * Obtiene una compra específica por ID.
+ */
+export const obtenerCompraPorId = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const compra = await Compra.findById(id)
+            .populate('productos.producto')
+            .populate('proveedor');
+
+        if (!compra) {
+            return res.status(404).json({ message: "Compra no encontrada." });
+        }
+
+        res.status(200).json(compra);
+    } catch (error) {
+        res.status(500).json({ message: "Error al obtener la compra.", error: error.message });
     }
 };

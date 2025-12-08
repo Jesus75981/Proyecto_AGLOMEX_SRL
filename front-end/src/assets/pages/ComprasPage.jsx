@@ -1,4 +1,3 @@
-// front-end/src/assets/pages/ComprasPage.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -57,13 +56,20 @@ const ComprasPage = ({ userRole }) => {
   // Data from API
   const [proveedores, setProveedores] = useState([]);
   const [productos, setProductos] = useState([]);
+  const [materiasPrimas, setMateriasPrimas] = useState([]);
   const [categorias, setCategorias] = useState([]);
+
+
+  // Editing states
+  const [isEditing, setIsEditing] = useState(false);
+  const [compraEditando, setCompraEditando] = useState(null);
 
   // Search & Filtering
   const [busquedaProveedor, setBusquedaProveedor] = useState('');
   const [busquedaProducto, setBusquedaProducto] = useState('');
   const [proveedoresFiltrados, setProveedoresFiltrados] = useState([]);
   const [productosFiltrados, setProductosFiltrados] = useState([]);
+  const [materiasPrimasFiltradas, setMateriasPrimasFiltradas] = useState([]);
   const [mostrarResultadosProveedor, setMostrarResultadosProveedor] = useState(false);
   const [mostrarResultadosProducto, setMostrarResultadosProducto] = useState(false);
 
@@ -104,7 +110,6 @@ const ComprasPage = ({ userRole }) => {
   const [showProductoForm, setShowProductoForm] = useState(false);
 
   // Payment - now checkboxes with amounts
-  const [metodoPagoSeleccionado, setMetodoPagoSeleccionado] = useState([]);
   const [pagos, setPagos] = useState({ Efectivo: 0, Transferencia: 0, Cheque: 0, Credito: 0 });
   const [chequeImage, setChequeImage] = useState(null);
 
@@ -118,6 +123,28 @@ const ComprasPage = ({ userRole }) => {
     nit: '',
     bancos: [{ nombre: '', numeroCuenta: '' }]
   });
+
+  // New product form state
+  const [nuevoProducto, setNuevoProducto] = useState({
+    tipo: 'Materia Prima',
+    nombre: '',
+    codigo: '',
+    categoria: '',
+    nuevaCategoria: '',
+    color: '',
+    marca: '',
+    dimensiones: { alto: '', ancho: '', profundidad: '' },
+    precioCompra: '',
+    precioCompra: '',
+    precioVenta: '',
+    imagen: '' // URL de la imagen subida
+  });
+  
+  const [imagenFile, setImagenFile] = useState(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  // Payment methods options
+  const metodosPagoOptions = ['Efectivo', 'Transferencia', 'Cheque', 'Credito'];
 
   // Funciones para manejar bancos
   const agregarBanco = () => {
@@ -143,23 +170,6 @@ const ComprasPage = ({ userRole }) => {
     }));
   };
 
-  const [nuevoProducto, setNuevoProducto] = useState({
-    nombre: '',
-    categoria: '',
-    nuevaCategoria: '',
-    color: '',
-    marca: '',
-    ubicacion: '',
-    proveedor: '',
-    codigo: '',
-    dimensiones: {
-      alto: '',
-      ancho: '',
-      profundidad: ''
-    }
-  });
-
-  // --- Data Loading ---
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -169,12 +179,14 @@ const ComprasPage = ({ userRole }) => {
 
     const fetchData = async () => {
       try {
-        const [proveedoresData, productosData] = await Promise.all([
+        const [proveedoresData, productosData, materiasPrimasData] = await Promise.all([
           apiFetch('/proveedores'),
-          apiFetch('/productos')
+          apiFetch('/productos'),
+          apiFetch('/materiaPrima')
         ]);
         setProveedores(proveedoresData);
         setProductos(productosData);
+        setMateriasPrimas(materiasPrimasData);
 
         // Extract unique categories from products
         const uniqueCategorias = [...new Set(productosData.map(p => p.categoria))];
@@ -209,18 +221,28 @@ const ComprasPage = ({ userRole }) => {
   }, [busquedaProveedor, proveedores]);
 
   useEffect(() => {
-    if (busquedaProducto) {
-      const filtrados = productos.filter(p =>
-        p.nombre.toLowerCase().includes(busquedaProducto.toLowerCase()) ||
-        p.codigo.toLowerCase().includes(busquedaProducto.toLowerCase())
-      );
-      setProductosFiltrados(filtrados);
-      setMostrarResultadosProducto(true);
+    if (busquedaProducto && busquedaProducto.trim() !== '') {
+      if (compra.tipoCompra === 'Materia Prima') {
+        const filtrados = materiasPrimas.filter(mp =>
+          (mp.nombre && mp.nombre.toLowerCase().includes(busquedaProducto.toLowerCase())) ||
+          (mp.codigo && mp.codigo.toLowerCase().includes(busquedaProducto.toLowerCase()))
+        );
+        setMateriasPrimasFiltradas(filtrados);
+        setMostrarResultadosProducto(true);
+      } else {
+        const filtrados = productos.filter(p =>
+          (p.nombre && p.nombre.toLowerCase().includes(busquedaProducto.toLowerCase())) ||
+          (p.codigo && p.codigo.toLowerCase().includes(busquedaProducto.toLowerCase()))
+        );
+        setProductosFiltrados(filtrados);
+        setMostrarResultadosProducto(true);
+      }
     } else {
       setProductosFiltrados([]);
+      setMateriasPrimasFiltradas([]);
       setMostrarResultadosProducto(false);
     }
-  }, [busquedaProducto, productos]);
+  }, [busquedaProducto, productos, materiasPrimas, compra.tipoCompra]);
 
   // --- Calculations ---
   const totalCompra = compra.productos.reduce((total, item) => total + item.costoTotal, 0);
@@ -230,115 +252,42 @@ const ComprasPage = ({ userRole }) => {
 
   const handleCrearProveedor = async () => {
     if (!nuevoProveedor.nombre || !nuevoProveedor.nit) {
-        alert('Nombre y NIT del proveedor son requeridos.');
-        return;
+      alert('Por favor complete los campos obligatorios: Nombre y NIT');
+      return;
     }
-    // Validación de email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (nuevoProveedor.contacto.email && !emailRegex.test(nuevoProveedor.contacto.email)) {
-        alert('Por favor ingrese un email válido.');
-        return;
-    }
-    // Validación de teléfono (ejemplo: solo números, mínimo 7 dígitos)
-    const phoneRegex = /^\d{7,15}$/;
-    if (nuevoProveedor.contacto.telefono && !phoneRegex.test(nuevoProveedor.contacto.telefono)) {
-        alert('Por favor ingrese un número de teléfono válido (solo números, 7-15 dígitos).');
-        return;
-    }
+
     try {
-        const proveedorCreado = await apiFetch('/proveedores', {
-            method: 'POST',
-            body: JSON.stringify(nuevoProveedor)
-        });
-        setProveedores([...proveedores, proveedorCreado]);
-        setShowProveedorForm(false);
-        setNuevoProveedor({
-          nombre: '',
-          nombreComercial: '',
-          contacto: { telefono: '', email: '' },
-          direccion: '',
-          ubicacion: '',
-          nit: '',
-          bancos: [{ nombre: '', numeroCuenta: '' }]
-        });
-        seleccionarProveedor(proveedorCreado); // Auto-select the new provider
-        alert('Proveedor creado y seleccionado exitosamente.');
+      const nuevoProv = await apiFetch('/proveedores', {
+        method: 'POST',
+        body: JSON.stringify(nuevoProveedor)
+      });
+
+      setProveedores(prev => [...prev, nuevoProv]);
+      setNuevoProveedor({
+        nombre: '',
+        nombreComercial: '',
+        contacto: { telefono: '', email: '' },
+        direccion: '',
+        ubicacion: '',
+        nit: '',
+        bancos: [{ nombre: '', numeroCuenta: '' }]
+      });
+      setShowProveedorForm(false);
+      alert('Proveedor creado exitosamente');
     } catch (error) {
-        console.error("Error creando proveedor:", error);
-        alert(`Error creando proveedor: ${error.message}`);
+      console.error('Error creando proveedor:', error);
+      alert('Error al crear el proveedor: ' + error.message);
     }
   };
 
   const seleccionarProveedor = (proveedor) => {
-    setCompra({
-      ...compra,
+    setCompra(prev => ({
+      ...prev,
       proveedorId: proveedor._id,
       proveedorNombre: proveedor.nombre
-    });
+    }));
     setBusquedaProveedor(proveedor.nombre);
     setMostrarResultadosProveedor(false);
-  };
-
-  const handleCategoriaChange = (e) => {
-    const value = e.target.value;
-    if (value === 'nueva') {
-      setNuevoProducto(prev => ({
-        ...prev,
-        categoria: 'nueva',
-        nuevaCategoria: ''
-      }));
-    } else {
-      setNuevoProducto(prev => ({
-        ...prev,
-        categoria: value,
-        nuevaCategoria: ''
-      }));
-    }
-  };
-
-  const handleCrearProducto = async () => {
-    if (!nuevoProducto.nombre || !nuevoProducto.categoria || !nuevoProducto.color) {
-        alert('Nombre, Categoría y Color son requeridos para el nuevo producto.');
-        return;
-    }
-    if (nuevoProducto.categoria === 'Mesas') {
-        alert('La categoría "Mesas" no es válida. Selecciona "Mesa" en su lugar.');
-        return;
-    }
-
-    // Usar nueva categoría si se especificó
-    const categoriaFinal = nuevoProducto.nuevaCategoria.trim() || nuevoProducto.categoria;
-
-    if (!categoriaFinal) {
-        alert('Debe seleccionar o crear una categoría');
-        return;
-    }
-
-    try {
-        // Filtrar campos vacíos para evitar errores de ObjectId
-        const productoData = { ...nuevoProducto };
-        if (!productoData.proveedor || productoData.proveedor === '') {
-            delete productoData.proveedor;
-        }
-        if (!productoData.marca || productoData.marca === '') {
-            delete productoData.marca;
-        }
-
-        // Usar la categoría final
-        productoData.categoria = categoriaFinal;
-
-        const productoCreado = await apiFetch('/productos', {
-            method: 'POST',
-            body: JSON.stringify(productoData)
-        });
-        setProductos([...productos, productoCreado]);
-        setShowProductoForm(false);
-        setNuevoProducto({ nombre: '', categoria: '', nuevaCategoria: '', color: '', marca: '', ubicacion: '', proveedor: '', codigo: '', dimensiones: { alto: '', ancho: '', profundidad: '' } });
-        alert('Producto creado exitosamente.');
-    } catch (error) {
-        console.error("Error creando producto:", error);
-        alert(`Error creando producto: ${error.message}`);
-    }
   };
 
   const seleccionarProducto = (producto) => {
@@ -346,7 +295,7 @@ const ComprasPage = ({ userRole }) => {
       productoId: producto._id,
       productoNombre: producto.nombre,
       cantidad: 1,
-      costoUnitario: producto.precioCompra || 0 // Use precioCompra from DB
+      costoUnitario: 0
     });
     setBusquedaProducto(producto.nombre);
     setMostrarResultadosProducto(false);
@@ -354,142 +303,245 @@ const ComprasPage = ({ userRole }) => {
 
   const agregarProductoACompra = () => {
     if (!productoTemporal.productoId || productoTemporal.cantidad <= 0 || productoTemporal.costoUnitario <= 0) {
-        alert('Seleccione un producto y asegúrese que la cantidad y el costo son mayores a 0.');
-        return;
+      alert('Por favor complete todos los campos correctamente');
+      return;
     }
 
-    const productoSeleccionado = productos.find(p => p._id === productoTemporal.productoId);
-    if (!productoSeleccionado) return;
-
-    const productoCompra = {
-      _id: productoSeleccionado._id,
-      nombre: productoSeleccionado.nombre,
-      codigo: productoSeleccionado.codigo,
-      color: productoSeleccionado.color,
-      cantidad: productoTemporal.cantidad,
-      costoUnitario: productoTemporal.costoUnitario,
-      costoTotal: productoTemporal.cantidad * productoTemporal.costoUnitario
+    const costoTotal = productoTemporal.cantidad * productoTemporal.costoUnitario;
+    const nuevoProductoCompra = {
+      ...productoTemporal,
+      costoTotal
     };
 
-    setCompra({
-      ...compra,
-      productos: [...compra.productos, productoCompra]
-    });
+    setCompra(prev => ({
+      ...prev,
+      productos: [...prev.productos, nuevoProductoCompra]
+    }));
 
-    // Reset temporary product form
-    setProductoTemporal({ productoId: '', productoNombre: '', cantidad: 1, costoUnitario: 0 });
+    // Reset temporal product
+    setProductoTemporal({
+      productoId: '',
+      productoNombre: '',
+      cantidad: 1,
+      costoUnitario: 0
+    });
     setBusquedaProducto('');
   };
 
-  const toggleMetodoPago = (metodo) => {
-    const nuevosMetodos = compra.metodoPago.includes(metodo)
-      ? compra.metodoPago.filter(m => m !== metodo)
-      : [...compra.metodoPago, metodo];
-    setCompra({ ...compra, metodoPago: nuevosMetodos });
-  };
-
-  const confirmarCompra = async () => {
-      if (!compra.proveedorId || compra.productos.length === 0) {
-          alert('Debe seleccionar un proveedor y agregar al menos un producto.');
-          return;
-      }
-
-      // Validación para pago con cheque: verificar imagen y monto
-      if (pagos.Cheque > 0) {
-          if (!chequeImage) {
-              alert('Debe subir una imagen del cheque para pagos con cheque.');
-              return;
-          }
-          // Aquí podrías agregar lógica para verificar el monto en la imagen, pero por ahora solo validamos que esté presente
-          // En un futuro, integrar OCR para leer el monto del cheque
-      }
-
-      const compraData = {
-          numCompra: compra.numeroCompra,
-          fecha: compra.fecha,
-          tipoCompra: compra.tipoCompra,
-          proveedor: compra.proveedorId,
-          productos: compra.productos.map(p => ({
-              producto: p._id,
-              cantidad: p.cantidad,
-              precioUnitario: p.costoUnitario,
-              nombreProducto: p.nombre,
-              colorProducto: p.color,
-              categoriaProducto: p.categoria,
-              dimensiones: { alto: 0, ancho: 0, profundidad: 0 }, // Default dimensions
-              imagenProducto: '' // Default empty image
-          })),
-          metodosPago: Object.entries(pagos)
-    .filter(([tipo, valor]) => valor > 0 && tipo !== 'Credito') // Excluir 'Credito'
-    .map(([tipo, monto]) => ({
-        tipo,
-        monto,
-        referencia: tipo === 'Cheque' ? 'REF-CHQ-' + Date.now() : '',
-        cuenta: ''
-    })),
-          totalCompra: totalCompra,
-          credito: pagos.Credito || 0,
-          estado: pagos.Credito > 0 ? 'Pendiente' : 'Pagada',
-          observaciones: compra.observaciones,
-          chequeImage: chequeImage ? chequeImage.name : null // Solo el nombre por ahora, en producción subir a servidor
-      };
-
-      try {
-          const compraCreada = await apiFetch('/compras', {
-              method: 'POST',
-              body: JSON.stringify(compraData)
-          });
-
-          if (pagos.Credito > 0) {
-              alert(`Compra registrada exitosamente. Total: Bs. ${totalCompra.toFixed(2)}. Estado: PENDIENTE DE PAGO. Redirigiendo al módulo de inventario para su verificación.`);
-              navigate('/inventario');
-          } else {
-              alert(`Compra registrada exitosamente. Total: Bs. ${totalCompra.toFixed(2)}. Redirigiendo al módulo de inventario para verificar.`);
-              navigate('/inventario');
-          }
-
-          // Reset form
-          setCompra({
-              fecha: new Date().toISOString().split('T')[0],
-              numeroCompra: generarNumeroCompra(), // Generate new automatic number
-              tipoCompra: 'Materia Prima', // Reset to default
-              proveedorId: '',
-              proveedorNombre: '',
-              observaciones: '',
-              numeroFactura: '',
-              metodoPago: [],
-              productos: [],
-              anticipos: []
-          });
-          setPagos({ Efectivo: 0, Transferencia: 0, Cheque: 0, Credito: 0 });
-          setChequeImage(null);
-      } catch (error) {
-          console.error("Error al confirmar la compra:", error);
-          alert(`Error al registrar la compra: ${error.message}`);
-      }
+  const handleCategoriaChange = (e) => {
+    const value = e.target.value;
+    setNuevoProducto(prev => ({
+      ...prev,
+      categoria: value,
+      nuevaCategoria: value === 'nueva' ? '' : prev.nuevaCategoria
+    }));
   };
 
   const handlePagoChange = (metodo, valor) => {
-    setPagos(prevPagos => ({
-      ...prevPagos,
+    setPagos(prev => ({
+      ...prev,
       [metodo]: valor
     }));
   };
 
-  const metodosPago = ['Efectivo', 'Transferencia', 'Cheque', 'Crédito'];
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-  const metodosPagoOptions = ['Efectivo', 'Transferencia', 'Cheque', 'Credito'];
+    setImagenFile(file);
+    setUploadingImage(true);
+
+    const formData = new FormData();
+    formData.append('image', file);
+
+    try {
+        // Usar fetch directamente para FormData ya que apiFetch está configurado para JSON
+        const token = getAuthToken();
+        const response = await fetch(`${API_URL}/upload`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            },
+            body: formData
+        });
+
+        if (!response.ok) throw new Error('Error al subir imagen');
+
+        const data = await response.json();
+        setNuevoProducto(prev => ({ ...prev, imagen: data.imageUrl }));
+    } catch (error) {
+        console.error('Error uploading image:', error);
+        alert('Error al subir la imagen');
+        setImagenFile(null);
+    } finally {
+        setUploadingImage(false);
+    }
+  };
+
+  const handleCrearProducto = async () => {
+    if (!nuevoProducto.nombre) {
+      alert('El nombre es obligatorio');
+      return;
+    }
+
+    if (nuevoProducto.tipo === 'Producto Terminado' && (!nuevoProducto.categoria || (nuevoProducto.categoria === 'nueva' && !nuevoProducto.nuevaCategoria) || !nuevoProducto.color)) {
+      alert('Complete todos los campos obligatorios para el producto terminado');
+      return;
+    }
+
+    try {
+      let endpoint, payload;
+
+      if (nuevoProducto.tipo === 'Materia Prima') {
+        endpoint = '/materiaPrima';
+        payload = {
+          nombre: nuevoProducto.nombre,
+          precioCompra: parseFloat(nuevoProducto.precioCompra) || 0,
+          precioVenta: parseFloat(nuevoProducto.precioVenta) || 0
+        };
+      } else {
+        endpoint = '/productos';
+        payload = {
+          nombre: nuevoProducto.nombre,
+          codigo: nuevoProducto.codigo,
+          categoria: nuevoProducto.categoria === 'nueva' ? nuevoProducto.nuevaCategoria : nuevoProducto.categoria,
+          color: nuevoProducto.color,
+          marca: nuevoProducto.marca,
+          dimensiones: {
+            alto: parseFloat(nuevoProducto.dimensiones.alto) || 0,
+            ancho: parseFloat(nuevoProducto.dimensiones.ancho) || 0,
+            profundidad: parseFloat(nuevoProducto.dimensiones.profundidad) || 0
+          },
+          imagen: nuevoProducto.imagen // Enviar URL de la imagen
+        };
+
+        // Add new category if created
+        if (nuevoProducto.categoria === 'nueva' && nuevoProducto.nuevaCategoria) {
+          setCategorias(prev => [...prev, nuevoProducto.nuevaCategoria]);
+        }
+      }
+
+      const nuevoItem = await apiFetch(endpoint, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+
+      // Update the appropriate list
+      if (nuevoProducto.tipo === 'Materia Prima') {
+        setMateriasPrimas(prev => [...prev, nuevoItem]);
+      } else {
+        setProductos(prev => [...prev, nuevoItem]);
+      }
+
+      // Reset form
+      setNuevoProducto({
+        tipo: 'Materia Prima',
+        nombre: '',
+        codigo: '',
+        categoria: '',
+        nuevaCategoria: '',
+        color: '',
+        marca: '',
+        dimensiones: { alto: '', ancho: '', profundidad: '' },
+        precioCompra: '',
+        precioCompra: '',
+        precioVenta: '',
+        imagen: ''
+      });
+      setImagenFile(null);
+      setShowProductoForm(false);
+      alert(`${nuevoProducto.tipo} creado exitosamente. ${nuevoProducto.imagen ? 'La generación del modelo 3D ha iniciado.' : ''}`);
+    } catch (error) {
+      console.error('Error creando producto:', error);
+      alert('Error al crear el item: ' + error.message);
+    }
+  };
+
+  const confirmarCompra = async () => {
+    if (compra.productos.length === 0) {
+      alert('Debe agregar al menos un producto a la compra');
+      return;
+    }
+
+    if (!compra.proveedorId) {
+      alert('Debe seleccionar un proveedor');
+      return;
+    }
+
+    if (totalPagado > totalCompra) {
+      alert('El total pagado no puede ser mayor al total de la compra');
+      return;
+    }
+
+    try {
+      // Map products to backend expected format
+      const productosMapped = compra.productos.map(p => ({
+        producto: p.productoId,
+        nombreProducto: p.productoNombre,
+        cantidad: p.cantidad,
+        precioUnitario: p.costoUnitario,
+        costoTotal: p.costoTotal,
+        onModel: compra.tipoCompra === 'Materia Prima' ? 'MateriaPrima' : 'ProductoTienda'
+      }));
+
+      // Map payment methods to backend expected format
+      const metodosPagoMapped = Object.entries(pagos).filter(([_, valor]) => valor > 0).map(([metodo, valor]) => ({
+        tipo: metodo === 'Credito' ? 'Crédito' : metodo,
+        monto: valor
+      }));
+
+      const compraData = {
+        tipoCompra: compra.tipoCompra,
+        proveedor: compra.proveedorId,
+        productos: productosMapped,
+        totalCompra,
+        metodosPago: metodosPagoMapped,
+        observaciones: compra.observaciones
+      };
+
+      const nuevaCompra = await apiFetch('/compras', {
+        method: 'POST',
+        body: JSON.stringify(compraData)
+      });
+
+      alert('Compra registrada exitosamente');
+
+      // Reset form
+      setCompra({
+        fecha: new Date().toISOString().split('T')[0],
+        numeroCompra: generarNumeroCompra(),
+        tipoCompra: 'Materia Prima',
+        proveedorId: '',
+        proveedorNombre: '',
+        observaciones: '',
+        numeroFactura: '',
+        metodoPago: [],
+        productos: [],
+        anticipos: []
+      });
+      setPagos({ Efectivo: 0, Transferencia: 0, Cheque: 0, Credito: 0 });
+      setChequeImage(null);
+      setBusquedaProveedor('');
+      setBusquedaProducto('');
+
+    } catch (error) {
+      console.error('Error confirmando compra:', error);
+      alert('Error al registrar la compra: ' + error.message);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navbar */}
-      <nav className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex justify-between items-center">
-            <button onClick={volverAlHome} className="flex items-center space-x-2 bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition">
-              <span>←</span> <span>Volver al Home</span>
-            </button>
+      <nav className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
             <h1 className="text-2xl font-bold text-gray-800">Módulo de Compras</h1>
+            <button
+              onClick={volverAlHome}
+              className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition"
+            >
+              Volver al Home
+            </button>
           </div>
         </div>
       </nav>
@@ -506,148 +558,94 @@ const ComprasPage = ({ userRole }) => {
           <div className="space-y-6">
             <div className="bg-white rounded-xl shadow-md p-6">
               <h2 className="text-2xl font-semibold text-gray-800 mb-6 border-b pb-4">Información General de la Compra</h2>
-
               {/* Basic Info */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Fecha</label>
-                  <input type="date" value={compra.fecha} onChange={(e) => setCompra({...compra, fecha: e.target.value})} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Número de Compra</label>
+                  <input type="text" value={compra.numeroCompra} readOnly className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Número de Compra (Automático)</label>
-                  <input type="text" value={compra.numeroCompra} readOnly className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Compra</label>
-                  <select value={compra.tipoCompra} onChange={(e) => setCompra({...compra, tipoCompra: e.target.value})} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Compra</label>
+                  <select
+                    value={compra.tipoCompra}
+                    onChange={(e) => setCompra({ ...compra, tipoCompra: e.target.value, productos: [] })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
                     <option value="Materia Prima">Materia Prima</option>
                     <option value="Producto Terminado">Producto Terminado</option>
                   </select>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Número de Factura</label>
-                  <input type="text" placeholder="Ingrese número de factura" value={compra.numeroFactura} onChange={(e) => setCompra({...compra, numeroFactura: e.target.value})} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" />
-                </div>
-              </div>
-
-              {/* Supplier */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Proveedor</label>
-                <div className="flex space-x-3">
-                  <div className="flex-1 relative">
-                    <input type="text" placeholder="Buscar proveedor por nombre o NIT..." value={busquedaProveedor} onChange={(e) => setBusquedaProveedor(e.target.value)} onFocus={() => busquedaProveedor && setMostrarResultadosProveedor(true)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" />
-                    {mostrarResultadosProveedor && (
-                      <div className="absolute z-20 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                        {proveedoresFiltrados.length > 0 ? proveedoresFiltrados.map(p => (
-                          <div key={p._id} onClick={() => seleccionarProveedor(p)} className="px-4 py-2 hover:bg-purple-50 cursor-pointer">
-                            <div className="font-medium text-gray-800">{p.nombre}</div>
-                            <div className="text-sm text-gray-600">NIT: {p.nit}</div>
-                          </div>
-                        )) : <div className="px-4 py-3 text-gray-500 text-center">No se encontraron proveedores</div>}
-                      </div>
-                    )}
+                <div className="relative">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Proveedor</label>
+                  <div className="flex space-x-2">
+                    <input
+                      type="text"
+                      placeholder="Buscar proveedor..."
+                      value={busquedaProveedor}
+                      onChange={(e) => setBusquedaProveedor(e.target.value)}
+                      onFocus={() => busquedaProveedor && setMostrarResultadosProveedor(true)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                    <button
+                      onClick={() => setShowProveedorForm(!showProveedorForm)}
+                      className="bg-green-500 text-white px-3 py-2 rounded-lg hover:bg-green-600 transition"
+                      title="Nuevo Proveedor"
+                    >
+                      +
+                    </button>
                   </div>
-                  <button onClick={() => setShowProveedorForm(!showProveedorForm)} className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition whitespace-nowrap">
-                    {showProveedorForm ? 'Cancelar' : '+ Crear Proveedor'}
-                  </button>
-                </div>
-                {compra.proveedorNombre && (
-                  <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded">
-                    <span className="text-sm text-green-800">✅ Proveedor seleccionado: <strong>{compra.proveedorNombre}</strong></span>
-                  </div>
-                )}
-              </div>
-
-              {/* New Supplier Form */}
-              {showProveedorForm && (
-                <div className="mb-6 p-4 bg-green-50 rounded-lg border border-green-200">
-                  <h3 className="text-lg font-semibold text-green-800 mb-4">Nuevo Proveedor</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input type="text" placeholder="Nombre del proveedor" value={nuevoProveedor.nombre} onChange={(e) => setNuevoProveedor({...nuevoProveedor, nombre: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
-                    <input type="text" placeholder="Nombre comercial" value={nuevoProveedor.nombreComercial} onChange={(e) => setNuevoProveedor({...nuevoProveedor, nombreComercial: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
-                    <input type="text" placeholder="NIT" value={nuevoProveedor.nit} onChange={(e) => setNuevoProveedor({...nuevoProveedor, nit: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
-                    <input type="text" placeholder="Ubicación" value={nuevoProveedor.ubicacion} onChange={(e) => setNuevoProveedor({...nuevoProveedor, ubicacion: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
-                    <input type="text" placeholder="Teléfono" value={nuevoProveedor.contacto.telefono} onChange={(e) => setNuevoProveedor({...nuevoProveedor, contacto: {...nuevoProveedor.contacto, telefono: e.target.value}})} className="px-4 py-2 border border-gray-300 rounded-lg" />
-                    <input type="email" placeholder="Email" value={nuevoProveedor.contacto.email} onChange={(e) => setNuevoProveedor({...nuevoProveedor, contacto: {...nuevoProveedor.contacto, email: e.target.value}})} className="px-4 py-2 border border-gray-300 rounded-lg" />
-                    <div className="md:col-span-2">
-                      <input type="text" placeholder="Dirección" value={nuevoProveedor.direccion} onChange={(e) => setNuevoProveedor({...nuevoProveedor, direccion: e.target.value})} className="w-full px-4 py-2 border border-gray-300 rounded-lg" />
-                    </div>
-
-                    {/* Información Bancaria */}
-                    <div className="md:col-span-2">
-                      <h4 className="text-md font-semibold text-gray-800 mb-3">Información Bancaria</h4>
-                      {nuevoProveedor.bancos.map((banco, index) => (
-                        <div key={index} className="mb-4 p-3 bg-gray-50 rounded-lg border">
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-2">
-                            <input
-                              type="text"
-                              placeholder="Nombre del banco"
-                              value={banco.nombre}
-                              onChange={(e) => actualizarBanco(index, 'nombre', e.target.value)}
-                              className="px-3 py-2 border border-gray-300 rounded-lg"
-                            />
-                            <input
-                              type="text"
-                              placeholder="Número de cuenta"
-                              value={banco.numeroCuenta}
-                              onChange={(e) => actualizarBanco(index, 'numeroCuenta', e.target.value)}
-                              className="px-3 py-2 border border-gray-300 rounded-lg"
-                            />
-                            <div className="flex items-center space-x-2">
-                              {nuevoProveedor.bancos.length > 1 && (
-                                <button
-                                  type="button"
-                                  onClick={() => eliminarBanco(index)}
-                                  className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm"
-                                >
-                                  Eliminar
-                                </button>
-                              )}
-                            </div>
-                          </div>
+                  {mostrarResultadosProveedor && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      {proveedoresFiltrados.length > 0 ? proveedoresFiltrados.map(p => (
+                        <div
+                          key={p._id}
+                          onClick={() => seleccionarProveedor(p)}
+                          className="px-4 py-2 hover:bg-purple-50 cursor-pointer transition"
+                        >
+                          <div className="font-medium text-gray-800">{p.nombre}</div>
+                          <div className="text-sm text-gray-600">NIT: {p.nit}</div>
                         </div>
-                      ))}
-                      <button
-                        type="button"
-                        onClick={agregarBanco}
-                        className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm"
-                      >
-                        + Agregar Banco
-                      </button>
+                      )) : (
+                        <div className="px-4 py-3 text-gray-500 text-center">No se encontraron proveedores</div>
+                      )}
                     </div>
-
-                    <div className="md:col-span-2 flex space-x-4">
-                      <button onClick={handleCrearProveedor} className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">Guardar</button>
-                    </div>
-                  </div>
+                  )}
                 </div>
-              )}
-
-              {/* Observations */}
-              <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Observaciones</label>
-                  <textarea value={compra.observaciones} onChange={(e) => setCompra({...compra, observaciones: e.target.value})} placeholder="Ej: El proveedor enviará la mercadería una vez se cancele el saldo." rows="3" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" />
               </div>
 
-              {/* --- Products Section --- */}
-              <div className="border-t pt-6">
-                 <h2 className="text-2xl font-semibold text-gray-800 mb-6">Productos de la Compra</h2>
+               {/* Formulario Nuevo Proveedor */}
+               {showProveedorForm && (
+                <div className="mb-6 p-4 bg-green-50 rounded-lg border border-green-200">
+                    <h3 className="text-lg font-semibold text-green-800 mb-4">Registrar Nuevo Proveedor</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input type="text" placeholder="Nombre Razón Social *" value={nuevoProveedor.nombre} onChange={(e) => setNuevoProveedor({...nuevoProveedor, nombre: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                        <input type="text" placeholder="NIT/CI *" value={nuevoProveedor.nit} onChange={(e) => setNuevoProveedor({...nuevoProveedor, nit: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                        <input type="text" placeholder="Nombre Comercial" value={nuevoProveedor.nombreComercial} onChange={(e) => setNuevoProveedor({...nuevoProveedor, nombreComercial: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                        <input type="text" placeholder="Dirección" value={nuevoProveedor.direccion} onChange={(e) => setNuevoProveedor({...nuevoProveedor, direccion: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                        <input type="text" placeholder="Teléfono" value={nuevoProveedor.contacto.telefono} onChange={(e) => setNuevoProveedor({...nuevoProveedor, contacto: {...nuevoProveedor.contacto, telefono: e.target.value}})} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                        <input type="email" placeholder="Email" value={nuevoProveedor.contacto.email} onChange={(e) => setNuevoProveedor({...nuevoProveedor, contacto: {...nuevoProveedor.contacto, email: e.target.value}})} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                        <div className="md:col-span-2">
+                            <button onClick={handleCrearProveedor} className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 font-semibold">Guardar Proveedor</button>
+                        </div>
+                    </div>
+                </div>
+               )}
 
-                {/* Search and Add Product */}
+              {/* Search and Add Product */}
                 <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
                   <h3 className="text-lg font-semibold text-blue-800 mb-4">Buscar y Agregar Producto</h3>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 items-end">
                     <div className="md:col-span-2 relative">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Buscar Producto</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Buscar {compra.tipoCompra === 'Materia Prima' ? 'Materia Prima' : 'Producto'}</label>
                       <input type="text" placeholder="Buscar por nombre o código..." value={busquedaProducto} onChange={(e) => setBusquedaProducto(e.target.value)} onFocus={() => busquedaProducto && setMostrarResultadosProducto(true)} className="w-full px-4 py-2 border border-gray-300 rounded-lg" />
                        {mostrarResultadosProducto && (
                         <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                          {productosFiltrados.length > 0 ? productosFiltrados.map(p => (
+                          {((compra.tipoCompra === 'Materia Prima' ? materiasPrimasFiltradas : productosFiltrados).length > 0) ? (compra.tipoCompra === 'Materia Prima' ? materiasPrimasFiltradas : productosFiltrados).map(p => (
                             <div key={p._id} onClick={() => seleccionarProducto(p)} className="px-4 py-2 hover:bg-blue-50 cursor-pointer">
                               <div className="font-medium text-gray-800">{p.nombre} ({p.codigo})</div>
-                              <div className="text-sm text-gray-600">Color: {p.color} - Cat: {p.categoria}</div>
+                              <div className="text-sm text-gray-600">{compra.tipoCompra === 'Materia Prima' ? 'Tipo: Materia Prima' : 'Color: ' + p.color + ' - Cat: ' + p.categoria}</div>
                             </div>
-                          )) : <div className="px-4 py-3 text-gray-500 text-center">No se encontraron productos</div>}
+                          )) : <div className="px-4 py-3 text-gray-500 text-center">No se encontraron {compra.tipoCompra === 'Materia Prima' ? 'materias primas' : 'productos'}</div>}
                         </div>
                       )}
                     </div>
@@ -670,7 +668,7 @@ const ComprasPage = ({ userRole }) => {
                       Agregar Producto a la Compra
                     </button>
                     <button onClick={() => setShowProductoForm(!showProductoForm)} className="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700">
-                      {showProductoForm ? 'Cancelar' : '+ Crear Nuevo Producto'}
+                      {showProductoForm ? 'Cancelar' : '+ Crear Nuevo Item'}
                     </button>
                   </div>
                 </div>
@@ -678,70 +676,106 @@ const ComprasPage = ({ userRole }) => {
                 {/* New Product Form */}
                 {showProductoForm && (
                   <div className="mb-6 p-4 bg-teal-50 rounded-lg border border-teal-200">
-                    <h3 className="text-lg font-semibold text-teal-800 mb-4">Crear Nuevo Producto</h3>
+                    <h3 className="text-lg font-semibold text-teal-800 mb-4">Registrar Nuevo Item</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <input type="text" placeholder="Nombre del producto" value={nuevoProducto.nombre} onChange={(e) => setNuevoProducto({...nuevoProducto, nombre: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
-                      <input type="text" placeholder="Código del producto" value={nuevoProducto.codigo} onChange={(e) => setNuevoProducto({...nuevoProducto, codigo: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
-
-                      <select value={nuevoProducto.categoria} onChange={handleCategoriaChange} className="px-4 py-2 border border-gray-300 rounded-lg">
-                        <option value="">-- Seleccionar Categoría --</option>
-                        {categorias.map(cat => (
-                          <option key={cat} value={cat}>{cat}</option>
-                        ))}
-                        <option value="nueva">Crear nueva categoría</option>
-                      </select>
-
-                      {nuevoProducto.categoria === 'nueva' && (
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Nueva Categoría *</label>
-                          <input
-                            type="text"
-                            name="nuevaCategoria"
-                            value={nuevoProducto.nuevaCategoria}
-                            onChange={(e) => setNuevoProducto({...nuevoProducto, nuevaCategoria: e.target.value})}
-                            placeholder="Ingrese nueva categoría"
-                            required
-                            className="w-full p-2 border border-gray-300 rounded-md"
-                          />
+                       {/* Selector de Tipo */}
+                       <div className="md:col-span-2 mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Item</label>
+                            <div className="flex space-x-4">
+                                <label className="inline-flex items-center">
+                                    <input
+                                        type="radio"
+                                        className="form-radio text-purple-600"
+                                        name="tipoProducto"
+                                        value="Materia Prima"
+                                        checked={nuevoProducto.tipo === 'Materia Prima'}
+                                        onChange={(e) => setNuevoProducto({...nuevoProducto, tipo: e.target.value})}
+                                    />
+                                    <span className="ml-2">Materia Prima</span>
+                                </label>
+                                <label className="inline-flex items-center">
+                                    <input
+                                        type="radio"
+                                        className="form-radio text-purple-600"
+                                        name="tipoProducto"
+                                        value="Producto Terminado"
+                                        checked={nuevoProducto.tipo === 'Producto Terminado'}
+                                        onChange={(e) => setNuevoProducto({...nuevoProducto, tipo: e.target.value})}
+                                    />
+                                    <span className="ml-2">Producto Terminado</span>
+                                </label>
+                            </div>
                         </div>
+
+                      <input type="text" placeholder="Nombre *" value={nuevoProducto.nombre} onChange={(e) => setNuevoProducto({...nuevoProducto, nombre: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                      
+                      {nuevoProducto.tipo === 'Producto Terminado' && (
+                        <>
+                            <input type="text" placeholder="Código" value={nuevoProducto.codigo} onChange={(e) => setNuevoProducto({...nuevoProducto, codigo: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                            <select value={nuevoProducto.categoria} onChange={handleCategoriaChange} className="px-4 py-2 border border-gray-300 rounded-lg">
+                                <option value="">Seleccionar Categoría *</option>
+                                {categorias.map(c => <option key={c} value={c}>{c}</option>)}
+                                <option value="nueva">+ Nueva Categoría</option>
+                            </select>
+                            {nuevoProducto.categoria === 'nueva' && (
+                                <input type="text" placeholder="Nombre Nueva Categoría" value={nuevoProducto.nuevaCategoria} onChange={(e) => setNuevoProducto({...nuevoProducto, nuevaCategoria: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg bg-teal-100" />
+                            )}
+                            <input type="text" placeholder="Color *" value={nuevoProducto.color} onChange={(e) => setNuevoProducto({...nuevoProducto, color: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                            <input type="text" placeholder="Marca" value={nuevoProducto.marca} onChange={(e) => setNuevoProducto({...nuevoProducto, marca: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                            <div className="grid grid-cols-3 gap-2">
+                                <input type="number" placeholder="Alto" value={nuevoProducto.dimensiones.alto} onChange={(e) => setNuevoProducto({...nuevoProducto, dimensiones: {...nuevoProducto.dimensiones, alto: e.target.value}})} className="px-2 py-2 border border-gray-300 rounded-lg" />
+                                <input type="number" placeholder="Ancho" value={nuevoProducto.dimensiones.ancho} onChange={(e) => setNuevoProducto({...nuevoProducto, dimensiones: {...nuevoProducto.dimensiones, ancho: e.target.value}})} className="px-2 py-2 border border-gray-300 rounded-lg" />
+                                <input type="number" placeholder="Prof." value={nuevoProducto.dimensiones.profundidad} onChange={(e) => setNuevoProducto({...nuevoProducto, dimensiones: {...nuevoProducto.dimensiones, profundidad: e.target.value}})} className="px-2 py-2 border border-gray-300 rounded-lg" />
+                            </div>
+                            
+                            <div className="md:col-span-2 mt-2">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Imagen del Producto (para generación 3D)</label>
+                                <input 
+                                    type="file" 
+                                    accept="image/*" 
+                                    onChange={handleImageUpload}
+                                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100"
+                                />
+                                {uploadingImage && <p className="text-sm text-blue-600 mt-1">Subiendo imagen...</p>}
+                                {nuevoProducto.imagen && <p className="text-sm text-green-600 mt-1">✅ Imagen subida correctamente</p>}
+                            </div>
+                        </>
                       )}
 
-                      <input type="text" placeholder="Color" value={nuevoProducto.color} onChange={(e) => setNuevoProducto({...nuevoProducto, color: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
-                      <input type="text" placeholder="Marca" value={nuevoProducto.marca} onChange={(e) => setNuevoProducto({...nuevoProducto, marca: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                      {nuevoProducto.tipo === 'Materia Prima' && (
+                          <>
+                            <input type="number" placeholder="Precio Compra" value={nuevoProducto.precioCompra} onChange={(e) => setNuevoProducto({...nuevoProducto, precioCompra: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                            <input type="number" placeholder="Precio Venta" value={nuevoProducto.precioVenta} onChange={(e) => setNuevoProducto({...nuevoProducto, precioVenta: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                          </>
+                      )}
 
-                      <input type="number" step="0.01" placeholder="Alto (cm)" value={nuevoProducto.dimensiones.alto} onChange={(e) => setNuevoProducto({...nuevoProducto, dimensiones: {...nuevoProducto.dimensiones, alto: e.target.value}})} className="px-4 py-2 border border-gray-300 rounded-lg" />
-                      <input type="number" step="0.01" placeholder="Ancho (cm)" value={nuevoProducto.dimensiones.ancho} onChange={(e) => setNuevoProducto({...nuevoProducto, dimensiones: {...nuevoProducto.dimensiones, ancho: e.target.value}})} className="px-4 py-2 border border-gray-300 rounded-lg" />
-                      <input type="number" step="0.01" placeholder="Profundidad (cm)" value={nuevoProducto.dimensiones.profundidad} onChange={(e) => setNuevoProducto({...nuevoProducto, dimensiones: {...nuevoProducto.dimensiones, profundidad: e.target.value}})} className="px-4 py-2 border border-gray-300 rounded-lg" />
-
-                      <input type="text" placeholder="Ubicación" value={nuevoProducto.ubicacion} onChange={(e) => setNuevoProducto({...nuevoProducto, ubicacion: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg" />
-                      <select value={nuevoProducto.proveedor} onChange={(e) => setNuevoProducto({...nuevoProducto, proveedor: e.target.value})} className="px-4 py-2 border border-gray-300 rounded-lg">
-                          <option value="">-- Seleccionar Proveedor --</option>
-                          {proveedores.map(p => <option key={p._id} value={p._id}>{p.nombre}</option>)}
-                      </select>
-                      <div className="md:col-span-2 flex space-x-4">
-                        <button onClick={handleCrearProducto} className="bg-teal-600 text-white px-6 py-2 rounded-lg hover:bg-teal-700">Guardar Producto</button>
+                      <div className="md:col-span-2">
+                        <button onClick={handleCrearProducto} className="w-full bg-teal-600 text-white py-2 rounded-lg hover:bg-teal-700 font-semibold">
+                            {nuevoProducto.tipo === 'Materia Prima' ? 'Guardar Materia Prima' : 'Guardar Producto Terminado'}
+                        </button>
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* Products in Purchase Table */}
+                {/* Products Table */}
                 <div className="overflow-x-auto">
-                    <table className="min-w-full bg-white">
-                        <thead className="bg-gray-100">
-                            <tr>
-                                <th className="text-left py-3 px-4">Producto</th>
-                                <th className="text-left py-3 px-4">Código</th>
-                                <th className="text-right py-3 px-4">Cantidad</th>
-                                <th className="text-right py-3 px-4">Costo Unit.</th>
-                                <th className="text-right py-3 px-4">Costo Total</th>
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="bg-gray-100 text-gray-700">
+                                <th className="py-3 px-4 font-semibold">Producto</th>
+                                <th className="py-3 px-4 font-semibold text-right">Cantidad</th>
+                                <th className="py-3 px-4 font-semibold text-right">Costo Unit.</th>
+                                <th className="py-3 px-4 font-semibold text-right">Total</th>
                             </tr>
                         </thead>
                         <tbody>
                             {compra.productos.map((p, index) => (
-                                <tr key={index} className="border-b">
-                                    <td className="py-3 px-4">{p.nombre}</td>
-                                    <td className="py-3 px-4">{p.codigo}</td>
+                                <tr key={index} className="border-b hover:bg-gray-50">
+                                    <td className="py-3 px-4">
+                                        <div className="font-medium text-gray-800">{p.productoNombre}</div>
+                                        <div className="text-sm text-gray-500">{p.codigo || 'N/A'}</div>
+                                    </td>
                                     <td className="text-right py-3 px-4">{p.cantidad}</td>
                                     <td className="text-right py-3 px-4">Bs. {p.costoUnitario.toFixed(2)}</td>
                                     <td className="text-right py-3 px-4">Bs. {p.costoTotal.toFixed(2)}</td>
@@ -826,8 +860,8 @@ const ComprasPage = ({ userRole }) => {
           </div>
         </div>
       </div>
-    </div>
-  );
+  ); 
+
 };
 
 export default ComprasPage;

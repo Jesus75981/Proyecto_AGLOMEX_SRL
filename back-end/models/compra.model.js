@@ -19,34 +19,41 @@ const pagoSchema = new mongoose.Schema({
         default: Date.now
     }
 }, { _id: false });
+
 const compraSchema = new mongoose.Schema({
-  numCompra: {
-    type: String,
-    required: true,
-    unique: true
-  },
-  fecha: {
-    type: Date,
-    default: Date.now
-  },
-  
-  tipoCompra: {
-    type: String,
-    enum: ["Materia Prima", "Producto Terminado"],
-    required: true,
-  },
-  proveedor: {
+    numCompra: {
+        type: String,
+        required: true,
+        unique: true
+    },
+    fecha: {
+        type: Date,
+        default: Date.now
+    },
+
+    tipoCompra: {
+        type: String,
+        enum: ["Materia Prima", "Producto Terminado"],
+        required: true,
+    },
+    proveedor: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Proveedor", // Solo un proveedor por compra
         required: true,
     },
     productos: [ // <--- ¡ESTE ES EL ARRAY CLAVE!
         {
-            producto: { 
+            producto: {
                 type: mongoose.Schema.Types.ObjectId,
-                ref: "ProductoTienda", 
+                refPath: 'productos.onModel', // Referencia dinámica
                 required: true,
             },
+            onModel: {
+                type: String,
+                required: true,
+                enum: ['MateriaPrima', 'ProductoTienda']
+            },
+            cantidad: { type: Number, required: true },
             precioUnitario: { type: Number, required: true },
             codigoProveedor: String
         },
@@ -59,24 +66,24 @@ const compraSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
-   metodosPago: {
+    metodosPago: {
         type: [pagoSchema], // Un array de los pagos realizados
         required: true,
         validate: { // Validación personalizada para asegurar que el array no esté vacío
-            validator: function(v) {
+            validator: function (v) {
                 return v.length > 0;
             },
             message: 'Debe especificar al menos un método de pago.'
         }
     },
-    
+
     estado: {
         type: String,
-        enum: ["Pendiente", "Pagada", "Parcialmente Pagada", "Cancelada"]
+        enum: ["Pendiente", "Pagada", "Parcialmente Pagada", "Cancelada"],
+        default: "Pagada"
     },
     observaciones: String
 }, { timestamps: true });
 
 
 export default mongoose.model("Compra", compraSchema);
-                                       

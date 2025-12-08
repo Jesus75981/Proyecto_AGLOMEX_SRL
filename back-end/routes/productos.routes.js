@@ -4,7 +4,6 @@ import { listarProductos, actualizarProducto, eliminarProducto, crearProducto, o
 const router = express.Router();
 
 router.post("/", crearProducto);
-router.get("/", listarProductos);
 router.get("/categorias", obtenerCategorias);
 router.put("/:id", actualizarProducto);
 router.delete("/:id", eliminarProducto);
