@@ -1,5 +1,16 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import Aglomex1 from '../images/Aglomex1.jpg';
+import Aglomex2 from '../images/Aglomex2.jpg';
+import Aglomex3 from '../images/Aglomex3.jpg';
+import aglomex4 from '../images/aglomex4.jpg';
+import aglomex5 from '../images/aglomex5.jpg';
+import aglomex6 from '../images/aglomex6.jpg';
+import aglomex7 from '../images/aglomex7.jpg';
+import aglomex8 from '../images/aglomex8.jpg';
+import aglomex9 from '../images/aglomex9.jpg';
+import aglomex10 from '../images/aglomex10.jpg';
+import aglomexblanco from '../images/aglomexblanco.jpg';
 
 import Aglomex1 from '../images/Aglomex1.jpg';
 import Aglomex2 from '../images/Aglomex2.jpg';
@@ -83,7 +94,7 @@ const LandingPage = () => {
   const navigate = useNavigate();
 
   const openCatalog = () => {
-    window.open('/catalogo', '_blank');
+    navigate('/catalogo');
   };
 
   return (

@@ -19,6 +19,7 @@ const pagoSchema = new mongoose.Schema({
         default: Date.now
     }
 }, { _id: false });
+
 const compraSchema = new mongoose.Schema({
     numCompra: {
         type: String,
@@ -44,9 +45,19 @@ const compraSchema = new mongoose.Schema({
         {
             producto: {
                 type: mongoose.Schema.Types.ObjectId,
+<<<<<<< HEAD
+                refPath: 'productos.onModel', // Referencia dinámica
+=======
                 ref: "ProductoTienda",
+>>>>>>> origin/main
                 required: true,
             },
+            onModel: {
+                type: String,
+                required: true,
+                enum: ['MateriaPrima', 'ProductoTienda']
+            },
+            cantidad: { type: Number, required: true },
             precioUnitario: { type: Number, required: true },
             codigoProveedor: String
         },
@@ -72,7 +83,8 @@ const compraSchema = new mongoose.Schema({
 
     estado: {
         type: String,
-        enum: ["Pendiente", "Pagada", "Parcialmente Pagada", "Cancelada"]
+        enum: ["Pendiente", "Pagada", "Parcialmente Pagada", "Cancelada"],
+        default: "Pagada"
     },
     observaciones: String
 }, { timestamps: true });

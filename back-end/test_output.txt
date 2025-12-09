@@ -1,0 +1,8 @@
+[dotenv@17.2.3] injecting env (2) from .env -- tip: ΓÜÖ∩╕Å  load multiple .env files with { path: ['.env.local', '.env'] }
+
+Γ¥î Error durante la prueba: TRIPO_API_KEY no est├í configurada en las variables de entorno.
+≡ƒº¬ Iniciando prueba de integraci├│n con Tripo AI...
+≡ƒöæ API Key configurada: S├ì
+
+1∩╕ÅΓâú  Enviando imagen a Tripo: https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Duck/Screenshot/Duck.png
+≡ƒÅü Prueba finalizada.

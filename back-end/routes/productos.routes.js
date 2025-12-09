@@ -3,8 +3,12 @@ import { listarProductos, actualizarProducto, eliminarProducto, crearProducto, o
 
 const router = express.Router();
 
+<<<<<<< HEAD
+router.post("/", crearProducto);
+=======
 router.post("/", uploadImage, crearProducto);
 router.get("/", listarProductos);
+>>>>>>> origin/main
 router.get("/categorias", obtenerCategorias);
 router.get("/:id", obtenerProducto);
 router.put("/:id", uploadImage, actualizarProducto);

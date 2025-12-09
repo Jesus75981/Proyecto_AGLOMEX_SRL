@@ -1,0 +1,161 @@
+DATOS NECESARIOS PARA LOS DIAGRAMAS DEL PROYECTO AGLOMEX SRL
+
+Este archivo contiene toda la información recopilada de los modelos, controladores, rutas y documento de tecnologías para crear los diagramas sugeridos para el proyecto AGLOMEX SRL (sistema de gestión de muebles full-stack).
+
+================================================================================
+1. DIAGRAMA DE ARQUITECTURA DEL SISTEMA
+================================================================================
+
+Elementos Clave:
+- Capa de Front-end: React (v18.2.0) con Vite (v4.5.0), React Router DOM (v7.8.2), Tailwind CSS (v3.4.3). Componentes: Navbar, Carrusel, ProductCard, ProductDetail, ProductList, Header. Páginas: HomePage, CatalogPage, LoginPage, ComprasPage, FabricacionPage, FinanzasPage, InventarioPage, LogisticaPage, RecepcionPedidosPage, ReporteVentasDiario, VentasPage, AdminCatalogPage, LandingPage.
+- Capa de Back-end: Node.js con Express.js (v5.1.0), Mongoose (v8.18.2), JWT para autenticación, bcrypt para hashing de contraseñas. Servidor en puerto 5000.
+- Base de Datos: MongoDB local (puerto 27017), base de datos "mueblesDB". Conexión via Mongoose.
+- Conexiones: Front-end hace peticiones HTTP a back-end via Axios. Back-end conecta a MongoDB. Proxy en Vite redirige /api al back-end.
+- Servicios Externos: Autenticación JWT, hashing bcrypt, CORS habilitado.
+- Arquitectura General: Full-stack con separación clara, patrón MVC en back-end, componentes reutilizables en React.
+
+Herramientas Recomendadas: Draw.io o PlantUML.
+
+================================================================================
+2. DIAGRAMA DE ESQUEMA DE BASE DE DATOS (ER DIAGRAM)
+================================================================================
+
+Entidades y Atributos (basado en modelos Mongoose):
+- User: username (String, unique), password (String), nombre (String), rol (enum: admin, empleado_tienda, empleado_stock). Métodos: comparePassword().
+- Cliente: nombre (String), empresa (String), direccion (String), telefono (String), email (String), nit (String), activo (Boolean), ci (String).
+- Proveedor: nombre (String), contacto (objeto: telefono, email), direccion (String), nit (String), activo (Boolean), banco (objeto: nombre, numeroCuenta).
+- ProductoTienda: idProductoTienda (String, unique), nombre (String, unique), descripcion (String), cantidad (Number), precioCompra (Number), precioVenta (Number), color (String), categoria (enum: Silla, Mesa, Sofa, Estanteria, Armario, Otro), marca (String), cajas (Number), ubicacion (String), tamano (String), codigo (String), proveedor (ObjectId ref Proveedor), imagen (String), dimensiones (objeto: alto, ancho, profundidad), objeto3D (ObjectId ref Objeto3D), ventasAcumuladas (Number), activo (Boolean).
+- MateriaPrima: idMateriaPrima (String, unique), nombre (String, unique), descripcion (String), cantidad (Number), precioCompra (Number), precioVenta (Number), proveedor (ObjectId ref Proveedor), activo (Boolean), imagen (String), color (String), categoria (enum: Madera, Tela, Metal, Plastico, Otro), ubicacion (String), tamano (String), codigo (String).
+- Compra: numCompra (String, unique), fecha (Date), tipoCompra (enum: Materia Prima, Producto Terminado), proveedor (ObjectId ref Proveedor), productos (array: producto ObjectId ref MateriaPrima/ProductoTienda, cantidad Number, precioUnitario Number, codigoProveedor String), metodosPago (array: tipo enum Efectivo/Transferencia/Cheque/Credito, monto Number, referencia String, cuenta String, fechaPago Date), estado (enum: Pendiente, Pagada, Parcialmente Pagada, Cancelada), observaciones (String).
+- Venta: numVenta (Number, unique), fecha (Date), cliente (ObjectId ref User), productos (array: producto ObjectId ref ProductoTienda, cantidad Number, precioUnitario Number, precioTotal Number), serviciosAdicionales (array: nombre String, costo Number), metodoPago (enum: Efectivo/Transferencia/Cheque/Credito), banco (String), anticipo (Number), numFactura (String), observaciones (String), requiereEnvio (Boolean).
+- Pedido: pedidoNumero (Number, unique), cliente (ObjectId ref Cliente), productos (array: producto ObjectId ref ProductoTienda, cantidad Number), estado (enum: pendiente, en_produccion, despachado, entregado), serviciosAdicionales (array: nombre String, costo Number), fechaPedido (Date), fechaEntrega (Date), direccionEntrega (String), observaciones (String).
+- Produccion: (Asumido de produccion.controller.js) progreso (Number, 0-100), estado (String), tiempoRestante (Number), productos (array), etc. (Necesita revisión del modelo completo).
+- Logistica: (Asumido) transportista (ObjectId), pedido (ObjectId), estado (String), etc.
+- Finanzas: (Asumido) ingresos (Number), egresos (Number), etc.
+- Transportista: (Asumido de transportistas.controller.js) nombre (String), contacto (String), telefono (String), email (String), tipo (String), costoBase (Number), tiempoEntrega (String).
+- Material: idMaterial (String, unique), nombre (String), cantidad (Number), precioCompra (Number), precioVenta (Number), proveedor (ObjectId ref Proveedor), activo (Boolean), imagen (String). Usado para gestionar materiales en producción, similar a MateriaPrima pero con idMaterial generado automáticamente.
+- Anticipo: (Asumido) venta (ObjectId), monto (Number), etc.
+- Objeto3D: (Asumido) nombre (String), url (String), etc.
+- Contador: nombre (String, unique), valor (Number, default 0). Usado para generar números secuenciales automáticos como numCompra, numVenta, pedidoNumero, idProduccion, idMaterial. Funciones getNextSequenceValue en controladores para incrementar el contador atómicamente.
+
+Relaciones:
+- User 1:N Venta (cliente).
+- Proveedor 1:N Compra.
+- Proveedor 1:N ProductoTienda/MateriaPrima.
+- ProductoTienda 1:N Venta.productos.
+- MateriaPrima 1:N Compra.productos (si tipoCompra = Materia Prima).
+- Cliente 1:N Pedido.
+- Pedido 1:N Logistica.
+- Venta 1:N Anticipo.
+- ProductoTienda 1:1 Objeto3D.
+
+Herramientas Recomendadas: Draw.io, ERwin o MongoDB Compass.
+
+================================================================================
+3. DIAGRAMA DE CASOS DE USO
+================================================================================
+
+Actores:
+- Admin: Gestiona usuarios, proveedores, productos, compras, ventas, producción, logística, finanzas, inventario.
+- Empleado_Tienda: Gestiona ventas, pedidos, catálogo público.
+- Empleado_Stock: Gestiona inventario, producción, compras.
+- Cliente: Navega catálogo, hace pedidos.
+
+Casos de Uso:
+- Login/Registro (todos).
+- Gestionar Clientes (Admin).
+- Gestionar Proveedores (Admin).
+- Gestionar Productos (Admin, Empleado_Stock).
+- Procesar Compras (Admin, Empleado_Stock).
+- Gestionar Ventas (Admin, Empleado_Tienda).
+- Seguimiento de Produccion (Admin, Empleado_Stock).
+- Gestionar Logistica (Admin).
+- Control Financiero (Admin).
+- Gestionar Inventario (Admin, Empleado_Stock).
+- Procesar Pedidos (Admin, Empleado_Tienda).
+- Ver Catálogo Público (Cliente).
+
+Relaciones: Incluye (ej. Procesar Pedidos incluye Seguimiento de Produccion), Extiende (ej. Gestionar Ventas extiende Control Financiero).
+
+Herramientas Recomendadas: Draw.io o StarUML.
+
+================================================================================
+4. DIAGRAMA DE SECUENCIA (para flujos clave)
+================================================================================
+
+Flujos Clave:
+- Login: Usuario → Front-end (LoginPage) → Back-end (/api/auth/login) → DB (User) → JWT Token → Front-end.
+- Compra: Empleado → Front-end (ComprasPage) → Back-end (/api/compras POST) → DB (Compra, ProductoTienda/MateriaPrima) → Actualizar Inventario.
+- Produccion: Empleado → Back-end (/api/produccion) → DB (Produccion) → Actualizar progreso cada 5 min → Notificar front-end.
+- Pedido: Cliente → Front-end (CatalogPage) → Back-end (/api/pedidos POST) → DB (Pedido) → Cambiar estado a en_produccion.
+
+Objetos: Usuario, Front-end, Back-end, DB.
+
+Herramientas Recomendadas: Draw.io o PlantUML.
+
+================================================================================
+5. DIAGRAMA DE COMPONENTES
+================================================================================
+
+Componentes Back-end:
+- Controllers: compras.controller.js (registrarCompra, listarCompras), clientes.controller.js, proveedores.controller.js, productos.controller.js, ventas.controller.js, produccion.controller.js, etc.
+- Models: compra.model.js, user.model.js, cliente.model.js, etc.
+- Routes: compras.routes.js (POST /, GET /), auth.routes.js, etc.
+- Server: server.js (Express app, middlewares CORS/JSON).
+
+Componentes Front-end:
+- Páginas: HomePage.jsx, ComprasPage.jsx, etc.
+- Componentes: Navbar.jsx, ProductCard.jsx, etc.
+- Servicios: Axios para API calls.
+
+Dependencias: Controllers dependen de Models y Routes; Routes dependen de Controllers; Front-end depende de Back-end via API.
+
+Herramientas Recomendadas: Draw.io.
+
+================================================================================
+6. DIAGRAMA DE DESPLIEGUE
+================================================================================
+
+Nodos:
+- Cliente (Navegador web).
+- Servidor Front-end (Vite build, localhost:3000).
+- Servidor Back-end (Node.js, localhost:5000).
+- Base de Datos (MongoDB, localhost:27017).
+
+Artefactos: HTML/CSS/JS (front-end), Node.js app (back-end), MongoDB database.
+
+Conexiones: HTTP requests, Proxy /api, DB connections.
+
+Herramientas Recomendadas: Draw.io.
+
+================================================================================
+7. DIAGRAMA DE FLUJO DE DATOS
+================================================================================
+
+Procesos: Login, Registrar Compra, Actualizar Produccion, Procesar Pedido.
+Almacenes: MongoDB colecciones (Users, Compras, etc.).
+Flujos: Datos de usuario, productos, pagos.
+Terminadores: Usuario, Proveedor (externo).
+
+Herramientas Recomendadas: Draw.io.
+
+================================================================================
+8. DIAGRAMA DE CLASES (para modelos de datos)
+================================================================================
+
+Clases (basado en modelos):
+- User: atributos username, password, nombre, rol; métodos comparePassword.
+- Compra: atributos numCompra, fecha, tipoCompra, proveedor, productos[], metodosPago[], estado; validaciones personalizadas.
+- ProductoTienda: atributos idProductoTienda, nombre, cantidad, precioCompra, etc.; hooks pre-save para idProductoTienda.
+- Etc. para otros modelos.
+
+Relaciones: Asociación (Compra.productos ref ProductoTienda), Herencia (si aplica).
+
+Herramientas Recomendadas: PlantUML o StarUML.
+
+================================================================================
+NOTAS ADICIONALES
+================================================================================
+- Esta información está basada en los archivos leídos (user.model.js, cliente.model.js, proveedores.model.js, venta.model.js, pedido.model.js, compra.model.js, productoTienda.model.js, materiaPrima.model.js) y el documento tecnologias_proyecto.txt.
+- Para modelos no leídos completamente (ej. Produccion, Logistica), se asumen basados en controladores.
+- Si necesitas más detalles o diagramas generados, avísame.

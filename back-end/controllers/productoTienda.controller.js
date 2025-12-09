@@ -1,8 +1,13 @@
 // controllers/productoTienda.controller.js
 import ProductoTienda from "../models/productoTienda.model.js";
+<<<<<<< HEAD
+import Objeto3D from "../models/objetos3d.model.js";
+import * as tripoService from "../services/tripo.service.js";
+=======
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+>>>>>>> origin/main
 
 // Función para generar un ID único
 const generarCodigoInterno = (nombre) => {
@@ -51,17 +56,24 @@ export const crearProducto = async (req, res) => {
   // { nombre: String, imagen: String, dimensiones: { alto: N, ancho: N, profundidad: N } }
   try {
     // 1. Validación adicional en el controlador
+<<<<<<< HEAD
+    const { nombre, color, categoria, codigo } = req.body;
+=======
     const { nombre, color, categoria, codigo, tipo } = req.body;
+>>>>>>> origin/main
 
     if (!nombre || nombre.trim().length === 0) {
       return res.status(400).json({ error: 'El campo "nombre" es obligatorio y no puede estar vacío.' });
     }
 
+<<<<<<< HEAD
+=======
     if (!tipo || tipo.trim().length === 0) {
       // Si no se envía, se asigna por defecto en el modelo, pero si se envía vacío, validamos.
       // Opcional: forzar que se envíe siempre.
     }
 
+>>>>>>> origin/main
     if (!color || color.trim().length === 0) {
       return res.status(400).json({ error: 'El campo "color" es obligatorio y no puede estar vacío.' });
     }
@@ -78,10 +90,17 @@ export const crearProducto = async (req, res) => {
     const idProductoTienda = generarCodigoInterno(req.body.nombre);
 
     // 3. Combinar los datos del body con el código generado, excluyendo campos no deseados
+<<<<<<< HEAD
+    const { cantidad, precioCompra, ...restoDelBody } = req.body;
+    const productoData = {
+      ...restoDelBody,
+      idProductoTienda: idProductoTienda,
+=======
     const productoData = {
       ...req.body,
       idProductoTienda: idProductoTienda,
       imagen: req.file ? `/uploads/${req.file.filename}` : '',
+>>>>>>> origin/main
       // El campo 'precioVenta' y 'descripcion'
       // se omiten si no se envían, y se permiten vacíos por el esquema.
     };
@@ -92,6 +111,34 @@ export const crearProducto = async (req, res) => {
 
     // 5. Respuesta exitosa
     res.status(201).json(producto);
+<<<<<<< HEAD
+
+    // 6. [ASYNC] Iniciar generación de modelo 3D si hay imagen
+    if (producto.imagen && producto.imagen.startsWith('http')) {
+      (async () => {
+        try {
+          console.log(`[TRIPO] Iniciando generación 3D para producto ${producto.nombre}...`);
+          const taskId = await tripoService.create3DTask(producto.imagen);
+
+          const nuevoObjeto3D = new Objeto3D({
+            producto: producto._id,
+            sourceImage: producto.imagen,
+            tripoTaskId: taskId,
+            status: 'queued'
+          });
+          await nuevoObjeto3D.save();
+
+          // Vincular al producto
+          producto.objeto3D = nuevoObjeto3D._id;
+          await producto.save();
+          console.log(`[TRIPO] Tarea creada: ${taskId}`);
+        } catch (error) {
+          console.error("[TRIPO] Error al iniciar generación:", error.message);
+        }
+      })();
+    }
+=======
+>>>>>>> origin/main
   } catch (err) {
     console.log('Error al crear producto:', err); // Agregar logging para depurar
     // Mongoose Validation Errors (por ejemplo, si falta 'imagen' o 'dimensiones')
@@ -104,9 +151,13 @@ export const crearProducto = async (req, res) => {
   }
 };
 
-// Listar productos activos
+// Listar productos activos con inventario disponible
 export const listarProductos = async (req, res) => {
   try {
+<<<<<<< HEAD
+    // Solo muestra los productos que tienen el estado activo: true y cantidad > 0
+    const productos = await ProductoTienda.find({ activo: true, cantidad: { $gt: 0 } }).populate("proveedor objeto3D");
+=======
     // Construir el filtro base (solo productos activos)
     const filtro = { activo: true };
 
@@ -117,6 +168,7 @@ export const listarProductos = async (req, res) => {
 
     // Buscar productos con el filtro y popular referencias
     const productos = await ProductoTienda.find(filtro).populate("proveedor objeto3D");
+>>>>>>> origin/main
     res.json(productos);
   } catch (error) {
     res.status(500).json({ error: error.message });

@@ -90,6 +90,13 @@ const productoTiendaSchema = new mongoose.Schema({
     ref: "Objeto3D" // para vincular con el modelo 3D en RA
   },
   ventasAcumuladas: { // <-- ¡NUEVO CAMPO REQUERIDO PARA "MÁS VENDIDOS"!
+<<<<<<< HEAD
+    type: Number,
+    default: 0
+  },
+  cantidad: { // <-- NUEVO CAMPO PARA INVENTARIO
+=======
+>>>>>>> origin/main
     type: Number,
     default: 0
   },

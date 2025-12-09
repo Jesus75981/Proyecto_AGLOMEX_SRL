@@ -1,0 +1,52 @@
+
+--- Recent Products ---
+ID: 6934265b4dbccb1f30b1bc34
+Name: asddd
+Image: http://localhost:5000/uploads/1765025369294-487066809.jpeg
+3D Model: NO (done)
+-----------------------
+ID: 6931947e111761f9f9c0403d
+Name: asd
+Image: http://localhost:5000/uploads/1764856954823-842718771.jpeg
+3D Model: NONE
+-----------------------
+ID: 691c9cc7f3463d011a8851f7
+Name: tornillo
+Image: 
+3D Model: NONE
+-----------------------
+ID: 691c9c87f3463d011a8851f5
+Name: maderaa
+Image: 
+3D Model: NONE
+-----------------------
+ID: 691c91acf3463d011a8851c3
+Name: asdddd
+Image: 
+3D Model: NONE
+-----------------------
+ID: 6915e747b61f062f99308359
+Name: Producto Test Atlas
+Image: 
+3D Model: NONE
+-----------------------
+ID: 6911e773f8433078cdd489a6
+Name: Silla Moderna - 1762781043082
+Image: 
+3D Model: NONE
+-----------------------
+ID: 690dfba43cb3f232e98ba501
+Name: mesa comedor
+Image: 
+3D Model: NONE
+-----------------------
+ID: 690df9903cb3f232e98ba4d7
+Name: Silla Moderna
+Image: 
+3D Model: NONE
+-----------------------
+ID: 6900bc9c95f4e8c7a6f0cac1
+Name: madera
+Image: 
+3D Model: NONE
+-----------------------
