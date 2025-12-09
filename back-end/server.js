@@ -44,7 +44,7 @@ const __dirname = path.dirname(__filename);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Conexión a MongoDB
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/mueblesDB';
+const MONGODB_URI = process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb://localhost:27017/mueblesDB';
 mongoose.connect(MONGODB_URI)
     .then(() => console.log('Conectado a MongoDB:', MONGODB_URI))
     .catch(err => console.error('Error conectando a MongoDB:', err));

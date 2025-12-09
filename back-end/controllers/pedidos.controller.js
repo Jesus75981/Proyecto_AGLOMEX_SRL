@@ -38,27 +38,81 @@ export const actualizarEstadoPedido = async (req, res) => {
   res.json(pedido);
 };
 
+// Importación adicional necesaria para el fallback
+import Venta from "../models/venta.model.js";
+
 export const obtenerPedidoPorNumero = async (req, res) => {
   try {
     const { numero } = req.params;
-    const numeroParsed = parseInt(numero);
+
+    // 1. Normalización de entrada (Soporte para TRK-1234, #1234, etc.)
+    let numeroLimpio = numero.replace(/\D/g, ''); // Extraer solo números
+    const numeroParsed = parseInt(numeroLimpio);
 
     if (isNaN(numeroParsed)) {
-      return res.status(400).json({ message: "Número de pedido inválido" });
+      return res.status(400).json({ message: "Número de pedido inválido. Ingrese el código numérico (ej: 1001)." });
     }
 
-    // Buscar en Pedido por pedidoNumero
+    // 2. Estrategia de Búsqueda Priorizada
+
+    // A. Buscar en Colección PEDIDOS (Pedidos personalizados)
     const pedido = await Pedido.findOne({ pedidoNumero: numeroParsed }).populate("cliente productos.producto");
 
-    if (!pedido) {
-      return res.status(404).json({ message: "Pedido no encontrado" });
+    if (pedido) {
+      const logistica = await Logistica.findOne({ pedidoNumero: numeroParsed }).populate("transportista"); // Usar pedidoNumero común
+      return res.json({ pedido, logistica });
     }
 
-    // Obtener logística asociada si existe
-    const logistica = await Logistica.findOne({ pedido: pedido._id }).populate("transportista ruta");
+    // B. Fallback: Buscar en LOGISTICA (Envíos de Ventas)
+    // Si no existe 'Pedido', es probable que sea una 'Venta' con envío.
+    const logistica = await Logistica.findOne({ pedidoNumero: numeroParsed })
+      .populate("cliente")
+      .populate("productos.producto")
+      .populate("transportista");
 
-    res.json({ pedido, logistica });
+    if (logistica) {
+      // Intentar recuperar datos extra de la Venta
+      const venta = await Venta.findOne({ numVenta: numeroParsed }).populate("cliente");
+
+      // Construir objeto "fake" de pedido para compatibilidad con frontend
+      const pedidoSimulado = {
+        pedidoNumero: logistica.pedidoNumero,
+        estado: logistica.estado === 'despachado' ? 'despachado' : (logistica.estado === 'entregado' ? 'entregado' : 'en_produccion'),
+        fechaPedido: logistica.fechaPedido,
+        fechaEntrega: logistica.fechaEntrega,
+        cliente: logistica.cliente,
+        productos: logistica.productos,
+        tipo: "Venta Directa"
+      };
+
+      return res.json({ pedido: pedidoSimulado, logistica });
+    }
+
+    // C. Fallback: Buscar en VENTAS (Venta sin envío aun o retirado)
+    const venta = await Venta.findOne({ numVenta: numeroParsed }).populate("cliente productos.producto");
+
+    if (venta) {
+      // Si es venta, adaptamos la respuesta
+      const pedidoSimulado = {
+        pedidoNumero: venta.numVenta,
+        estado: 'pendiente', // Asumir pendiente si no hay logistica
+        fechaPedido: venta.fecha,
+        fechaEntrega: null, // No hay fecha definida
+        cliente: venta.cliente,
+        productos: venta.productos.map(p => ({
+          producto: p.producto,
+          cantidad: p.cantidad
+        })),
+        tipo: "Venta Tienda"
+      };
+      // Retornar logistica null
+      return res.json({ pedido: pedidoSimulado, logistica: null });
+    }
+
+    return res.status(404).json({ message: `No se encontró el pedido #${numeroParsed}. Verifique el número.` });
+
   } catch (error) {
+    console.error(error);
     res.status(500).json({ message: "Error al obtener el pedido", error: error.message });
   }
 };

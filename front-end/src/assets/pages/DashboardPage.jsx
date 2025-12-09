@@ -122,6 +122,10 @@ const DashboardPage = ({ userRole }) => {
     if (!token) navigate('/login');
   }, [navigate]);
 
+  useEffect(() => {
+    cargarDatos();
+  }, [activeTab, periodo, selectedYear, selectedMonth, selectedDate]);
+
   const cargarDatos = async () => {
     setLoading(true);
     setError(null);
@@ -151,7 +155,7 @@ const DashboardPage = ({ userRole }) => {
       if (activeTab === 'finanzas') {
         const stats = await apiFetch(`/finanzas/estadisticas?${queryString}`, { headers });
         const resumen = await apiFetch('/finanzas/resumen', { headers });
-        setFinanzasData({ ...stats, resumenTotal: resumen });
+        setFinanzasData({ ...stats, resumenTotal: resumen.data || {} });
       }
 
       // 4. Inventario
@@ -306,7 +310,7 @@ const DashboardPage = ({ userRole }) => {
               onChange={(e) => setSelectedYear(Number(e.target.value))}
               className="border-gray-300 rounded-lg text-sm focus:ring-indigo-500 focus:border-indigo-500"
             >
-              {Array.from({ length: 11 }, (_, i) => currentYear - 5 + i).map(y => (
+              {Array.from({ length: 11 }, (_, i) => 2025 + i).map(y => (
                 <option key={y} value={y}>{y}</option>
               ))}
             </select>

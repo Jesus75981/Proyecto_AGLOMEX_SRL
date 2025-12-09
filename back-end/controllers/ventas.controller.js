@@ -249,6 +249,18 @@ export const getEstadisticasVentas = async (req, res) => {
       const endOfDay = new Date(date);
       endOfDay.setHours(23, 59, 59, 999);
       matchCondition.fecha = { $gte: startOfDay, $lte: endOfDay };
+    } else if (period === 'week' && date) {
+      const selectedDate = new Date(date);
+      const dayOfWeek = selectedDate.getDay();
+      const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const startOfWeek = new Date(selectedDate);
+      startOfWeek.setDate(selectedDate.getDate() + diffToMonday);
+      startOfWeek.setHours(0, 0, 0, 0);
+
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 6);
+      endOfWeek.setHours(23, 59, 59, 999);
+      matchCondition.fecha = { $gte: startOfWeek, $lte: endOfWeek };
     } else if (period === 'month' && year && month) {
       const startDate = new Date(year, month - 1, 1);
       const endDate = new Date(year, month, 0, 23, 59, 59);

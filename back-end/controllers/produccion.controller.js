@@ -245,23 +245,41 @@ export const confirmarProduccion = async (req, res) => {
 // Nueva función para obtener estadísticas de producción
 export const getEstadisticasProduccion = async (req, res) => {
   try {
-    const { year, month } = req.query;
+    const { year, month, period, date } = req.query;
 
     let matchCondition = {};
+    const currentYear = year ? parseInt(year) : new Date().getFullYear();
 
-    if (year) {
-      matchCondition.createdAt = {
-        $gte: new Date(`${year}-01-01`),
-        $lt: new Date(`${parseInt(year) + 1}-01-01`)
-      };
-    }
+    if (period === 'day' && date) {
+      const selectedDate = new Date(date);
+      const startOfDay = new Date(selectedDate.setHours(0, 0, 0, 0));
+      const endOfDay = new Date(selectedDate.setHours(23, 59, 59, 999));
+      matchCondition.createdAt = { $gte: startOfDay, $lte: endOfDay };
+    } else if (period === 'week' && date) {
+      const selectedDate = new Date(date);
+      const dayOfWeek = selectedDate.getDay();
+      const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const startOfWeek = new Date(selectedDate);
+      startOfWeek.setDate(selectedDate.getDate() + diffToMonday);
+      startOfWeek.setHours(0, 0, 0, 0);
 
-    if (month && year) {
-      const startDate = new Date(`${year}-${month.padStart(2, '0')}-01`);
-      const endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 1);
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 6);
+      endOfWeek.setHours(23, 59, 59, 999);
+      matchCondition.createdAt = { $gte: startOfWeek, $lte: endOfWeek };
+    } else if (period === 'month' && month) {
+      const selectedMonth = parseInt(month);
+      const startDate = new Date(currentYear, selectedMonth - 1, 1);
+      const endDate = new Date(currentYear, selectedMonth, 0, 23, 59, 59, 999);
       matchCondition.createdAt = {
         $gte: startDate,
-        $lt: endDate
+        $lte: endDate
+      };
+    } else {
+      // Annual (default)
+      matchCondition.createdAt = {
+        $gte: new Date(currentYear, 0, 1),
+        $lte: new Date(currentYear, 11, 31, 23, 59, 59, 999)
       };
     }
 

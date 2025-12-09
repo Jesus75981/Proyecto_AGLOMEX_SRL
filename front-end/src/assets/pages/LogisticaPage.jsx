@@ -107,6 +107,13 @@ const LogisticaPage = ({ userRole }) => {
   const transportistasFiltrados = transportistas.filter(t => (t.nombre?.toLowerCase() || '').includes(searchTermLower));
   const rutasFiltradas = rutas.filter(r => (r.nombre?.toLowerCase() || '').includes(searchTermLower));
 
+  // Efecto para actualizar estadísticas cuando cambian los envíos
+  useEffect(() => {
+    if (envios.length > 0) {
+      cargarEstadisticas();
+    }
+  }, [envios]);
+
   // Funciones
   const cargarEstadisticas = async () => {
     // Mock stats for now
