@@ -282,9 +282,7 @@ const LogisticaPage = ({ userRole }) => {
         fechaEstimada: new Date(envio.fechaEntrega).toLocaleDateString(),
         tiempoEstimado: envio.tiempoEstimado,
         metodoEntrega: envio.metodoEntrega || 'Envio Domicilio',
-        metodoEntrega: envio.metodoEntrega || 'Envio Domicilio',
         costoEnvio: envio.costoEnvio || envio.costoAdicional || 0,
-        tracking: `TRK${envio.pedidoNumero}`,
         tracking: `TRK${envio.pedidoNumero}`,
         ubicacionActual: envio.estado === 'entregado' ? 'Entregado' : 'En proceso',
         empresaEnvio: envio.empresaEnvio || ''
@@ -407,7 +405,6 @@ const LogisticaPage = ({ userRole }) => {
           pais: nuevoEnvio.pais
         },
         metodoEntrega: nuevoEnvio.metodoEntrega,
-        tipoMovimiento: 'Envío a Cliente',
         tipoMovimiento: 'Envío a Cliente',
         costoAdicional: 0, // Deprecated in favor of costoEnvio
         costoEnvio: parseFloat(nuevoEnvio.costoEnvio),

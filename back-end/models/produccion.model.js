@@ -6,6 +6,10 @@ const produccionSchema = new mongoose.Schema({
     required: true,
     unique: true
   },
+  numeroOrden: {
+    type: Number,
+    unique: true
+  },
   nombre: {
     type: String,
     required: true
@@ -34,7 +38,7 @@ const produccionSchema = new mongoose.Schema({
     {
       material: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "ProductoTienda" // Usamos ProductoTienda con tipo 'Materia Prima'
+        ref: "MateriaPrima"
       },
       cantidad: Number
     }

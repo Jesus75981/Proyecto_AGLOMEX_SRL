@@ -45,11 +45,7 @@ const compraSchema = new mongoose.Schema({
         {
             producto: {
                 type: mongoose.Schema.Types.ObjectId,
-<<<<<<< HEAD
                 refPath: 'productos.onModel', // Referencia dinámica
-=======
-                ref: "ProductoTienda",
->>>>>>> origin/main
                 required: true,
             },
             onModel: {

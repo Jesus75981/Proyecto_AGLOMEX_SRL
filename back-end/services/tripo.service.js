@@ -17,7 +17,9 @@ const uploadImageToTripo = async (filePath) => {
     }
 
     const formData = new FormData();
-    formData.append('file', fs.createReadStream(filePath));
+    const filename = path.basename(filePath);
+    const fileBuffer = fs.readFileSync(filePath); // Read entire file into buffer
+    formData.append('file', fileBuffer, filename);
 
     try {
         const response = await axios.post(
@@ -65,9 +67,20 @@ export const create3DTask = async (imageUrl) => {
 
             console.log(`[TRIPO] Detectada URL local. Subiendo archivo: ${filePath}`);
             const imageToken = await uploadImageToTripo(filePath);
+            console.log(`[TRIPO] Image Token obtained: ${imageToken ? imageToken.substring(0, 10) + '...' : 'undefined'}`);
+
+            const ext = filename.split('.').pop().toLowerCase();
+            const validTypes = ['jpg', 'jpeg', 'png'];
+            const type = validTypes.includes(ext) ? ext : 'jpg'; // Default to jpg if unknown
+
+            // Tripo expects 'jpg' for both jpg and jpeg? Or allows 'jpeg'?
+            // Let's map jpeg to jpg just in case, or use strict. 
+            // Common API behavior: 'jpg' covers 'jpeg'.
+            // But if I send 'jpeg', it might reject it if it strictly wants 'jpg'.
+            // Let's normalize 'jpeg' -> 'jpg'.
 
             payload.file = {
-                type: 'jpg', // Tripo detecta el tipo, pero requiere este campo
+                type: ext === 'jpeg' ? 'jpg' : ext,
                 file_token: imageToken
             };
         } else {
@@ -77,6 +90,8 @@ export const create3DTask = async (imageUrl) => {
                 url: imageUrl
             };
         }
+
+        console.log('[TRIPO] Sending payload:', JSON.stringify(payload, null, 2));
 
         const response = await axios.post(
             `${TRIPO_API_URL}/task`,
@@ -95,7 +110,7 @@ export const create3DTask = async (imageUrl) => {
             throw new Error(`Error de Tripo: ${response.data.message}`);
         }
     } catch (error) {
-        console.error("Error al crear tarea en Tripo:", error.response ? error.response.data : error.message);
+        console.error("Error al crear tarea en Tripo Full:", error.response ? JSON.stringify(error.response.data, null, 2) : error.message);
         throw error;
     }
 };

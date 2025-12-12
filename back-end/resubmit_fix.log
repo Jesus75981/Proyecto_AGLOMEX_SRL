@@ -1,0 +1,25 @@
+[dotenv@17.2.3] injecting env (4) from .env -- tip: ≡ƒöÉ encrypt with Dotenvx: https://dotenvx.com
+--- RECOVERY: RESUBMITTING "asd" ---
+Found target: asd (ID: 693429a387b99dea96f04fe6)
+Current Source Image: http://localhost:5000/uploads/1764856954823-842718771.jpeg
+Resubmitting to Tripo...
+Resolved local path: C:\Users\PREDATOR\OneDrive - Universidad Privada del Valle\Documents\Proyecto_AGLOMEX_SRL\back-end\public\uploads\1764856954823-842718771.jpeg
+File size: 102759 bytes
+[TRIPO] Sending payload: {
+  "type": "image_to_model",
+  "file": {
+    "type": "jpg",
+    "url": "C:\\Users\\PREDATOR\\OneDrive - Universidad Privada del Valle\\Documents\\Proyecto_AGLOMEX_SRL\\back-end\\public\\uploads\\1764856954823-842718771.jpeg"
+  }
+}
+Error al crear tarea en Tripo Full: {
+  "code": 1004,
+  "message": "One or more of your parameter is invalid",
+  "suggestion": "Refer to the API documentation for parameter requirements"
+}
+Γ¥î Resubmission failed: Request failed with status code 400
+{
+  code: 1004,
+  message: 'One or more of your parameter is invalid',
+  suggestion: 'Refer to the API documentation for parameter requirements'
+}

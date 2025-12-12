@@ -13,7 +13,7 @@ import Produccion from './models/produccion.model.js';
 import Material from './models/materiales.model.js';
 import Logistica from './models/logistica.model.js';
 import Finanzas from './models/finanzas.model.js';
-import Anticipo from './models/anticipo.model.js';
+
 import Transportista from './models/transportista.model.js';
 import Objeto3D from './models/objetos3d.model.js';
 import Contador from './models/contador.model.js';

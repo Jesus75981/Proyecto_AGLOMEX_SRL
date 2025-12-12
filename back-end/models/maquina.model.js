@@ -11,7 +11,7 @@ const maquinaSchema = new mongoose.Schema({
     },
     estado: {
         type: String,
-        enum: ['Operativa', 'En mantenimiento', 'Fuera de servicio'],
+        enum: ['Operativa', 'En mantenimiento', 'Fuera de servicio', 'En revisión', 'Necesita reparación'],
         default: 'Operativa'
     },
     ultimoMantenimiento: {
@@ -20,12 +20,6 @@ const maquinaSchema = new mongoose.Schema({
     },
     proximoMantenimiento: {
         type: Date
-    },
-    eficiencia: {
-        type: Number,
-        default: 100,
-        min: 0,
-        max: 100
     }
 }, { timestamps: true });
 

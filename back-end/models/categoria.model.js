@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
 const categoriaSchema = new mongoose.Schema({
     nombre: {
@@ -6,7 +6,17 @@ const categoriaSchema = new mongoose.Schema({
         required: true,
         unique: true,
         trim: true
+    },
+    descripcion: {
+        type: String,
+        trim: true
+    },
+    activo: {
+        type: Boolean,
+        default: true
     }
-}, { timestamps: true });
+}, {
+    timestamps: true
+});
 
-export default mongoose.model("Categoria", categoriaSchema);
+export default mongoose.model('Categoria', categoriaSchema);

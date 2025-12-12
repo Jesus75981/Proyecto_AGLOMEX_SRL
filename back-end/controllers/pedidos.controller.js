@@ -23,6 +23,9 @@ export const crearPedido = async (req, res) => {
     await pedido.save();
     res.status(201).json(pedido);
   } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({ error: "Ya existe un pedido con estos datos únicos." });
+    }
     console.error('Error creando pedido:', error);
     res.status(500).json({ error: error.message });
   }

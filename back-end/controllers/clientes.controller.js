@@ -21,6 +21,10 @@ export const crearCliente = async (req, res) => {
     await cliente.save();
     res.status(201).json(cliente);
   } catch (err) {
+    if (err.code === 11000) {
+      const field = Object.keys(err.keyPattern)[0];
+      return res.status(400).json({ error: `Ya existe un cliente con este ${field} (${err.keyValue[field]}).` });
+    }
     res.status(400).json({ error: err.message });
   }
 };
@@ -35,8 +39,17 @@ export const listarClientes = async (req, res) => {
 };
 
 export const actualizarCliente = async (req, res) => {
-  const cliente = await Cliente.findByIdAndUpdate(req.params.id, req.body, { new: true });
-  res.json(cliente);
+  try {
+    const cliente = await Cliente.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    if (!cliente) return res.status(404).json({ error: "Cliente no encontrado" });
+    res.json(cliente);
+  } catch (error) {
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
+      return res.status(400).json({ error: `Ya existe un cliente con este ${field} (${error.keyValue[field]}).` });
+    }
+    res.status(400).json({ error: error.message });
+  }
 };
 
 export const eliminarCliente = async (req, res) => {

@@ -257,7 +257,7 @@ const FinanzasPage = ({ userRole }) => {
       await apiFetch(endpoint, {
         method: 'POST',
         data: {
-          monto: pagoDeudaData.monto,
+          monto: parseFloat(pagoDeudaData.monto),
           tipoPago: pagoDeudaData.tipoPago,
           referencia: pagoDeudaData.referencia,
           cuenta: pagoDeudaData.cuenta
@@ -273,7 +273,7 @@ const FinanzasPage = ({ userRole }) => {
       if (userRole === 'admin') loadSummary();
     } catch (err) {
       console.error('Error al pagar deuda:', err);
-      alert('Error al registrar el pago');
+      alert('Error al registrar el pago: ' + (err.response?.data?.message || err.message));
     }
   };
 

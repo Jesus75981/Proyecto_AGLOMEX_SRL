@@ -44,6 +44,7 @@ const InventarioPage = ({ userRole }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [selectedImageFile, setSelectedImageFile] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
 
   // Estados para búsqueda en formularios
@@ -244,9 +245,7 @@ const InventarioPage = ({ userRole }) => {
     if (!modificarProducto.categoria) {
       errores.categoria = 'Debe seleccionar una categoría';
     }
-    if (modificarProducto.cantidad === '' || isNaN(modificarProducto.cantidad) || parseInt(modificarProducto.cantidad) < 0) {
-      errores.cantidad = 'La cantidad debe ser un número entero positivo o cero';
-    }
+
     if (modificarProducto.precioCompra === '' || isNaN(modificarProducto.precioCompra) || parseFloat(modificarProducto.precioCompra) < 0) {
       errores.precioCompra = 'El precio de compra debe ser un número positivo';
     }
@@ -280,7 +279,7 @@ const InventarioPage = ({ userRole }) => {
         formData.append('idProductoTienda', modificarProducto.codigo);
         formData.append('precioCompra', parseFloat(modificarProducto.precioCompra));
         formData.append('precioVenta', parseFloat(modificarProducto.precioVenta));
-        formData.append('cantidad', parseInt(modificarProducto.cantidad));
+
         formData.append('imagen', selectedImageFile);
 
         const token = getAuthToken();
@@ -310,7 +309,7 @@ const InventarioPage = ({ userRole }) => {
           idProductoTienda: modificarProducto.codigo,
           precioCompra: parseFloat(modificarProducto.precioCompra),
           precioVenta: parseFloat(modificarProducto.precioVenta),
-          cantidad: parseInt(modificarProducto.cantidad)
+
         };
 
         response = await apiFetch(`/productos/${productoEditando._id}`, {
@@ -446,16 +445,17 @@ const InventarioPage = ({ userRole }) => {
           </div>
 
           {/* Barra de Búsqueda */}
-          <div className="mb-6">
-            <div className="relative">
+          {/* Barra de Búsqueda Mejorada */}
+          <div className="mb-8 bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+            <div className="relative flex-1">
               <input
                 type="text"
                 placeholder={`Buscar en ${activeTab}...`}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 w-full"
+                className="pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 w-full text-gray-700 shadow-sm transition-all duration-200 text-lg"
               />
-              <div className="absolute left-3 top-2.5 text-gray-400">
+              <div className="absolute left-4 top-3.5 text-gray-400 text-xl">
                 🔍
               </div>
             </div>
@@ -573,7 +573,7 @@ const InventarioPage = ({ userRole }) => {
                       type="number"
                       placeholder="Cantidad inicial"
                       value={nuevoProducto.cantidad}
-                      onChange={(e) => setNuevoProducto({ ...nuevoProducto, cantidad: parseInt(e.target.value) || 0 })}
+                      onChange={(e) => setNuevoProducto({ ...nuevoProducto, cantidad: parseFloat(e.target.value) || 0 })}
                       className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
                     <input
@@ -592,7 +592,7 @@ const InventarioPage = ({ userRole }) => {
                     />
                     <input
                       type="text"
-                      placeholder="Ubicación en almacén"
+                      placeholder="Almacén"
                       value={nuevoProducto.ubicacion}
                       onChange={(e) => setNuevoProducto({ ...nuevoProducto, ubicacion: e.target.value })}
                       className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
@@ -743,12 +743,16 @@ const InventarioPage = ({ userRole }) => {
                               key={prod.id}
                               onClick={() => {
                                 setProductoSeleccionadoParaEditar(prod.producto);
+                                if (prod.cantidad === 0) {
+                                  alert("No se puede editar un producto con Stock 0.");
+                                  return;
+                                }
                                 iniciarEdicion(prod);
                                 setShowEditarProductoForm(false);
                               }}
-                              className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                              className={`px-4 py-2 cursor-pointer ${prod.cantidad === 0 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'hover:bg-gray-100'}`}
                             >
-                              {prod.producto} - SKU: {prod.sku}
+                              {prod.producto} - SKU: {prod.sku} {prod.cantidad === 0 ? '(Stock 0 - No editable)' : ''}
                             </div>
                           ))}
                         </div>
@@ -813,7 +817,7 @@ const InventarioPage = ({ userRole }) => {
                     />
                     <input
                       type="text"
-                      placeholder="Ubicación"
+                      placeholder="Almacén"
                       value={modificarProducto.ubicacion}
                       onChange={(e) => setModificarProducto({ ...modificarProducto, ubicacion: e.target.value })}
                       className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"

@@ -21,7 +21,7 @@ import User from '../models/user.model.js';
 
 // Configuración
 dotenv.config();
-const mongoURI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/mueblesDB';
+const mongoURI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/mueblesDB';
 
 
 // Función para inicializar la base de datos
@@ -61,20 +61,6 @@ const initDB = async () => {
     await User.deleteMany({ rol: { $ne: 'admin' } });
     console.log('✅ Colección de Usuarios (no administradores) eliminada');
 
-    // Recrear usuarios de prueba
-    const testUsers = [
-      { username: "dueno", password: "admin123", nombre: "Dueño", rol: "admin" },
-      { username: "tienda", password: "admin123", nombre: "Vendedor", rol: "empleado_tienda" },
-      { username: "stock", password: "admin123", nombre: "Almacenista", rol: "empleado_stock" }
-    ];
-
-    for (const user of testUsers) {
-      const exists = await User.findOne({ username: user.username });
-      if (!exists) {
-        await new User(user).save();
-        console.log(`✅ Usuario de prueba "${user.username}" creado`);
-      }
-    }
 
     console.log('✅ Base de datos limpiada correctamente');
 

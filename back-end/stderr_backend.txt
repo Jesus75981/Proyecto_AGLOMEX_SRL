@@ -1,0 +1,12 @@
+file:///C:/Users/PREDATOR/OneDrive%20-%20Universidad%20Privada%20del%20Valle/Documents/Proyecto_AGLOMEX_SRL/back-end/server.js:25
+<<<<<<< HEAD
+^^
+
+SyntaxError: Unexpected token '<<'
+    at compileSourceTextModule (node:internal/modules/esm/utils:340:16)
+    at ModuleLoader.moduleStrategy (node:internal/modules/esm/translators:102:18)
+    at #translate (node:internal/modules/esm/loader:433:12)
+    at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:480:27)
+    at async ModuleJob._link (node:internal/modules/esm/module_job:112:19)
+
+Node.js v22.11.0

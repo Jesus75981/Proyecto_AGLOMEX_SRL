@@ -1,0 +1,266 @@
+INFORMACIÓN DEL SISTEMA AGLOMEX SRL (Para Diagramación)
+
+Esta documentación describe la estructura y lógica de los módulos principales: Catálogo, Fabricación, Inventario, Reportes, Ventas y Compras. Se excluye Dashboard y detalles financieros profundos.
+
+================================================================================
+1. MÓDULO DE CATÁLOGO (TIENDA ONLINE)
+================================================================================
+DESCRIPCIÓN:
+Permite a los clientes visualizar productos, ver modelos 3D/AR y realizar pedidos (actualmente vía WhatsApp).
+
+ENTIDADES (DATA MODELS):
+- ProductoTienda (Colección: productotiendas)
+  - _id: ObjectId
+  - idProductoTienda: String (UUID)
+  - nombre: String
+  - descripcion: String
+  - precioVenta: Number
+  - cantidad: Number (Stock disponible para venta)
+  - categoria: String (Dinámico, e.g., "Muebles", "Estantes")
+  - imagen: String (URL)
+  - objeto3D: Referencia a Objeto3D (para AR)
+  - activo: Boolean
+  - ventasAcumuladas: Number (Para lógica de "Más Vendidos")
+  - dimensiones: { alto, ancho, profundidad }
+
+PROCESOS CLAVE:
+- Visualización de Catálogo:
+  - El usuario puede filtrar por categoría, buscar por nombre.
+  - Se visualizan productos con `activo: true`.
+  - Integración AR: Se usa `<model-viewer>` para mostrar el campo `objeto3D`.
+- Carrito de Compras:
+  - Se maneja en sesión (frontend).
+  - Al completar, genera un mensaje de WhatsApp con el detalle. NO genera una "Venta" en base de datos automáticamente (eso lo hace el administrador manualmente al confirmar).
+
+================================================================================
+2. MÓDULO DE FABRICACIÓN (PRODUCCIÓN)
+================================================================================
+DESCRIPCIÓN:
+Gestiona la transformación de Materia Prima en Productos Terminados.
+
+ENTIDADES (DATA MODELS):
+- Produccion (Colección: produccions)
+  - numeroOrden: Number (Correlativo único)
+  - nombre: String (Nombre del producto a fabricar)
+  - cantidad: Number (Cantidad a producir)
+  - estado: Enum ['Pendiente', 'En Progreso', 'Completado', 'Retrasado']
+  - materiales: Array [{ material: Ref(MateriaPrima), cantidad: Number }]
+  - productoFinal: Ref(ProductoTienda) (Se vincula al terminar)
+  - tiempoEstimado: Number (Horas)
+  - progreso: Number (0-100%)
+  
+- Maquina (Colección: maquinas)
+  - nombre: String
+  - estado: Enum ['Operativa', 'En mantenimiento', 'Fuera de servicio', 'En revisión', 'Necesita reparación']
+
+PROCESOS CLAVE:
+- Creación de Orden de Producción:
+  - Valida si hay stock suficiente de `MateriaPrima`.
+  - Si hay stock, crea la orden en estado 'Pendiente'.
+- Inicio de Producción:
+  - Cambia estado a 'En Progreso'.
+  - DESCUENTA el stock de `MateriaPrima` inmediatamente.
+- Producción Automática (Simulación):
+  - Un proceso en segundo plano actualiza el `progreso` basado en el tiempo transcurrido vs estimado.
+- Finalización de Producción:
+  - Cuando `progreso` llega a 100% o validación manual.
+  - Crea o actualiza un `ProductoTienda` (incrementa stock de producto terminado).
+  - Genera un registro de logística interno (traslado a tienda).
+
+================================================================================
+3. MÓDULO DE INVENTARIO
+================================================================================
+DESCRIPCIÓN:
+Gestiona tanto Materias Primas como Productos Terminados.
+
+ENTIDADES (DATA MODELS):
+- MateriaPrima (Colección: materiaprimas)
+  - idMateriaPrima: String (Código interno)
+  - nombre: String
+  - cantidad: Number
+  - precioCompra: Number
+  - proveedor: Ref(Proveedor)
+  - unidadMedida: String (Implícito en lógica, generalmente unidades o planchas)
+
+- ProductoTienda (Ver Catálogo)
+
+- MovimientoInventario (Colección: movimientoinventarios)
+  - producto: Ref(ProductoTienda)
+  - tipo: Enum ['Entrada', 'Salida', 'Ajuste']
+  - cantidad: Number
+  - motivo: String
+  - stockAnterior: Number
+  - stockActual: Number
+  - fecha: Date
+
+PROCESOS CLAVE:
+- Control de Stock:
+  - Las Compras AUMENTAN el stock (sea MP o Producto).
+  - Las Ventas DISMINUYEN el stock de ProductoTienda.
+  - La Producción DISMINUYE MP y AUMENTA ProductoTienda.
+- Ajustes Manuales (MovimientoInventario):
+  - Registro de mermas, correcciones o entradas manuales de stock.
+  - Mantiene un historial detallado (Kardex) de cambios manuales.
+- Alertas:
+  - Se generan alertas si el stock es <= 5 (Lógica en controladores de Venta/Producción).
+
+================================================================================
+4. MÓDULO DE COMPRAS (ABASTECIMIENTO)
+================================================================================
+DESCRIPCIÓN:
+Registro de adquisición de insumos o productos para reventa.
+
+ENTIDADES (DATA MODELS):
+- Compra (Colección: compras)
+  - numCompra: String (Formato COMP-YYYYMMDD-XXXX)
+  - proveedor: Ref(Proveedor)
+  - tipoCompra: Enum ['Materia Prima', 'Producto Terminado']
+  - productos: Array [{ producto: Ref(Dinámico), cantidad, precioUnitario }]
+  - totalCompra: Number
+  - saldoPendiente: Number
+  - estado: Enum ['Pendiente', 'Pagada', 'Parcialmente Pagada']
+  - metodosPago: Array (Efectivo, Transferencia, Cheque, Crédito)
+
+- DeudaCompra (Colección: deudacompras)
+  - compraId: Ref(Compra)
+  - montoOriginal: Number
+  - saldoActual: Number
+
+PROCESOS CLAVE:
+- Registrar Compra:
+  - Crea el registro de Compra.
+  - Si el producto no existe, lo crea automáticamente en `MateriaPrima` o `ProductoTienda` según `tipoCompra`.
+  - AUMENTA el stock de los items comprados.
+  - Si el pago es parcial o crédito, crea una `DeudaCompra`.
+  - Registra el egreso financiero (Gasto).
+
+================================================================================
+5. MÓDULO DE VENTAS (COMERCIAL)
+================================================================================
+DESCRIPCIÓN:
+Registro de venta de productos terminados y facturación.
+
+ENTIDADES (DATA MODELS):
+- Venta (Colección: ventas)
+  - numVenta: Number (Correlativo)
+  - cliente: Ref(Cliente)
+  - productos: Array [{ producto: Ref(ProductoTienda), cantidad, precio }]
+  - saldoPendiente: Number
+  - estado: Enum ['Completada', 'Pendiente']
+  - metodosPago: Array
+
+- DeudaVenta (Colección: deudaventas)
+  - ventaId: Ref(Venta)
+  - cliente: Ref(Cliente)
+  - saldoActual: Number
+
+PROCESOS CLAVE:
+- Registrar Venta:
+  - Valida stock suficiente en `ProductoTienda`.
+  - DISMINUYE el stock de los productos vendidos.
+  - Registra el ingreso financiero.
+  - Si es a crédito, crea una `DeudaVenta`.
+  - Genera alertas de stock bajo si corresponde.
+
+================================================================================
+6. MÓDULO DE REPORTES
+================================================================================
+DESCRIPCIÓN:
+Generación de estadísticas y listados históricos.
+
+PROCESOS CLAVE (CONTROLADORES):
+- Reporte de Ventas:
+  - Filtros por fecha, cliente, producto.
+  - Calcula: Total Ingresos, Total Productos Vendidos, Productos Más Vendidos, Ventas por Categoría.
+- Reporte de Producción:
+  - Eficiencia (Tiempo estimado vs real).
+  - Producción por estado (Completadas vs Retrasadas).
+- Reporte de Compras:
+  - Gastos por proveedor.
+  - Compras mensuales.
+
+================================================================================
+RELACIONES PRINCIPALES (RESUMEN ER)
+================================================================================
+1. [Proveedor] 1 -- * [Compra]
+2. [Compra] 1 -- * [DetalleCompra] (Items)
+3. [DetalleCompra] * -- 1 [MateriaPrima] O [ProductoTienda] (Polimórfica)
+4. [MateriaPrima] 1 -- * [DetalleProduccion]
+5. [Produccion] 1 -- 1 [ProductoTienda] (Output)
+6. [Cliente] 1 -- * [Venta]
+7. [Venta] 1 -- * [DetalleVenta]
+8. [DetalleVenta] * -- 1 [ProductoTienda]
+9. [ProductoTienda] 1 -- 1 [Objeto3D]
+
+================================================================================
+RESUMEN PARA DIAGRAMA DE ARQUITECTURA
+================================================================================
+ESTILO ARQUITECTÓNICO:
+Aplicación Web Monolítica Modular (Cliente-Servidor) con Frontend desacoplado (SPA).
+
+CAPAS LÓGICAS:
+1. Capa de Presentación (Frontend):
+   - Tecnología: React.js (Vite).
+   - Componentes UI: Tailwind CSS.
+   - Visor 3D/AR: <model-viewer> (Google).
+   - Comunicación: Axios (HTTP/REST) hacia el Backend.
+   - Responsabilidad: Renderizado de UI, gestión de estado local, visualización AR.
+
+2. Capa de Aplicación/Controlador (Backend Service):
+   - Tecnología: Node.js con Express.
+   - Responsabilidad: Lógica de negocio, validaciones, enrutamiento, autenticación (JWT).
+   - Componentes clave: Controllers (Ventas, Compras, Producción, TripoService para IA 3D).
+
+3. Capa de Datos (Persistencia):
+   - Tecnología: MongoDB (NoSQL) con Mongoose (ODM).
+   - Responsabilidad: Almacenamiento de documentos JSON (Colecciones).
+
+SERVICIOS EXTERNOS:
+- Tripo AI API: Servicio externo para generación de modelos 3D a partir de imágenes.
+
+FLUJO TÍPICO (EJEMPLO):
+Usuario (Browser) -> Frontend (React) -> API REST (Express) -> Controller -> Mongoose Model -> MongoDB.
+
+================================================================================
+RESUMEN PARA DIAGRAMA DE COMPONENTES
+================================================================================
+Este diagrama debe mostrar cómo se organizan y comunican los componentes de software.
+
+COMPONENTES PRINCIPALES (BACKEND):
+
+1. Componente de Ventas (SalesController):
+   - Interfaces: `registrarVenta()`, `listarVentas()`.
+   - Dependencias: 
+     - `ProductoModel` (Para leer/actualizar stock).
+     - `DeudaVentaModel` (Para crear créditos).
+     - `FinanzasController` (Para registrar el ingreso).
+
+2. Componente de Compras (PurchasesController):
+   - Interfaces: `registrarCompra()`, `listarCompras()`.
+   - Dependencias:
+     - `ProveedorModel`.
+     - `MateriaPrimaModel` / `ProductoTiendaModel` (Actualiza inventario).
+     - `DeudaCompraModel`.
+     - `FinanzasController` (Registra egreso).
+
+3. Componente de Producción (ProductionController):
+   - Interfaces: `crearOrden()`, `iniciarProduccion()`, `completarProduccion()`.
+   - Dependencias:
+     - `MateriaPrimaModel` (Consume stock).
+     - `ProductoTiendaModel` (Crea stock final).
+     - `TripoService` (Genera modelo 3D automático si hay imagen).
+
+4. Componente de Inventario (InventoryController - Lógica distribuida):
+   - Gestionado por `ProductoTiendaController` y `MateriaPrimaController`.
+   - Interfaces: `listarProductos()`, `actualizarStock()`.
+
+5. Componente de Catálogo (CatalogController):
+   - Interfaces: `listarProductosDisponibles()`.
+   - Consume: `ProductoTiendaModel` (Solo activos y con stock).
+
+6. Componente de Reportes (ReportsController):
+   - Interfaces: `reporteVentas()`, `reporteProduccion()`, `reporteCompras()`.
+   - Dependencias: Acceso de lectura a TODOS los modelos (Ventas, Compras, Producción).
+
+RELACIÓN CON BASE DE DATOS:
+Todos los componentes anteriores usan Mongoose para interactuar con la Base de Datos MongoDB.

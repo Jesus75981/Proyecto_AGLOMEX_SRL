@@ -17,7 +17,7 @@ import Material from '../models/materiales.model.js';
 import Pedido from '../models/pedido.model.js';
 import Transportista from '../models/transportista.model.js';
 import User from '../models/user.model.js';
-import Anticipo from '../models/anticipo.model.js';
+
 import Contador from '../models/contador.model.js';
 import Movimiento from '../models/movimiento.model.js';
 import Ruta from '../models/ruta.model.js';

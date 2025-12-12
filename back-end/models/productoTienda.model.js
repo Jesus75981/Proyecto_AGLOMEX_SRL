@@ -10,7 +10,8 @@ const productoTiendaSchema = new mongoose.Schema({
   nombre: {
     type: String,
     required: true,
-    trim: true
+    trim: true,
+    // unique: false (Explicitly not unique by itself)
   },
   descripcion: {
     type: String,
@@ -90,13 +91,6 @@ const productoTiendaSchema = new mongoose.Schema({
     ref: "Objeto3D" // para vincular con el modelo 3D en RA
   },
   ventasAcumuladas: { // <-- ¡NUEVO CAMPO REQUERIDO PARA "MÁS VENDIDOS"!
-<<<<<<< HEAD
-    type: Number,
-    default: 0
-  },
-  cantidad: { // <-- NUEVO CAMPO PARA INVENTARIO
-=======
->>>>>>> origin/main
     type: Number,
     default: 0
   },
@@ -106,6 +100,9 @@ const productoTiendaSchema = new mongoose.Schema({
     default: true,
   },
 }, { timestamps: true });
+
+// Compound Index: Enforce uniqueness on Name + Color
+productoTiendaSchema.index({ nombre: 1, color: 1 }, { unique: true });
 
 // HOOK DE MANTENIMIENTO: Genera automáticamente el idProductoTienda (SKU interno)
 productoTiendaSchema.pre('save', function (next) {

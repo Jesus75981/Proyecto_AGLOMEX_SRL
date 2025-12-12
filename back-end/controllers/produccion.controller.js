@@ -1,7 +1,10 @@
 import Produccion from "../models/produccion.model.js";
 import ProductoTienda from "../models/productoTienda.model.js";
+import MateriaPrima from "../models/materiaPrima.model.js";
 import Logistica from "../models/logistica.model.js";
 import Contador from "../models/contador.model.js";
+import Objeto3D from "../models/objetos3d.model.js";
+import * as tripoService from "../services/tripo.service.js";
 
 // Función auxiliar para obtener el siguiente valor de la secuencia del contador
 const getNextSequenceValue = async (nombreSecuencia) => {
@@ -22,37 +25,67 @@ const generarCodigoInterno = (nombre) => {
 
 export const crearProduccion = async (req, res) => {
   try {
-    console.log('Creating Production:', req.body);
+    console.log('Creating Production Payload:', JSON.stringify(req.body));
 
-    // Validar stock de materiales antes de crear la orden
+    // 1. Validar stock de materiales
     if (req.body.materiales && req.body.materiales.length > 0) {
-      for (const item of req.body.materiales) {
-        // item.material puede ser el ID directamente o un objeto con _id
-        const materialId = item.material._id || item.material;
-        const material = await ProductoTienda.findById(materialId);
+      try {
+        for (const item of req.body.materiales) {
+          if (!item.material) continue; // Skip invalid items
 
-        if (!material) {
-          return res.status(400).json({ message: `Material no encontrado: ${materialId}` });
-        }
+          const materialId = item.material._id || item.material;
+          const material = await MateriaPrima.findById(materialId);
 
-        if (material.cantidad < item.cantidad) {
-          return res.status(400).json({
-            message: `Stock insuficiente para: ${material.nombre}. Disponible: ${material.cantidad}, Requerido: ${item.cantidad}`
-          });
+          if (!material) {
+            console.error(`Material not found: ${materialId}`);
+            return res.status(400).json({ message: `Material no encontrado con ID: ${materialId}` });
+          }
+
+          if (material.cantidad < item.cantidad) {
+            console.error(`Insufficient stock for ${material.nombre}: Has ${material.cantidad}, Need ${item.cantidad}`);
+            return res.status(400).json({
+              message: `Stock insuficiente para: ${material.nombre}. Disponible: ${material.cantidad}, Requerido: ${item.cantidad}`
+            });
+          }
         }
+      } catch (validationError) {
+        console.error('Error during material validation:', validationError);
+        return res.status(500).json({
+          error: 'Error validando materiales',
+          details: validationError.message
+        });
       }
     }
 
-    const produccion = new Produccion(req.body);
-    await produccion.save();
-    console.log('Production created:', produccion._id);
-    res.status(201).json(produccion);
+    // 2. Crear y Guardar Producción
+    try {
+      // Clean payload if necessary? Mongoose handles it.
+      // Generate unique order number
+      const numeroOrden = await getNextSequenceValue('produccionNumero');
+      const produccion = new Produccion({
+        ...req.body,
+        numeroOrden
+      });
+      await produccion.save();
+      console.log('Production created successfully:', produccion._id);
+      res.status(201).json(produccion);
+    } catch (saveError) {
+      if (saveError.code === 11000) {
+        return res.status(400).json({ error: "Ya existe una orden de producción con estos datos únicos." });
+      }
+      console.error('Error saving production to DB:', saveError);
+      return res.status(500).json({
+        error: 'Error guardando orden de producción',
+        details: saveError.message,
+        // stack: saveError.stack // Optional: hide stack in production usually, but good for debug
+      });
+    }
+
   } catch (error) {
-    console.error('Error creating production:', error);
+    console.error('Unexpected error in crearProduccion:', error);
     res.status(500).json({
-      error: 'Error creating production',
-      details: error.message,
-      stack: error.stack
+      error: 'Error inesperado al crear producción',
+      details: error.message
     });
   }
 };
@@ -80,7 +113,7 @@ export const iniciarProduccion = async (req, res) => {
 
     // Verificar y descontar stock de materiales
     for (const item of produccion.materiales) {
-      const material = await ProductoTienda.findById(item.material._id);
+      const material = await MateriaPrima.findById(item.material._id);
       if (!material) {
         return res.status(400).json({ message: `Material no encontrado: ${item.material.nombre}` });
       }
@@ -139,7 +172,7 @@ export const actualizarProgresoAutomatico = async () => {
 };
 
 // Función para completar producción automáticamente
-const completarProduccionAutomatica = async (produccion) => {
+const completarProduccionAutomatica = async (produccion, datosExtra = {}) => {
   try {
     // Buscar si ya existe un producto con el mismo nombre
     let productoFinal = await ProductoTienda.findOne({ nombre: produccion.nombre });
@@ -155,17 +188,45 @@ const completarProduccionAutomatica = async (produccion) => {
       productoFinal = new ProductoTienda({
         idProductoTienda: idProductoTienda,
         nombre: produccion.nombre,
-        descripcion: `Producto fabricado automáticamente - ${produccion.nombre}`,
+        descripcion: datosExtra.descripcion || `Producto fabricado automáticamente - ${produccion.nombre}`,
         cantidad: produccion.cantidad,
         precioCompra: produccion.precioCompra,
-        precioVenta: produccion.precioVenta,
-        imagen: produccion.imagen,
+        precioVenta: datosExtra.precioVenta || produccion.precioVenta,
+        imagen: produccion.imagen || datosExtra.imagen || "",
         tipo: 'Producto Terminado',
-        categoria: 'Muebles', // Categoría por defecto, podría venir de la orden
-        color: 'Estándar',
+        categoria: datosExtra.categoria || 'Muebles',
+        color: datosExtra.color || 'Estándar',
         codigo: idProductoTienda
       });
       await productoFinal.save();
+
+      // [New] Trigger 3D generation if image is present (Automatic Creation)
+      if (productoFinal.imagen) {
+        const simulUrl = productoFinal.imagen.startsWith('http')
+          ? productoFinal.imagen
+          : `http://localhost:5000${productoFinal.imagen}`;
+
+        (async () => {
+          try {
+            console.log(`[TRIPO] Iniciando generación 3D (Automatic) para producto ${productoFinal.nombre}...`);
+            const taskId = await tripoService.create3DTask(simulUrl);
+
+            const nuevoObjeto3D = new Objeto3D({
+              producto: productoFinal._id,
+              sourceImage: productoFinal.imagen,
+              tripoTaskId: taskId,
+              status: 'queued'
+            });
+            await nuevoObjeto3D.save();
+
+            productoFinal.objeto3D = nuevoObjeto3D._id;
+            await productoFinal.save();
+            console.log(`[TRIPO] Tarea creada (Automatic): ${taskId}`);
+          } catch (error) {
+            console.error("[TRIPO] Error al iniciar generación (Automatic):", error.message);
+          }
+        })();
+      }
     }
 
     produccion.productoFinal = productoFinal._id;
@@ -231,12 +292,23 @@ export const confirmarProduccion = async (req, res) => {
       return res.status(404).json({ message: "Registro de producción no encontrado" });
     }
 
-    if (produccion.estado !== 'Completado') {
-      return res.status(400).json({ message: "La producción debe estar completada para confirmar" });
+    if (produccion.estado === 'Completado') {
+      return res.status(400).json({ message: "La producción ya está completada" });
     }
 
-    // La producción ya está completada automáticamente, solo confirmar
-    res.json({ message: "Producción confirmada", produccion });
+    // Actualizar estado
+    produccion.estado = 'Completado';
+    produccion.progreso = 100;
+
+    // Usar datos del body (modal frontend) si existen
+    const datosExtra = req.body || {};
+
+    await produccion.save();
+
+    // Crear producto en tienda usando los datos extra
+    await completarProduccionAutomatica(produccion, datosExtra);
+
+    res.json({ message: "Producción confirmada y producto creado", produccion });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

@@ -1,9 +1,12 @@
-import express from "express";
-import { getCategorias, createCategoria } from "../controllers/categoria.controller.js";
+import { Router } from 'express';
+import { getCategorias, createCategoria } from '../controllers/categorias.controller.js';
 
-const router = express.Router();
+const router = Router();
 
-router.get("/", getCategorias);
-router.post("/", createCategoria);
+// GET /api/categorias
+router.get('/', getCategorias);
+
+// POST /api/categorias (opcional, protegido si se desea)
+router.post('/', createCategoria);
 
 export default router;

@@ -97,12 +97,10 @@ const VentasPage = ({ userRole }) => {
 
   const [nuevaVenta, setNuevaVenta] = useState({
     cliente: '',
-    productos: [], // Array de productos en la venta (carrito)
+    productos: [], 
     fecha: new Date().toISOString().split('T')[0],
-    metodoPago: 'Efectivo',
-    metodoPago: 'Efectivo',
-    metodoEntrega: 'Recojo en Tienda', // ✅ Default delivery method
-    numFactura: generarNumFactura(),
+    metodosPago: [], // Array de pagos múltiples
+    metodoEntrega: 'Recojo en Tienda',
     numFactura: generarNumFactura(),
     observaciones: ''
   });
@@ -115,10 +113,17 @@ const VentasPage = ({ userRole }) => {
     precioUnitario: 0
   });
 
+  // Estado temporal para pagos múltiples
+  const [pagoTemporal, setPagoTemporal] = useState({
+    metodo: 'Efectivo',
+    monto: ''
+  });
+
   const [errors, setErrors] = useState({});
   const [clienteErrors, setClienteErrors] = useState({});
   const [showForm, setShowForm] = useState(false);
   const [showCreateClientForm, setShowCreateClientForm] = useState(false);
+  const [showClienteDropdown, setShowClienteDropdown] = useState(false); // Estado para dropdown de clientes
   const [nuevoCliente, setNuevoCliente] = useState({
     nombre: '',
     empresa: '',
@@ -138,6 +143,93 @@ const VentasPage = ({ userRole }) => {
   );
 
 
+
+  // --- Tabs de Navegación ---
+  const [activeTab, setActiveTab] = useState('ventas'); // 'ventas' | 'clientes'
+  const [clienteEditing, setClienteEditing] = useState(null); // Cliente en edición
+  
+  // --- Estado para Modal de Detalles ---
+  const [selectedVenta, setSelectedVenta] = useState(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+
+  // Función para abrir modal de detalles
+  const verDetallesVenta = (venta) => {
+    setSelectedVenta(venta);
+    setShowDetailModal(true);
+  };
+
+  // Función para manejar la edición de cliente
+  const handleEditCliente = (cliente) => {
+    setNuevoCliente({
+      nombre: cliente.nombre,
+      empresa: cliente.empresa || '',
+      direccion: cliente.direccion,
+      telefono: cliente.telefono,
+      email: cliente.email || '',
+      nit: cliente.nit || '',
+      ci: cliente.ci || '',
+      ubicacion: cliente.ubicacion || ''
+    });
+    setClienteEditing(cliente);
+    setShowCreateClientForm(true);
+  };
+
+  // Función para eliminar cliente
+  const handleDeleteCliente = async (id) => {
+    if (!window.confirm('¿Estás seguro de que deseas eliminar este cliente?')) return;
+
+    try {
+      await apiFetch(`/clientes/${id}`, { method: 'DELETE' });
+      setClientes(clientes.filter(c => c._id !== id));
+      alert('Cliente eliminado exitosamente');
+    } catch (error) {
+      console.error('Error al eliminar cliente:', error);
+      alert('Error al eliminar cliente: ' + error.message);
+    }
+  };
+
+  // Función para actualizar cliente
+  const actualizarCliente = async () => {
+    if (!validarCliente()) return;
+
+    try {
+      const clienteData = { ...nuevoCliente };
+      
+      const clienteActualizado = await apiFetch(`/clientes/${clienteEditing._id}`, {
+        method: 'PUT',
+        body: JSON.stringify(clienteData)
+      });
+
+      setClientes(clientes.map(c => c._id === clienteEditing._id ? clienteActualizado : c));
+      
+      // Reset form
+      setNuevoCliente({
+        nombre: '',
+        empresa: '',
+        direccion: '',
+        telefono: '',
+        email: '',
+        nit: '',
+        ci: '',
+        ubicacion: ''
+      });
+      setClienteEditing(null);
+      setShowCreateClientForm(false);
+      alert('Cliente actualizado exitosamente');
+    } catch (error) {
+      console.error('Error al actualizar cliente:', error);
+      alert('Error al actualizar cliente: ' + error.message);
+    }
+  };
+
+  // Wrapper para guardar (Crear o Actualizar)
+  const handleSaveCliente = () => {
+    if (clienteEditing) {
+      actualizarCliente();
+    } else {
+      crearCliente();
+    }
+  };
 
   // ✅ VALIDACIONES COMPLETAS
   const validarVenta = () => {
@@ -173,6 +265,12 @@ const VentasPage = ({ userRole }) => {
 
     if (!productoSeleccionado) {
       alert('Producto no encontrado. Por favor, selecciona un producto válido.');
+      return;
+    }
+
+    // Validar stock disponible
+    if (productoTemporal.cantidad > productoSeleccionado.cantidad) {
+      alert(`No hay suficiente stock para este producto. Disponible: ${productoSeleccionado.cantidad}`);
       return;
     }
 
@@ -220,8 +318,28 @@ const VentasPage = ({ userRole }) => {
       productoId: '',
       productoNombre: '',
       cantidad: 1,
-      precioUnitario: 0
     });
+  };
+
+  // Agregar un método de pago a la lista
+  const agregarPago = () => {
+    const monto = parseFloat(pagoTemporal.monto);
+    if (!monto || monto <= 0) {
+        alert('El monto debe ser mayor a 0');
+        return;
+    }
+
+    setNuevaVenta({
+        ...nuevaVenta,
+        metodosPago: [...nuevaVenta.metodosPago, { tipo: pagoTemporal.metodo, monto: monto }]
+    });
+    setPagoTemporal({ ...pagoTemporal, monto: '' });
+  };
+
+  // Quitar un pago
+  const quitarPago = (index) => {
+    const nuevosPagos = nuevaVenta.metodosPago.filter((_, i) => i !== index);
+    setNuevaVenta({ ...nuevaVenta, metodosPago: nuevosPagos });
   };
 
   // Función para quitar producto de la venta
@@ -263,12 +381,12 @@ const VentasPage = ({ userRole }) => {
       nuevosErrores.email = 'El email debe tener un formato válido';
     }
 
-    if (nuevoCliente.nit && !/^[0-9]{7,15}$/.test(nuevoCliente.nit)) {
-      nuevosErrores.nit = 'El NIT debe contener solo números (7-15 dígitos)';
+    if (nuevoCliente.nit && !/^[a-zA-Z0-9\s-]{5,20}$/.test(nuevoCliente.nit)) {
+      nuevosErrores.nit = 'El NIT puede contener números y letras (5-20 caracteres)';
     }
 
-    if (nuevoCliente.ci && !/^[0-9]{7,15}$/.test(nuevoCliente.ci)) {
-      nuevosErrores.ci = 'El CI debe contener solo números (7-15 dígitos)';
+    if (nuevoCliente.ci && !/^[a-zA-Z0-9\s-]{5,20}$/.test(nuevoCliente.ci)) {
+      nuevosErrores.ci = 'El CI puede contener números y letras (5-20 caracteres)';
     }
 
     setClienteErrors(nuevosErrores);
@@ -385,17 +503,11 @@ const VentasPage = ({ userRole }) => {
         cliente: clienteSeleccionado ? clienteSeleccionado._id : null, // ID del cliente o null si no hay cliente
         productos: nuevaVenta.productos, // Usar el array de productos
         fecha: nuevaVenta.fecha,
-        // metodoPago: nuevaVenta.metodoPago, // DEPRECADO: Se usa metodosPago ahora
-        metodosPago: [
-          {
-            tipo: nuevaVenta.metodoPago,
-            monto: totalVenta // Por ahora asumimos pago único por el total
-          }
-        ],
-        metodoEntrega: nuevaVenta.metodoEntrega, // ✅ Send delivery method
+        metodosPago: nuevaVenta.metodosPago.length > 0 ? nuevaVenta.metodosPago : [{ tipo: 'Efectivo', monto: totalVenta }], // Fallback a efectivo si no hay pagos
+        metodoEntrega: nuevaVenta.metodoEntrega,
         numFactura: nuevaVenta.numFactura,
         observaciones: nuevaVenta.observaciones,
-        estado: nuevaVenta.metodoPago === 'Crédito' ? 'Pendiente' : 'Pagada', // Estado inicial depende del pago
+        estado: (nuevaVenta.metodosPago.reduce((acc, p) => acc + p.monto, 0) >= totalVenta) ? 'Pagada' : 'Pendiente',
         vendedor: userRole || 'usuario'
       };
 
@@ -405,20 +517,16 @@ const VentasPage = ({ userRole }) => {
         body: JSON.stringify(ventaData)
       });
 
-      // Actualizar estado local
-      setVentas([...ventas, nuevaVentaGuardada]);
+      // Recargar lista de ventas para obtener datos poblados (nombres de clientes/productos)
+      try {
+          const ventasActualizadas = await apiFetch('/ventas');
+          setVentas(ventasActualizadas);
+      } catch (err) {
+          console.error("Error al recargar ventas:", err);
+          // Fallback: add locally if fetch fails, though populated data might be missing
+          setVentas([...ventas, nuevaVentaGuardada]);
+      }
 
-      // Limpiar formulario
-      setNuevaVenta({
-        cliente: '',
-        productos: [], // Limpiar productos
-        fecha: new Date().toISOString().split('T')[0],
-        metodoPago: 'Efectivo',
-        metodoEntrega: 'Recojo en Tienda',
-        numFactura: generarNumFactura(),
-        observaciones: ''
-      });
-      setProductoSearchTerm('');
       setErrors({});
       setShowForm(false);
 
@@ -471,72 +579,83 @@ const VentasPage = ({ userRole }) => {
 
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Navbar de Navegación */}
-      <nav className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-4">
-              <button
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Header */}
+      <header className="bg-white shadow-sm sticky top-0 z-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+          <div className="flex items-center gap-4">
+             <button
                 onClick={volverAlHome}
-                className="flex items-center space-x-2 bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition duration-200"
-              >
-                <span>←</span>
+                className="flex items-center space-x-2 bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 hover:text-green-600 transition-colors shadow-sm font-medium"
+                title="Volver al Inicio"
+             >
+                <span className="text-xl">←</span>
                 <span>Volver al Home</span>
-              </button>
-              <h1 className="text-2xl font-bold text-gray-800">Sistema Aglomex</h1>
-            </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">Módulo de Ventas</span>
-              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                {userRole || 'Usuario'}
-              </span>
-            </div>
+             </button>
+             <h1 className="text-2xl font-bold text-gray-900">Módulo de Ventas y Clientes</h1>
+          </div>
+          
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setActiveTab('ventas')}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                activeTab === 'ventas' 
+                ? 'bg-green-600 text-white shadow-md' 
+                : 'bg-white text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              Ventas
+            </button>
+            <button
+              onClick={() => setActiveTab('clientes')}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                activeTab === 'clientes' 
+                ? 'bg-green-600 text-white shadow-md' 
+                : 'bg-white text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              Gestionar Clientes
+            </button>
           </div>
         </div>
-      </nav>
+      </header>
 
-      {/* Contenido Principal */}
-      <div className="p-6">
-        <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold text-green-600 mb-2">Módulo de Ventas</h1>
-            <p className="text-gray-600 text-lg">Gestión completa de ventas y clientes</p>
-          </div>
+      {/* Content */}
+      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        
+        {/* --- VISTA DE VENTAS --- */}
+        {activeTab === 'ventas' && (
+          <>
+            {/* Header Venta */}
+            <div className="mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
+              <div>
+                 <h1 className="text-3xl font-bold text-green-600 mb-1">Nueva Venta</h1>
+                 <p className="text-gray-600">Registra ventas y controla el flujo de caja.</p>
+              </div>
+              
+              <div className="flex flex-wrap gap-4 items-center">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Buscar por cliente, producto..."
+                      value={searchTerm ?? ''}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 w-64"
+                    />
+                    <div className="absolute left-3 top-2.5 text-gray-400">🔍</div>
+                  </div>
 
-
-
-          {/* Controles Superiores */}
-          <div className="flex justify-between items-center mb-6">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Buscar por cliente, producto o estado..."
-                value={searchTerm ?? ''}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 w-80"
-              />
-              <div className="absolute left-3 top-2.5 text-gray-400">
-                🔍
+                  {!showForm && (
+                    <button
+                      onClick={() => setShowForm(true)}
+                      className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-bold shadow-md transition-all flex items-center gap-2 transform hover:scale-105"
+                    >
+                      <span>＋</span> Registrar Venta
+                    </button>
+                  )}
               </div>
             </div>
 
-            <div className="flex space-x-4">
-              <button
-                onClick={() => setShowCreateClientForm(!showCreateClientForm)}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition duration-200 font-semibold"
-              >
-                {showCreateClientForm ? 'Cancelar Cliente' : '+ Nuevo Cliente'}
-              </button>
-              <button
-                onClick={() => setShowForm(!showForm)}
-                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition duration-200 font-semibold"
-              >
-                {showForm ? 'Cancelar Venta' : '+ Nueva Venta'}
-              </button>
-            </div>
-          </div>
 
           {/* Formulario de Crear Cliente */}
           {showCreateClientForm && (
@@ -678,14 +797,59 @@ const VentasPage = ({ userRole }) => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Cliente (Opcional)</label>
-                  <input
-                    type="text"
-                    value={nuevaVenta.cliente}
-                    onChange={(e) => setNuevaVenta({ ...nuevaVenta, cliente: e.target.value })}
-                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${errors.cliente ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                    placeholder="Nombre completo del cliente (opcional)"
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={nuevaVenta.cliente}
+                      onChange={(e) => {
+                          setNuevaVenta({ ...nuevaVenta, cliente: e.target.value });
+                          setShowClienteDropdown(true);
+                      }}
+                      onFocus={() => setShowClienteDropdown(true)}
+                      onBlur={() => setTimeout(() => setShowClienteDropdown(false), 200)}
+                      className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${errors.cliente ? 'border-red-500' : 'border-gray-300'}`}
+                      placeholder="Buscar o escribir nombre..."
+                      autoComplete="off"
+                    />
+                    {/* Botón para limpiar */}
+                    {nuevaVenta.cliente && (
+                        <button
+                            onClick={() => setNuevaVenta({ ...nuevaVenta, cliente: '' })}
+                            className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+                        >
+                            ✕
+                        </button>
+                    )}
+
+                    {/* Dropdown de Clientes */}
+                    {showClienteDropdown && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        {clientes
+                          .filter(c => c.nombre.toLowerCase().includes((nuevaVenta.cliente || '').toLowerCase()) || (c.empresa || '').toLowerCase().includes((nuevaVenta.cliente || '').toLowerCase()))
+                          .slice(0, 10) // Limit results
+                          .map((cliente) => (
+                            <div
+                              key={cliente._id}
+                              onClick={() => {
+                                setNuevaVenta({ ...nuevaVenta, cliente: cliente.nombre });
+                                setShowClienteDropdown(false);
+                              }}
+                              className="px-4 py-2 hover:bg-green-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                            >
+                              <div className="font-medium text-gray-800">{cliente.nombre}</div>
+                              {cliente.empresa && <div className="text-xs text-gray-500">{cliente.empresa}</div>}
+                            </div>
+                          ))}
+                         
+                         {/* Opción para crear si no existe (visual cue, though typing works) */}
+                         {clientes.filter(c => c.nombre.toLowerCase().includes((nuevaVenta.cliente || '').toLowerCase())).length === 0 && nuevaVenta.cliente && (
+                            <div className="px-4 py-2 text-sm text-gray-500 italic">
+                                Presiona Enter o haz clic fuera para usar "{nuevaVenta.cliente}" como nuevo cliente (o cliente casual).
+                            </div>
+                         )}
+                      </div>
+                    )}
+                  </div>
                   {errors.cliente && <p className="text-red-500 text-sm mt-1">{errors.cliente}</p>}
                 </div>
 
@@ -749,7 +913,7 @@ const VentasPage = ({ userRole }) => {
                                   ...productoTemporal,
                                   productoId: producto._id,
                                   productoNombre: producto.nombre,
-                                  precioUnitario: producto.precioVenta || producto.precio
+                                  precioUnitario: producto.precioVenta || producto.precioCompra || producto.precio || 0
                                 });
                                 setShowProductoDropdown(false);
                               }}
@@ -859,19 +1023,78 @@ const VentasPage = ({ userRole }) => {
 
               {/* Detalles Adicionales de la Venta */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Método de Pago</label>
-                  <select
-                    value={nuevaVenta.metodoPago}
-                    onChange={(e) => setNuevaVenta({ ...nuevaVenta, metodoPago: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  >
-                    <option value="Efectivo">Efectivo</option>
-                    <option value="Tarjeta">Tarjeta</option>
-                    <option value="Transferencia">Transferencia</option>
-                    <option value="Cheque">Cheque</option>
-                    <option value="Crédito">Crédito</option>
-                  </select>
+                <div className="md:col-span-2 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Métodos de Pago</label>
+                  
+                  {/* Selector y Input de Pago */}
+                  <div className="flex flex-wrap gap-2 mb-3 items-end">
+                      <div className="flex-1 min-w-[150px]">
+                          <label className="text-xs text-gray-500">Método</label>
+                          <select
+                              value={pagoTemporal.metodo}
+                              onChange={(e) => setPagoTemporal({ ...pagoTemporal, metodo: e.target.value })}
+                              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-green-500"
+                          >
+                              <option value="Efectivo">Efectivo</option>
+                              <option value="Transferencia">Transferencia</option>
+                              <option value="Cheque">Cheque</option>
+                              <option value="Tarjeta">Tarjeta</option>
+                          </select>
+                      </div>
+                      <div className="w-32">
+                           <label className="text-xs text-gray-500">Monto (Bs)</label>
+                           <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={pagoTemporal.monto}
+                              onChange={(e) => setPagoTemporal({ ...pagoTemporal, monto: e.target.value })}
+                              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-green-500"
+                              placeholder="0.00"
+                           />
+                      </div>
+                      <button
+                          onClick={agregarPago}
+                          className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 font-bold"
+                      >
+                          +
+                      </button>
+                  </div>
+
+                  {/* Lista de Pagos Agregados */}
+                  {nuevaVenta.metodosPago.length > 0 && (
+                      <div className="space-y-2 mb-2">
+                          {nuevaVenta.metodosPago.map((pago, idx) => (
+                              <div key={idx} className="flex justify-between items-center bg-white p-2 rounded border border-gray-200 shadow-sm text-sm">
+                                  <span className="font-medium text-gray-700">{pago.tipo}</span>
+                                  <div className="flex items-center gap-3">
+                                      <span className="font-bold text-gray-900">Bs. {pago.monto.toFixed(2)}</span>
+                                      <button onClick={() => quitarPago(idx)} className="text-red-500 hover:text-red-700 font-bold">✕</button>
+                                  </div>
+                              </div>
+                          ))}
+                      </div>
+                  )}
+
+                  {/* Resumen de Pagos */}
+                  <div className="flex justify-between items-center text-sm pt-2 border-t border-gray-300">
+                      <div>
+                          <span className="text-gray-600">Total Venta: </span>
+                          <span className="font-bold">Bs. {calcularTotal().toFixed(2)}</span>
+                      </div>
+                      <div>
+                          <span className="text-gray-600">Pagado: </span>
+                          <span className="font-bold text-blue-600">
+                              Bs. {nuevaVenta.metodosPago.reduce((s, p) => s + p.monto, 0).toFixed(2)}
+                          </span>
+                      </div>
+                      <div>
+                          <span className="text-gray-600">Saldo/Cambio: </span>
+                          <span className={`font-bold ${(nuevaVenta.metodosPago.reduce((s, p) => s + p.monto, 0) - calcularTotal()) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              Bs. {(nuevaVenta.metodosPago.reduce((s, p) => s + p.monto, 0) - calcularTotal()).toFixed(2)}
+                          </span>
+                      </div>
+                  </div>
                 </div>
 
                 <div>
@@ -906,7 +1129,8 @@ const VentasPage = ({ userRole }) => {
                       cliente: '',
                       productos: [],
                       fecha: new Date().toISOString().split('T')[0],
-                      metodoPago: 'Efectivo',
+                      metodosPago: [],
+                      metodoEntrega: 'Recojo en Tienda',
                       numFactura: generarNumFactura(),
                       observaciones: ''
                     });
@@ -964,7 +1188,7 @@ const VentasPage = ({ userRole }) => {
                         {venta.saldoPendiente > 0 ? `Bs. ${venta.saldoPendiente.toFixed(2)}` : '-'}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(venta.fecha).toLocaleDateString('es-ES')}
+                        {venta.fecha ? new Date(venta.fecha).toLocaleDateString('es-ES') : '-'}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${venta.estado === 'Completada' || venta.estado === 'Pagada'
@@ -976,6 +1200,13 @@ const VentasPage = ({ userRole }) => {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
                         <div className="flex space-x-2">
+                           {/* Botón Detalles */}
+                           <button
+                              onClick={() => verDetallesVenta(venta)}
+                              className="text-blue-600 hover:text-blue-900 text-xs"
+                            >
+                              Ver Detalles
+                            </button>
                           {venta.estado === 'Pendiente' && (
                             <button
                               onClick={() => cambiarEstadoVenta(venta._id, 'Completada')}
@@ -1006,9 +1237,373 @@ const VentasPage = ({ userRole }) => {
               )}
             </div>
           </div>
-        </div>
-      </div>
-    </div >
+
+            {/* --- MODAL DE DETALLES DE VENTA --- */}
+            {showDetailModal && selectedVenta && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+                  <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50 rounded-t-xl">
+                    <div>
+                      <h3 className="text-2xl font-bold text-gray-800">Detalles de Venta #{selectedVenta.numVenta}</h3>
+                      <p className="text-sm text-gray-500">Fecha: {new Date(selectedVenta.fecha).toLocaleDateString('es-ES')} - {new Date(selectedVenta.fecha).toLocaleTimeString('es-ES')}</p>
+                    </div>
+                    <button 
+                       onClick={() => setShowDetailModal(false)}
+                       className="text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-full p-2 transition-colors"
+                    >
+                       ✕
+                    </button>
+                  </div>
+                  
+                  <div className="p-6 space-y-6">
+                    
+                    {/* Info Cliente y Estado */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-blue-50 p-4 rounded-lg border border-blue-100">
+                      <div>
+                        <h4 className="font-semibold text-blue-800 mb-2">Información del Cliente</h4>
+                        {selectedVenta.cliente ? (
+                          <ul className="text-sm text-gray-700 space-y-1">
+                            <li><span className="font-medium">Nombre:</span> {selectedVenta.cliente.nombre}</li>
+                            {selectedVenta.cliente.empresa && <li><span className="font-medium">Empresa:</span> {selectedVenta.cliente.empresa}</li>}
+                            {selectedVenta.cliente.nit && <li><span className="font-medium">NIT/CI:</span> {selectedVenta.cliente.nit || selectedVenta.cliente.ci}</li>}
+                            <li><span className="font-medium">Teléfono:</span> {selectedVenta.cliente.telefono}</li>
+                          </ul>
+                        ) : (
+                          <p className="text-sm text-gray-500 italic">Cliente Casual / No registrado</p>
+                        )}
+                      </div>
+                      <div className="text-right">
+                         <h4 className="font-semibold text-gray-800 mb-2">Estado de Venta</h4>
+                         <span className={`inline-block px-3 py-1 text-sm font-semibold rounded-full ${selectedVenta.estado === 'Completada' || selectedVenta.estado === 'Pagada'
+                           ? 'bg-green-100 text-green-800'
+                           : 'bg-yellow-100 text-yellow-800'
+                           }`}>
+                           {selectedVenta.estado}
+                         </span>
+                         <div className="mt-2 text-sm text-gray-600">
+                            <p>Factura/Recibo: <span className="font-mono font-medium">{selectedVenta.numFactura}</span></p>
+                            <p>Entrega: {selectedVenta.metodoEntrega}</p>
+                         </div>
+                      </div>
+                    </div>
+
+                    {/* Tabla de Productos */}
+                    <div>
+                      <h4 className="font-bold text-gray-800 mb-3 text-lg border-b pb-2">Productos Vendidos</h4>
+                      <div className="overflow-x-auto border rounded-lg">
+                        <table className="w-full text-sm">
+                          <thead className="bg-gray-100 text-gray-700">
+                            <tr>
+                               <th className="px-4 py-2 text-left">Código</th>
+                               <th className="px-4 py-2 text-left">Producto</th>
+                               <th className="px-4 py-2 text-center">Color</th>
+                               <th className="px-4 py-2 text-center">Cant.</th>
+                               <th className="px-4 py-2 text-right">Precio Unit.</th>
+                               <th className="px-4 py-2 text-right">Subtotal</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {selectedVenta.productos.map((item, idx) => (
+                              <tr key={idx} className="hover:bg-gray-50">
+                                <td className="px-4 py-2 font-mono text-gray-500">{item.producto?.codigo || item.producto?.idProductoTienda || 'N/A'}</td>
+                                <td className="px-4 py-2 font-medium text-gray-900">
+                                   <div className="flex items-center gap-2">
+                                     {item.producto?.imagen && (
+                                       <img src={`http://localhost:5000${item.producto.imagen}`} alt="" className="w-8 h-8 rounded object-cover border" />
+                                     )}
+                                     <span>{item.producto?.nombre || item.productoNombre || 'Producto Eliminado'}</span>
+                                   </div>
+                                </td>
+                                <td className="px-4 py-2 text-center text-gray-600">{item.producto?.color || '-'}</td>
+                                <td className="px-4 py-2 text-center font-semibold">{item.cantidad}</td>
+                                <td className="px-4 py-2 text-right">
+                                   <div className="flex flex-col">
+                                      <span className="text-gray-900">Bs. {(item.producto?.precioVenta || item.producto?.precio || 0).toFixed(2)}</span>
+                                      {item.producto?.precioVenta !== item.precioUnitario && (
+                                         <span className="text-xs text-gray-500 line-through">Oficial</span>
+                                      )}
+                                   </div>
+                                </td>
+                                <td className="px-4 py-2 text-right font-medium text-green-600">
+                                   <div className="flex flex-col">
+                                      <span>Bs. {(item.cantidad * item.precioUnitario).toFixed(2)}</span>
+                                      {item.producto?.precioVenta !== item.precioUnitario && (
+                                          <span className="text-xs text-blue-600">
+                                              (A: Bs. {item.precioUnitario.toFixed(2)})
+                                          </span>
+                                      )}
+                                   </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot className="bg-gray-50 font-semibold">
+                             <tr>
+                                <td colSpan="5" className="px-4 py-2 text-right text-gray-800">Total Venta:</td>
+                                <td className="px-4 py-2 text-right text-lg text-green-700">Bs. {(selectedVenta.productos.reduce((sum, p) => sum + (p.cantidad * p.precioUnitario), 0)).toFixed(2)}</td>
+                             </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Pagos y Observaciones */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                       <div>
+                          <h4 className="font-bold text-gray-800 mb-2 border-b pb-1">Observaciones</h4>
+                          <p className="text-gray-600 text-sm bg-gray-50 p-3 rounded-lg border min-h-[80px]">
+                             {selectedVenta.observaciones || "Sin observaciones adicionales."}
+                          </p>
+                       </div>
+                       <div>
+                          <h4 className="font-bold text-gray-800 mb-2 border-b pb-1">Desglose de Pagos</h4>
+                          <div className="space-y-2">
+                             {selectedVenta.metodosPago && selectedVenta.metodosPago.length > 0 ? (
+                                selectedVenta.metodosPago.map((pago, idx) => (
+                                   <div key={idx} className="flex justify-between text-sm">
+                                      <span>{pago.tipo}:</span>
+                                      <span className="font-medium">Bs. {pago.monto.toFixed(2)}</span>
+                                   </div>
+                                ))
+                             ) : (
+                                <p className="text-sm text-gray-500">No hay pagos registrados (Posiblemente crédito total)</p>
+                             )}
+                             <div className="border-t pt-2 flex justify-between font-bold text-gray-900 mt-2">
+                                <span>Total Pagado:</span>
+                                <span>Bs. {(selectedVenta.metodosPago?.reduce((acc, curr) => acc + curr.monto, 0) || 0).toFixed(2)}</span>
+                             </div>
+                             <div className="flex justify-between text-red-600 font-bold">
+                                <span>Saldo Pendiente:</span>
+                                <span>Bs. {(selectedVenta.saldoPendiente || 0).toFixed(2)}</span>
+                             </div>
+                          </div>
+                       </div>
+                    </div>
+
+                  </div>
+
+                  <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end rounded-b-xl">
+                    <button
+                      onClick={() => setShowDetailModal(false)}
+                      className="px-6 py-2 bg-gray-600 text-white font-medium rounded-lg hover:bg-gray-700 shadow transition-colors"
+                    >
+                      Cerrar
+                    </button>
+                    {/* Opcional: Agregar botón Imprimir aquí */}
+                  </div>
+                </div>
+              </div>
+            )}
+
+          </>
+        )}
+
+        {/* --- VISTA DE GESTIÓN DE CLIENTES --- */}
+        {activeTab === 'clientes' && (
+          <div className="bg-white rounded-xl shadow-lg border border-gray-100">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-gray-800">Cartera de Clientes</h2>
+              <button
+                onClick={() => {
+                  setClienteEditing(null); // Modo crear
+                  setNuevoCliente({
+                     nombre: '', empresa: '', direccion: '', telefono: '', email: '', nit: '', ci: '', ubicacion: ''
+                  });
+                  setShowCreateClientForm(true);
+                }}
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm flex items-center gap-2"
+              >
+                <span>+</span> Nuevo Cliente
+              </button>
+            </div>
+
+            {/* Formulario Modal para Crear/Editar Cliente */}
+            {showCreateClientForm && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                  <div className="flex justify-between items-center p-6 border-b border-gray-100">
+                    <h3 className="text-xl font-bold text-gray-800">
+                      {clienteEditing ? 'Editar Cliente' : 'Registrar Nuevo Cliente'}
+                    </h3>
+                    <button 
+                       onClick={() => setShowCreateClientForm(false)}
+                       className="text-gray-400 hover:text-gray-600"
+                    >
+                       ✕
+                    </button>
+                  </div>
+                  
+                  <div className="p-6 space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Nombre Completo *</label>
+                        <input
+                          type="text"
+                          value={nuevoCliente.nombre}
+                          onChange={(e) => setNuevoCliente({...nuevoCliente, nombre: e.target.value})}
+                          className={`w-full p-2 border ${clienteErrors.nombre ? 'border-red-500' : 'border-gray-300'} rounded-lg`}
+                        />
+                        {clienteErrors.nombre && <p className="text-red-500 text-xs mt-1">{clienteErrors.nombre}</p>}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Empresa</label>
+                        <input
+                          type="text"
+                          value={nuevoCliente.empresa}
+                          onChange={(e) => setNuevoCliente({...nuevoCliente, empresa: e.target.value})}
+                          className="w-full p-2 border border-gray-300 rounded-lg"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono *</label>
+                        <input
+                          type="text"
+                          value={nuevoCliente.telefono}
+                          onChange={(e) => setNuevoCliente({...nuevoCliente, telefono: e.target.value})}
+                          className={`w-full p-2 border ${clienteErrors.telefono ? 'border-red-500' : 'border-gray-300'} rounded-lg`}
+                        />
+                        {clienteErrors.telefono && <p className="text-red-500 text-xs mt-1">{clienteErrors.telefono}</p>}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Dirección *</label>
+                        <input
+                          type="text"
+                          value={nuevoCliente.direccion}
+                          onChange={(e) => setNuevoCliente({...nuevoCliente, direccion: e.target.value})}
+                          className={`w-full p-2 border ${clienteErrors.direccion ? 'border-red-500' : 'border-gray-300'} rounded-lg`}
+                        />
+                        {clienteErrors.direccion && <p className="text-red-500 text-xs mt-1">{clienteErrors.direccion}</p>}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                        <input
+                          type="email"
+                          value={nuevoCliente.email}
+                          onChange={(e) => setNuevoCliente({...nuevoCliente, email: e.target.value})}
+                          className={`w-full p-2 border ${clienteErrors.email ? 'border-red-500' : 'border-gray-300'} rounded-lg`}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">NIT</label>
+                        <input
+                          type="text"
+                          value={nuevoCliente.nit}
+                          onChange={(e) => setNuevoCliente({...nuevoCliente, nit: e.target.value})}
+                          className="w-full p-2 border border-gray-300 rounded-lg"
+                        />
+                      </div>
+                      <div>
+                         <label className="block text-sm font-medium text-gray-700 mb-1">CI</label>
+                         <input
+                           type="text"
+                           value={nuevoCliente.ci}
+                           onChange={(e) => setNuevoCliente({...nuevoCliente, ci: e.target.value})}
+                           className="w-full p-2 border border-gray-300 rounded-lg"
+                         />
+                      </div>
+                      <div>
+                         <label className="block text-sm font-medium text-gray-700 mb-1">Ubicación</label>
+                         <input
+                           type="text"
+                           value={nuevoCliente.ubicacion}
+                           onChange={(e) => setNuevoCliente({...nuevoCliente, ubicacion: e.target.value})}
+                           className="w-full p-2 border border-gray-300 rounded-lg"
+                           placeholder="Coordenadas o Ref."
+                         />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-2 rounded-b-xl">
+                    <button
+                      onClick={() => setShowCreateClientForm(false)}
+                      className="px-4 py-2 text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleSaveCliente}
+                      className="px-6 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 shadow-md transition-colors"
+                    >
+                      {clienteEditing ? 'Actualizar Cliente' : 'Guardar Cliente'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Tabla de Clientes */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left text-gray-500">
+                <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b">
+                   <tr>
+                      <th className="px-6 py-3">Cliente / Empresa</th>
+                      <th className="px-6 py-3">Contacto</th>
+                      <th className="px-6 py-3">Ubicación</th>
+                      <th className="px-6 py-3">NIT / CI</th>
+                      <th className="px-6 py-3 text-center">Acciones</th>
+                   </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {clientes.map(cliente => (
+                    <tr key={cliente._id} className="bg-white hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="font-bold text-gray-900">{cliente.nombre}</div>
+                        {cliente.empresa && <div className="text-indigo-600 text-xs">{cliente.empresa}</div>}
+                      </td>
+                      <td className="px-6 py-4">
+                         <div className="flex items-center gap-2">
+                            <span>📞</span> {cliente.telefono}
+                         </div>
+                         {cliente.email && (
+                            <div className="flex items-center gap-2 text-xs">
+                               <span>✉️</span> {cliente.email}
+                            </div>
+                         )}
+                      </td>
+                      <td className="px-6 py-4 max-w-xs truncate">
+                         {cliente.direccion}
+                         {cliente.ubicacion && <div className="text-xs text-blue-500">📍 {cliente.ubicacion}</div>}
+                      </td>
+                       <td className="px-6 py-4">
+                         {cliente.nit ? `NIT: ${cliente.nit}` : ''}
+                         {cliente.ci ? `CI: ${cliente.ci}` : ''}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <div className="flex justify-center gap-2">
+                           <button 
+                              onClick={() => handleEditCliente(cliente)}
+                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              title="Editar"
+                           >
+                              ✏️
+                           </button>
+                           <button 
+                              onClick={() => handleDeleteCliente(cliente._id)}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Eliminar"
+                           >
+                              🗑️
+                           </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {clientes.length === 0 && (
+                     <tr>
+                        <td colSpan="5" className="px-6 py-8 text-center text-gray-400">
+                           No hay clientes registrados
+                        </td>
+                     </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+      </main>
+    </div>
   );
 };
 

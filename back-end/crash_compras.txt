@@ -1,0 +1,6 @@
+[2025-12-12T13:38:30.855Z] Error: Datos insuficientes para crear un nuevo producto. Se requiere nombre, color y categoría.
+    at encontrarOCrearProducto (file:///C:/Users/PREDATOR/OneDrive%20-%20Universidad%20Privada%20del%20Valle/Documents/Proyecto_AGLOMEX_SRL/back-end/controllers/compras.controller.js:45:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async file:///C:/Users/PREDATOR/OneDrive%20-%20Universidad%20Privada%20del%20Valle/Documents/Proyecto_AGLOMEX_SRL/back-end/controllers/compras.controller.js:207:38
+    at async Promise.all (index 0)
+    at async registrarCompra (file:///C:/Users/PREDATOR/OneDrive%20-%20Universidad%20Privada%20del%20Valle/Documents/Proyecto_AGLOMEX_SRL/back-end/controllers/compras.controller.js:228:33)

@@ -1,42 +1,41 @@
-import mongoose from 'mongoose';
-import dotenv from 'dotenv';
-import User from '../models/user.model.js';
 
+import mongoose from 'mongoose';
+import User from '../models/user.model.js';
+import dotenv from 'dotenv';
 dotenv.config();
 
-const mongoURI = 'mongodb://127.0.0.1:27017/mueblesDB'; // Asegurando que coincida con server_new.js
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/mueblesDB';
 
 const createAdmin = async () => {
     try {
-        await mongoose.connect(mongoURI);
+        await mongoose.connect(MONGODB_URI);
         console.log('✅ Conectado a MongoDB');
 
         // Verificar si ya existe
-        const existingUser = await User.findOne({ username: 'dueno' });
-        if (existingUser) {
-            console.log('⚠️ El usuario "dueno" ya existe.');
-
-            // Opcional: Actualizar contraseña si es necesario, o borrar y recrear
-            // await User.deleteOne({ username: 'dueno' });
-        } else {
-            const adminUser = new User({
-                username: 'dueno',
-                password: 'admin123',
-                rol: 'admin',
-                nombre: 'Dueño',
-                email: 'dueno@aglomex.com'
-            });
-
-            await adminUser.save();
-            console.log('✅ Usuario "dueno" creado exitosamente.');
+        const existingAdmin = await User.findOne({ username: 'admin' });
+        if (existingAdmin) {
+            console.log('⚠️ El usuario admin ya existe.');
+            return;
         }
 
+        // Crear nuevo admin
+        const adminUser = new User({
+            username: 'admin',
+            password: 'admin123', // El hook pre-save lo hasheará
+            nombre: 'Administrador Default',
+            rol: 'admin'
+        });
+
+        await adminUser.save();
+        console.log('🎉 Usuario admin creado exitosamente.');
+        console.log('User: admin');
+        console.log('Pass: admin123');
+
     } catch (error) {
-        console.error('❌ Error creando usuario:', error);
+        console.error('❌ Error creando admin:', error);
     } finally {
         await mongoose.connection.close();
-        console.log('Conexión cerrada');
-        process.exit(0);
+        process.exit();
     }
 };
 

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const FabricacionPage = ({ userRole }) => {
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Verificar autenticación al cargar el componente
   useEffect(() => {
@@ -13,6 +14,13 @@ const FabricacionPage = ({ userRole }) => {
     }
   }, [navigate]);
 
+  // Handle initial tab from navigation state
+  useEffect(() => {
+     if (location.state?.initialTab) {
+        setActiveTab(location.state.initialTab);
+     }
+  }, [location.state]);
+
   // ✅ Volver al HOME (menú principal)
   const volverAlHome = () => {
     navigate('/home');
@@ -21,7 +29,10 @@ const FabricacionPage = ({ userRole }) => {
   // Estados para el módulo de fabricación
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('ordenes');
+
   const [showForm, setShowForm] = useState(false);
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [selectedOrdenId, setSelectedOrdenId] = useState(null);
 
   // Estados de datos
   const [ordenesFabricacion, setOrdenesFabricacion] = useState([]);
@@ -52,6 +63,25 @@ const FabricacionPage = ({ userRole }) => {
     ubicacion: ''
   });
 
+  // Estado para selección de material en el formulario de orden
+  const [materialSeleccionado, setMaterialSeleccionado] = useState('');
+  const [cantidadMaterialSeleccionada, setCantidadMaterialSeleccionada] = useState(1);
+
+  // Estado para datos de finalización de producción
+  const [datosCompletados, setDatosCompletados] = useState({
+      descripcion: '',
+      categoria: '',
+      precioVenta: 0,
+      imagen: ''
+  });
+
+  // Estado para nueva máquina
+  const [nuevaMaquina, setNuevaMaquina] = useState({
+    nombre: '',
+    tipo: '',
+    estado: 'Operativa'
+  });
+
   // Cargar datos iniciales
   useEffect(() => {
     cargarDatos();
@@ -65,7 +95,11 @@ const FabricacionPage = ({ userRole }) => {
 
   const cargarOrdenes = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/produccion');
+      const response = await fetch('http://localhost:5000/api/produccion', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
       if (response.ok) {
         const data = await response.json();
         setOrdenesFabricacion(data);
@@ -77,8 +111,12 @@ const FabricacionPage = ({ userRole }) => {
 
   const cargarMateriales = async () => {
     try {
-      // Ahora filtramos por tipo 'Materia Prima' desde la API de productos
-      const response = await fetch('http://localhost:5000/api/productos?tipo=Materia Prima');
+      // Fetch from dedicated Materia Prima endpoint
+      const response = await fetch('http://localhost:5000/api/materiaPrima', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
       if (response.ok) {
         const data = await response.json();
         setMateriales(data);
@@ -90,7 +128,11 @@ const FabricacionPage = ({ userRole }) => {
 
   const cargarMaquinas = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/maquinas');
+      const response = await fetch('http://localhost:5000/api/maquinas', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
       if (response.ok) {
         const data = await response.json();
         setMaquinas(data);
@@ -98,6 +140,55 @@ const FabricacionPage = ({ userRole }) => {
     } catch (error) {
       console.error('Error cargando máquinas:', error);
     }
+  };
+
+  // Calcular costo estimado automáticamente
+  useEffect(() => {
+    const costoTotal = nuevaOrden.materiales.reduce((acc, item) => {
+      // Find material details to get price
+      const mat = materiales.find(m => m._id === item.material);
+      const precio = mat ? (mat.precioCompra || 0) : 0;
+      return acc + (precio * item.cantidad);
+    }, 0);
+    
+    setNuevaOrden(prev => ({ ...prev, precioCompra: costoTotal }));
+  }, [nuevaOrden.materiales, materiales]);
+
+  const agregarMaterialAOrden = () => {
+      if (!materialSeleccionado) return;
+      
+      const matInfo = materiales.find(m => m._id === materialSeleccionado);
+      if (!matInfo) return;
+
+      if (cantidadMaterialSeleccionada <= 0) {
+          alert("La cantidad debe ser mayor a 0");
+          return;
+      }
+
+      // Check if already exists
+      const exists = nuevaOrden.materiales.find(m => m.material === materialSeleccionado);
+      
+      let updatedMaterials;
+      if (exists) {
+          updatedMaterials = nuevaOrden.materiales.map(m => 
+              m.material === materialSeleccionado 
+                  ? { ...m, cantidad: m.cantidad + cantidadMaterialSeleccionada }
+                  : m
+          );
+      } else {
+          updatedMaterials = [...nuevaOrden.materiales, { material: materialSeleccionado, cantidad: cantidadMaterialSeleccionada }];
+      }
+
+      setNuevaOrden({ ...nuevaOrden, materiales: updatedMaterials });
+      setMaterialSeleccionado('');
+      setCantidadMaterialSeleccionada(1);
+  };
+
+  const eliminarMaterialDeOrden = (idMaterial) => {
+      setNuevaOrden({
+          ...nuevaOrden,
+          materiales: nuevaOrden.materiales.filter(m => m.material !== idMaterial)
+      });
   };
 
   // Filtrar datos según búsqueda
@@ -146,7 +237,9 @@ const FabricacionPage = ({ userRole }) => {
           imagen: ''
         });
       } else {
-        alert('❌ Error al crear orden');
+        const errorData = await response.json();
+        alert(`❌ Error al crear orden: ${errorData.message || errorData.error || 'Error desconocido'}`);
+        if (errorData.details) console.error(errorData.details);
       }
     } catch (error) {
       console.error('Error:', error);
@@ -178,18 +271,33 @@ const FabricacionPage = ({ userRole }) => {
     }
   };
 
-  const confirmarProduccion = async (id) => {
+  const abrirModalConfirmacion = (orden) => {
+      setSelectedOrdenId(orden._id);
+      setDatosCompletados({
+          descripcion: `Producto fabricado: ${orden.nombre}`,
+          categoria: 'Muebles', // Default or fetch existing
+          precioVenta: orden.precioVenta || 0,
+          imagen: orden.imagen || ''
+      });
+      setShowCompletionModal(true);
+  };
+
+  const confirmarProduccion = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/produccion/${id}/confirmar`, {
+      if (!selectedOrdenId) return;
+
+      const response = await fetch(`http://localhost:5000/api/produccion/${selectedOrdenId}/confirmar`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+        },
+        body: JSON.stringify(datosCompletados)
       });
 
       if (response.ok) {
-        alert('✅ Producción confirmada exitosamente');
+        alert('✅ Producción confirmada y producto creado en inventario.');
+        setShowCompletionModal(false);
         cargarOrdenes();
       } else {
         const errorData = await response.json();
@@ -201,10 +309,10 @@ const FabricacionPage = ({ userRole }) => {
     }
   };
 
-  // Funciones para materiales (ahora productos)
+  // Funciones para materiales (usa endpoint dedicado)
   const agregarMaterial = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/productos', {
+      const response = await fetch('http://localhost:5000/api/materiaPrima', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -212,9 +320,8 @@ const FabricacionPage = ({ userRole }) => {
         },
         body: JSON.stringify({
           ...nuevoMaterial,
-          tipo: 'Materia Prima',
-          color: 'N/A', // Valor por defecto
-          codigo: `MAT-${Date.now()}` // Generar código automático
+          // Materia Prima controller generates ID automatically if not provided, or uses nombre
+          // We don't need 'tipo' or 'codigo' here as strict as ProductoTienda
         })
       });
 
@@ -260,6 +367,35 @@ const FabricacionPage = ({ userRole }) => {
       }
     } catch (error) {
       console.error('Error:', error);
+    }
+  };
+
+  const agregarMaquina = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/maquinas', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(nuevaMaquina)
+      });
+
+      if (response.ok) {
+        alert('✅ Máquina agregada exitosamente');
+        setShowForm(false);
+        cargarMaquinas();
+        setNuevaMaquina({
+          nombre: '',
+          tipo: '',
+          estado: 'Operativa'
+        });
+      } else {
+        alert('❌ Error al agregar máquina');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert('❌ Error de conexión');
     }
   };
 
@@ -353,6 +489,15 @@ const FabricacionPage = ({ userRole }) => {
                 {showForm ? 'Cancelar' : '+ Nuevo Material'}
               </button>
             )}
+
+            {activeTab === 'maquinas' && (
+              <button
+                onClick={() => setShowForm(!showForm)}
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition duration-200 font-semibold"
+              >
+                {showForm ? 'Cancelar' : '+ Nueva Máquina'}
+              </button>
+            )}
           </div>
 
           {/* Contenido de Pestañas */}
@@ -386,12 +531,13 @@ const FabricacionPage = ({ userRole }) => {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Costo Estimado</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Costo Estimado (Auto)</label>
                       <input
                         type="number"
                         value={nuevaOrden.precioCompra}
-                        onChange={(e) => setNuevaOrden({ ...nuevaOrden, precioCompra: parseFloat(e.target.value) || 0 })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        readOnly
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 focus:outline-none"
+                        title="Calculado automáticamente según materiales"
                       />
                     </div>
 
@@ -417,44 +563,93 @@ const FabricacionPage = ({ userRole }) => {
                   </div>
 
                   {/* Selección de Materiales (Simplificada por ahora) */}
-                  <div className="mt-4">
-                    <h3 className="font-medium mb-2">Materiales Requeridos</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {materiales.map(mat => (
-                        <div key={mat._id} className="flex items-center space-x-2">
-                          <input
-                            type="checkbox"
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setNuevaOrden({
-                                  ...nuevaOrden,
-                                  materiales: [...nuevaOrden.materiales, { material: mat._id, cantidad: 1 }]
-                                });
-                              } else {
-                                setNuevaOrden({
-                                  ...nuevaOrden,
-                                  materiales: nuevaOrden.materiales.filter(m => m.material !== mat._id)
-                                });
-                              }
-                            }}
-                          />
-                          <span>{mat.nombre} (Stock: {mat.cantidad})</span>
-                          {nuevaOrden.materiales.find(m => m.material === mat._id) && (
-                            <input
-                              type="number"
-                              className="w-20 border rounded px-1"
-                              placeholder="Cant"
-                              onChange={(e) => {
-                                const updatedMaterials = nuevaOrden.materiales.map(m =>
-                                  m.material === mat._id ? { ...m, cantidad: parseInt(e.target.value) || 1 } : m
-                                );
-                                setNuevaOrden({ ...nuevaOrden, materiales: updatedMaterials });
-                              }}
-                            />
-                          )}
+                  {/* Selección de Materiales (Carrito) */}
+                  <div className="mt-6 border-t pt-4">
+                    <h3 className="font-semibold text-gray-800 mb-3">Materiales Requeridos</h3>
+                    
+                    {/* Selector */}
+                    <div className="flex flex-wrap gap-4 items-end mb-4 bg-gray-50 p-4 rounded-lg">
+                        <div className="flex-1 min-w-[200px]">
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Material</label>
+                            <select 
+                                value={materialSeleccionado}
+                                onChange={(e) => setMaterialSeleccionado(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                            >
+                                <option value="">-- Seleccionar Material --</option>
+                                {materiales.map(mat => (
+                                    <option key={mat._id} value={mat._id}>
+                                        {mat.nombre} (Stock: {mat.cantidad}) - {mat.precioCompra} Bs
+                                    </option>
+                                ))}
+                            </select>
                         </div>
-                      ))}
+                        <div className="w-32">
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Cantidad</label>
+                            <input 
+                                type="number" 
+                                min="1"
+                                value={cantidadMaterialSeleccionada}
+                                onChange={(e) => setCantidadMaterialSeleccionada(parseInt(e.target.value) || 0)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                            />
+                        </div>
+                        <button 
+                            onClick={agregarMaterialAOrden}
+                            className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition"
+                            disabled={!materialSeleccionado}
+                        >
+                            + Agregar
+                        </button>
                     </div>
+
+                    {/* Tabla de Materiales Agregados */}
+                    {nuevaOrden.materiales.length > 0 ? (
+                        <div className="overflow-hidden border border-gray-200 rounded-lg">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
+                                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Costo Unit.</th>
+                                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Cant.</th>
+                                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Subtotal</th>
+                                        <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {nuevaOrden.materiales.map((item, index) => {
+                                        const mat = materiales.find(m => m._id === item.material);
+                                        const precio = mat ? (mat.precioCompra || 0) : 0;
+                                        return (
+                                            <tr key={index}>
+                                                <td className="px-4 py-2 text-sm text-gray-900">{mat ? mat.nombre : 'Desconocido'}</td>
+                                                <td className="px-4 py-2 text-sm text-gray-600 text-right">{precio} Bs</td>
+                                                <td className="px-4 py-2 text-sm text-gray-900 text-right">{item.cantidad}</td>
+                                                <td className="px-4 py-2 text-sm font-medium text-gray-900 text-right">{(precio * item.cantidad).toFixed(2)} Bs</td>
+                                                <td className="px-4 py-2 text-center">
+                                                    <button 
+                                                        onClick={() => eliminarMaterialDeOrden(item.material)}
+                                                        className="text-red-600 hover:text-red-900 text-sm font-medium"
+                                                    >
+                                                        Eliminar
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                                <tfoot className="bg-gray-50">
+                                    <tr>
+                                        <td colSpan="3" className="px-4 py-2 text-right font-bold text-gray-700">Total Materiales:</td>
+                                        <td className="px-4 py-2 text-right font-bold text-orange-600">{nuevaOrden.precioCompra.toFixed(2)} Bs</td>
+                                        <td></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    ) : (
+                        <p className="text-gray-500 text-sm italic text-center py-4">No has agregado materiales aún.</p>
+                    )}
                   </div>
 
                   <div className="flex space-x-4 mt-6">
@@ -494,7 +689,7 @@ const FabricacionPage = ({ userRole }) => {
                         {ordenesFiltradas.map((orden) => (
                           <tr key={orden._id} className="hover:bg-gray-50">
                             <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-orange-600">
-                              {orden.idProduccion}
+                              #{orden.numeroOrden ? orden.numeroOrden.toString().padStart(3, '0') : '---'}
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                               {orden.nombre}
@@ -532,7 +727,7 @@ const FabricacionPage = ({ userRole }) => {
                                 )}
                                 {orden.estado === 'En Progreso' && (
                                   <button
-                                    onClick={() => confirmarProduccion(orden._id)}
+                                    onClick={() => abrirModalConfirmacion(orden)}
                                     className="text-green-600 hover:text-green-900"
                                     title="Confirmar Producción"
                                   >
@@ -632,7 +827,7 @@ const FabricacionPage = ({ userRole }) => {
                         </div>
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-600">Precio Compra:</span>
-                          <span className="font-medium">${material.precioCompra}</span>
+                          <span className="font-medium">{material.precioCompra} Bs</span>
                         </div>
                       </div>
                     </div>
@@ -644,6 +839,62 @@ const FabricacionPage = ({ userRole }) => {
 
           {activeTab === 'maquinas' && (
             <div className="space-y-6">
+              {/* Formulario de Nueva Máquina */}
+              {showForm && (
+                <div className="bg-white rounded-xl shadow-md p-6">
+                  <h2 className="text-2xl font-semibold text-gray-800 mb-6">Nueva Máquina o Equipo</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Nombre *</label>
+                      <input
+                        type="text"
+                        value={nuevaMaquina.nombre}
+                        onChange={(e) => setNuevaMaquina({ ...nuevaMaquina, nombre: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Ej. Sierra Circular"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Tipo *</label>
+                      <input
+                        type="text"
+                        value={nuevaMaquina.tipo}
+                        onChange={(e) => setNuevaMaquina({ ...nuevaMaquina, tipo: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Ej. Corte"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Estado Inicial</label>
+                      <select
+                        value={nuevaMaquina.estado}
+                        onChange={(e) => setNuevaMaquina({ ...nuevaMaquina, estado: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="Operativa">Operativa</option>
+                        <option value="En mantenimiento">En mantenimiento</option>
+                        <option value="Fuera de servicio">Fuera de servicio</option>
+                        <option value="En revisión">En revisión</option>
+                        <option value="Necesita reparación">Necesita reparación</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex space-x-4 mt-6">
+                    <button
+                      onClick={agregarMaquina}
+                      className="bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 transition duration-200 font-semibold"
+                    >
+                      Guardar Máquina
+                    </button>
+                    <button
+                      onClick={() => setShowForm(false)}
+                      className="bg-gray-500 text-white py-3 px-6 rounded-lg hover:bg-gray-600 transition duration-200 font-semibold"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
               <div className="bg-white rounded-xl shadow-md p-6">
                 <h2 className="text-2xl font-semibold text-gray-800 mb-6">Estado de Maquinaria</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -666,33 +917,82 @@ const FabricacionPage = ({ userRole }) => {
                             <option value="Operativa">Operativa</option>
                             <option value="En mantenimiento">En mantenimiento</option>
                             <option value="Fuera de servicio">Fuera de servicio</option>
+                            <option value="En revisión">En revisión</option>
+                            <option value="Necesita reparación">Necesita reparación</option>
                           </select>
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <p className="text-gray-500">Último Mantenimiento</p>
-                          <p className="font-medium">{new Date(maquina.ultimoMantenimiento).toLocaleDateString()}</p>
-                        </div>
-                        <div className="col-span-2">
-                          <p className="text-gray-500 mb-1">Eficiencia Operativa</p>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div
-                              className={`h-2 rounded-full ${maquina.eficiencia >= 90 ? 'bg-green-500' : maquina.eficiencia >= 75 ? 'bg-yellow-500' : 'bg-red-500'}`}
-                              style={{ width: `${maquina.eficiencia}%` }}
-                            ></div>
-                          </div>
-                          <p className="text-right text-xs text-gray-500 mt-1">{maquina.eficiencia}%</p>
-                        </div>
-                      </div>
+                    <div className="text-sm">
+                        <p className="text-gray-500">Último Mantenimiento</p>
+                        <p className="font-medium">{new Date(maquina.ultimoMantenimiento).toLocaleDateString()}</p>
                     </div>
+                  </div>
+
                   ))}
                 </div>
               </div>
             </div>
           )}
-        </div>
+          
+          {/* Modal de Finalización de Producción */}
+          {showCompletionModal && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                  <div className="bg-white rounded-lg p-6 w-full max-w-lg">
+                      <h2 className="text-xl font-bold mb-4 text-gray-800">Finalizar Producción</h2>
+                      <p className="text-gray-600 mb-4 text-sm">
+                          Complete los datos para registrar el producto terminado en el inventario.
+                      </p>
+                      
+                      <div className="space-y-4">
+                          <div>
+                              <label className="block text-sm font-medium text-gray-700">Descripción del Producto</label>
+                              <input 
+                                  type="text" 
+                                  className="w-full border rounded px-3 py-2 mt-1"
+                                  value={datosCompletados.descripcion}
+                                  onChange={(e) => setDatosCompletados({...datosCompletados, descripcion: e.target.value})}
+                              />
+                          </div>
+                          <div>
+                              <label className="block text-sm font-medium text-gray-700">Categoría</label>
+                              <input 
+                                  type="text" 
+                                  className="w-full border rounded px-3 py-2 mt-1"
+                                  value={datosCompletados.categoria}
+                                  onChange={(e) => setDatosCompletados({...datosCompletados, categoria: e.target.value})}
+                              />
+                          </div>
+                          <div>
+                              <label className="block text-sm font-medium text-gray-700">Precio de Venta Final (Bs)</label>
+                              <input 
+                                  type="number" 
+                                  className="w-full border rounded px-3 py-2 mt-1"
+                                  value={datosCompletados.precioVenta}
+                                  onChange={(e) => setDatosCompletados({...datosCompletados, precioVenta: parseFloat(e.target.value) || 0})}
+                              />
+                          </div>
+                      </div>
+
+                      <div className="flex justify-end space-x-3 mt-6">
+                          <button 
+                              onClick={() => setShowCompletionModal(false)}
+                              className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                          >
+                              Cancelar
+                          </button>
+                          <button 
+                              onClick={confirmarProduccion}
+                              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                          >
+                              Finalizar y Añadir al Inventario
+                          </button>
+                      </div>
+                  </div>
+              </div>
+          )}
+
       </div>
+    </div>
     </div>
   );
 };

@@ -47,7 +47,6 @@ const materiaPrimaSchema = new mongoose.Schema({
   },
   categoria: {
     type: String,
-    enum: ["Madera", "Tela", "Metal", "Plástico", "Otro"],
     default: "Otro"
   },
   ubicacion: {

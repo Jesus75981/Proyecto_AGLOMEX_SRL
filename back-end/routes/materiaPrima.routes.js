@@ -4,13 +4,18 @@ import {
     listarMateriasPrimas,
     actualizarMateriaPrima,
     eliminarMateriaPrima,
-    buscarMateriaPrimaPorId
+    buscarMateriaPrimaPorId,
+    obtenerCategorias
 } from '../controllers/materiaPrima.controller.js';
+import { uploadImage } from '../controllers/productoTienda.controller.js';
 
 const router = express.Router();
 
 // Crear una nueva materia prima
-router.post('/', crearMateriaPrima);
+router.post('/', uploadImage, crearMateriaPrima);
+
+// Listar categorías disponibles
+router.get('/categorias', obtenerCategorias);
 
 // Listar todas las materias primas
 router.get('/', listarMateriasPrimas);
@@ -19,7 +24,7 @@ router.get('/', listarMateriasPrimas);
 router.get('/:id', buscarMateriaPrimaPorId);
 
 // Actualizar materia prima por ID
-router.put('/:id', actualizarMateriaPrima);
+router.put('/:id', uploadImage, actualizarMateriaPrima);
 
 // Eliminar materia prima por ID
 router.delete('/:id', eliminarMateriaPrima);

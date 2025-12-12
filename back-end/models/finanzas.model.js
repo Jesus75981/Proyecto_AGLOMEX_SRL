@@ -14,13 +14,15 @@ const finanzasSchema = new mongoose.Schema({
       'venta_productos',
       'anticipo_cobrado',
       'ingreso_manual',
+      'cobro_venta', // Added
 
       // Egresos
       'compra_materias',
       'compra_productos',
       'anticipo_pagado',
       'gasto_operativo',
-      'egreso_manual'
+      'egreso_manual',
+      'pago_deuda_compra' // Added
     ],
     required: true
   },

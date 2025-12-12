@@ -8,19 +8,28 @@ export const registrarUsuario = async (req, res) => {
     await user.save();
     res.status(201).json(user);
   } catch (err) {
+    if (err.code === 11000) {
+      const field = Object.keys(err.keyPattern)[0];
+      return res.status(400).json({ error: `Ya existe un usuario con este ${field} (${err.keyValue[field]}).` });
+    }
     res.status(400).json({ error: err.message });
   }
 };
 
 // Login
 export const loginUsuario = async (req, res) => {
-  const { username, password } = req.body;
-  const user = await User.findOne({ username });
-  if (!user || !(await user.comparePassword(password))) {
-    return res.status(401).json({ error: "Credenciales inválidas" });
+  try {
+    const { username, password } = req.body;
+    const user = await User.findOne({ username });
+    if (!user || !(await user.comparePassword(password))) {
+      return res.status(401).json({ error: "Credenciales inválidas" });
+    }
+    const token = jwt.sign({ id: user._id, rol: user.rol }, process.env.JWT_SECRET, { expiresIn: "1d" });
+    res.json({ token, user });
+  } catch (error) {
+    console.error("Login Error:", error);
+    res.status(500).json({ error: "Error interno del servidor" });
   }
-  const token = jwt.sign({ id: user._id, rol: user.rol }, process.env.JWT_SECRET, { expiresIn: "1d" });
-  res.json({ token, user });
 };
 
 // Crear usuarios de prueba

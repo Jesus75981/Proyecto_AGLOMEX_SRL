@@ -1,7 +1,7 @@
 import Finanzas from '../models/finanzas.model.js';
 import Venta from '../models/venta.model.js';
 import Compra from '../models/compra.model.js';
-import Anticipo from '../models/anticipo.model.js';
+
 import DeudaCompra from '../models/deudaCompra.model.js';
 import Proveedor from '../models/proveedores.model.js';
 import BankAccount from '../models/bankAccount.model.js';
@@ -69,6 +69,9 @@ export const createTransaction = async (req, res) => {
     res.status(201).json(newTransaction);
   } catch (err) {
     console.error(err);
+    if (err.code === 11000) {
+      return res.status(400).json({ message: "Transacción duplicada detectada." });
+    }
     res.status(500).json({ message: 'Error al crear la transacción.' });
   }
 };
@@ -561,6 +564,9 @@ export const createAccount = async (req, res) => {
     res.status(201).json(newAccount);
   } catch (error) {
     console.error("Error al crear cuenta bancaria:", error);
+    if (error.code === 11000) {
+      return res.status(400).json({ message: "Ya existe una cuenta con este número." });
+    }
     res.status(500).json({ message: "Error al crear la cuenta bancaria." });
   }
 };

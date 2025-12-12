@@ -121,6 +121,9 @@ export const registrarVenta = async (req, res) => {
 
   } catch (error) {
     console.error("Error al registrar la venta:", error);
+    if (error.code === 11000) {
+      return res.status(400).json({ msg: "Error: Ya existe una venta con este número." });
+    }
     return res.status(500).json({ msg: "Error interno del servidor.", error: error.message });
   }
 };
@@ -174,7 +177,7 @@ export const listarVentas = async (req, res) => {
   try {
     const ventas = await Venta.find()
       .populate("cliente productos.producto")
-      .sort({ fecha: -1 }); // Ordenar por fecha descendente (más recientes primero)
+      .sort({ numVenta: -1 }); // Ordenar por número de venta descendente
 
     // Agregar campo 'estado' basado en la lógica de negocio
     const ventasConEstado = ventas.map(venta => ({
@@ -475,6 +478,10 @@ export const generarReporteVentas = async (req, res) => {
 
     if (clienteId) {
       query.cliente = clienteId;
+    }
+
+    if (req.body.productoId) {
+      query['productos.producto'] = req.body.productoId;
     }
 
     const ventas = await Venta.find(query)
