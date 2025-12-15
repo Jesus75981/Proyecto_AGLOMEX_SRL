@@ -408,9 +408,13 @@ export const generarReporteCompras = async (req, res) => {
             query['productos.producto'] = req.body.productoId;
         }
 
+        if (req.body.searchQuery) {
+            query.numCompra = { $regex: req.body.searchQuery, $options: 'i' };
+        }
+
         const compras = await Compra.find(query)
             .populate('proveedor', 'nombre nit')
-            .populate('productos.producto', 'nombre codigo')
+            .populate('productos.producto', 'nombre codigo color idProductoTienda')
             .sort({ fecha: -1 });
 
         const totalCompras = compras.length;

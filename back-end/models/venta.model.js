@@ -57,6 +57,7 @@ const ventaSchema = new mongoose.Schema({
     required: false
   },
   banco: String,
+  descuento: { type: Number, default: 0 },
   anticipo: { type: Number, default: 0 },
   metodoEntrega: {
     type: String,

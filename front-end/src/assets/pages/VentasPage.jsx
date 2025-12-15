@@ -53,9 +53,14 @@ const VentasPage = ({ userRole }) => {
     if (productoSearchTerm.trim() === '') {
       setProductosFiltrados([]);
     } else {
-      const filtrados = productos.filter(producto =>
-        producto.nombre.toLowerCase().includes(productoSearchTerm.toLowerCase())
-      );
+      const filtrados = productos.filter(producto => {
+        const term = productoSearchTerm.toLowerCase();
+        return (
+          producto.nombre.toLowerCase().includes(term) ||
+          (producto.codigo && producto.codigo.toLowerCase().includes(term)) ||
+          (producto.idProductoTienda && producto.idProductoTienda.toLowerCase().includes(term))
+        );
+      });
       setProductosFiltrados(filtrados);
     }
   }, [productoSearchTerm, productos]);
@@ -101,8 +106,9 @@ const VentasPage = ({ userRole }) => {
     fecha: new Date().toISOString().split('T')[0],
     metodosPago: [], // Array de pagos múltiples
     metodoEntrega: 'Recojo en Tienda',
-    numFactura: generarNumFactura(),
-    observaciones: ''
+    numFactura: '', // Default empty for manual entry
+    observaciones: '',
+    descuento: 0 // Global discount
   });
 
   // Estados temporales para agregar productos al carrito
@@ -110,13 +116,14 @@ const VentasPage = ({ userRole }) => {
     productoId: '',
     productoNombre: '',
     cantidad: 1,
-    precioUnitario: 0
+    precioUnitario: ''
   });
 
   // Estado temporal para pagos múltiples
   const [pagoTemporal, setPagoTemporal] = useState({
     metodo: 'Efectivo',
-    monto: ''
+    monto: '',
+    cuentaId: '' // Para transferencias
   });
 
   const [errors, setErrors] = useState({});
@@ -148,9 +155,24 @@ const VentasPage = ({ userRole }) => {
   const [activeTab, setActiveTab] = useState('ventas'); // 'ventas' | 'clientes'
   const [clienteEditing, setClienteEditing] = useState(null); // Cliente en edición
   
-  // --- Estado para Modal de Detalles ---
+  // Estado para Modal de Detalles
   const [selectedVenta, setSelectedVenta] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+
+  // Estados para cuentas bancarias (Para Transferencias)
+  const [activeBankAccounts, setActiveBankAccounts] = useState([]);
+
+  useEffect(() => {
+    const fetchAccounts = async () => {
+      try {
+        const cuentas = await apiFetch('/finanzas/cuentas');
+        setActiveBankAccounts(cuentas || []);
+      } catch (error) {
+        console.error("Error fetching accounts:", error);
+      }
+    };
+    fetchAccounts();
+  }, []);
 
   // Función para abrir modal de detalles
   const verDetallesVenta = (venta) => {
@@ -305,6 +327,8 @@ const VentasPage = ({ userRole }) => {
       const nuevoProducto = {
         producto: productoSeleccionado._id,
         productoNombre: productoSeleccionado.nombre,
+        productoCodigo: productoSeleccionado.codigo || productoSeleccionado.idProductoTienda || 'S/C',
+        productoColor: productoSeleccionado.color || '-',
         cantidad: productoTemporal.cantidad,
         precioUnitario: productoTemporal.precioUnitario,
         precioTotal: productoTemporal.cantidad * productoTemporal.precioUnitario
@@ -318,6 +342,7 @@ const VentasPage = ({ userRole }) => {
       productoId: '',
       productoNombre: '',
       cantidad: 1,
+      precioUnitario: 0 // Ensure this is reset
     });
   };
 
@@ -329,11 +354,17 @@ const VentasPage = ({ userRole }) => {
         return;
     }
 
+    const nuevoPago = {
+        tipo: pagoTemporal.metodo,
+        monto: monto,
+        cuentaId: pagoTemporal.cuentaId // Include account ID if selected
+    };
+
     setNuevaVenta({
         ...nuevaVenta,
-        metodosPago: [...nuevaVenta.metodosPago, { tipo: pagoTemporal.metodo, monto: monto }]
+        metodosPago: [...nuevaVenta.metodosPago, nuevoPago]
     });
-    setPagoTemporal({ ...pagoTemporal, monto: '' });
+    setPagoTemporal({ ...pagoTemporal, monto: '', cuentaId: '' }); // Clear monto and cuentaId after adding
   };
 
   // Quitar un pago
@@ -350,7 +381,8 @@ const VentasPage = ({ userRole }) => {
 
   // Calcular total de la venta
   const calcularTotal = () => {
-    return nuevaVenta.productos.reduce((total, producto) => total + producto.precioTotal, 0);
+    const subtotal = nuevaVenta.productos.reduce((total, producto) => total + producto.precioTotal, 0);
+    return Math.max(0, subtotal - (parseFloat(nuevaVenta.descuento) || 0));
   };
 
   // ✅ VALIDACIONES PARA FORMULARIO DE CLIENTE
@@ -507,6 +539,7 @@ const VentasPage = ({ userRole }) => {
         metodoEntrega: nuevaVenta.metodoEntrega,
         numFactura: nuevaVenta.numFactura,
         observaciones: nuevaVenta.observaciones,
+        descuento: nuevaVenta.descuento,
         estado: (nuevaVenta.metodosPago.reduce((acc, p) => acc + p.monto, 0) >= totalVenta) ? 'Pagada' : 'Pendiente',
         vendedor: userRole || 'usuario'
       };
@@ -866,6 +899,17 @@ const VentasPage = ({ userRole }) => {
                   {errors.fecha && <p className="text-red-500 text-sm mt-1">{errors.fecha}</p>}
                 </div>
 
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Factura / Recibo (Opcional)</label>
+                  <input
+                    type="text"
+                    value={nuevaVenta.numFactura}
+                    onChange={(e) => setNuevaVenta({ ...nuevaVenta, numFactura: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="Número manual"
+                  />
+                </div>
+
                 {/* Método de Entrega */}
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Método de Entrega</label>
@@ -907,20 +951,24 @@ const VentasPage = ({ userRole }) => {
                           {productosFiltrados.map((producto, index) => (
                             <div
                               key={index}
-                              onClick={() => {
+                              onMouseDown={() => {
                                 setProductoSearchTerm(producto.nombre);
                                 setProductoTemporal({
                                   ...productoTemporal,
                                   productoId: producto._id,
                                   productoNombre: producto.nombre,
-                                  precioUnitario: producto.precioVenta || producto.precioCompra || producto.precio || 0
+                                  precioUnitario: '' // Ensure manual entry
                                 });
                                 setShowProductoDropdown(false);
                               }}
                               className="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
                             >
-                              <div className="font-medium">{producto.nombre}</div>
-                              <div className="text-sm text-gray-500">Bs. {producto.precioVenta || producto.precio}</div>
+                              <div className="font-medium text-gray-900">{producto.nombre}</div>
+                              <div className="text-xs text-gray-500 flex gap-2">
+                                 <span>Cod: {producto.codigo || 'S/C'}</span>
+                                 {producto.color && <span>• Color: {producto.color}</span>}
+                                 <span>• Bs. {producto.precioVenta || producto.precio}</span>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -947,7 +995,7 @@ const VentasPage = ({ userRole }) => {
                       min="0"
                       step="0.01"
                       value={productoTemporal.precioUnitario}
-                      onChange={(e) => setProductoTemporal({ ...productoTemporal, precioUnitario: parseFloat(e.target.value) || 0 })}
+                      onChange={(e) => setProductoTemporal({ ...productoTemporal, precioUnitario: e.target.value === '' ? '' : parseFloat(e.target.value) })}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
                   </div>
@@ -966,13 +1014,15 @@ const VentasPage = ({ userRole }) => {
               {/* Carrito de Compras */}
               {nuevaVenta.productos.length > 0 && (
                 <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Carrito de Compras</h3>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Carrito de Ventas</h3>
 
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
                         <tr className="bg-gray-50">
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Código</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Color</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cantidad</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Precio Unit.</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
@@ -982,8 +1032,14 @@ const VentasPage = ({ userRole }) => {
                       <tbody>
                         {nuevaVenta.productos.map((item, index) => (
                           <tr key={index} className="border-t border-gray-200">
+                            <td className="px-4 py-2 text-sm text-gray-500 font-mono">
+                              {item.productoCodigo}
+                            </td>
                             <td className="px-4 py-2 text-sm font-medium text-gray-900">
                               {item.productoNombre}
+                            </td>
+                            <td className="px-4 py-2 text-sm text-gray-500">
+                              {item.productoColor}
                             </td>
                             <td className="px-4 py-2 text-sm text-gray-500">
                               {item.cantidad}
@@ -1006,9 +1062,31 @@ const VentasPage = ({ userRole }) => {
                         ))}
                       </tbody>
                       <tfoot>
+                        <tr className="border-t">
+                          <td colSpan="3" className="px-4 py-2 text-right text-sm font-semibold text-gray-700">Subtotal:</td>
+                          <td className="px-4 py-2 text-sm font-semibold text-gray-900">
+                             Bs. {nuevaVenta.productos.reduce((s, p) => s + p.precioTotal, 0).toFixed(2)}
+                          </td>
+                          <td></td>
+                        </tr>
+                        <tr>
+                          <td colSpan="3" className="px-4 py-2 text-right text-sm font-semibold text-gray-700">Descuento Global:</td>
+                          <td className="px-4 py-1">
+                             <input
+                               type="number"
+                               min="0"
+                               step="0.01"
+                               value={nuevaVenta.descuento}
+                               onChange={(e) => setNuevaVenta({ ...nuevaVenta, descuento: parseFloat(e.target.value) || 0 })}
+                               className="w-24 px-2 py-1 border rounded text-right text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                               placeholder="0"
+                             />
+                          </td>
+                          <td></td>
+                        </tr>
                         <tr className="border-t-2 border-gray-300">
-                          <td colSpan="3" className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
-                            Total de la Venta:
+                          <td colSpan="3" className="px-4 py-3 text-right text-sm font-bold text-gray-900">
+                            Total Final:
                           </td>
                           <td className="px-4 py-3 text-lg font-bold text-green-600">
                             Bs. {calcularTotal().toFixed(2)}
@@ -1032,15 +1110,34 @@ const VentasPage = ({ userRole }) => {
                           <label className="text-xs text-gray-500">Método</label>
                           <select
                               value={pagoTemporal.metodo}
-                              onChange={(e) => setPagoTemporal({ ...pagoTemporal, metodo: e.target.value })}
-                              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-green-500"
-                          >
-                              <option value="Efectivo">Efectivo</option>
-                              <option value="Transferencia">Transferencia</option>
-                              <option value="Cheque">Cheque</option>
-                              <option value="Tarjeta">Tarjeta</option>
-                          </select>
+                            onChange={(e) => setPagoTemporal({ ...pagoTemporal, metodo: e.target.value, cuentaId: '' })}
+                            className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-green-500"
+                        >
+                            <option value="Efectivo">Efectivo</option>
+                            <option value="Transferencia">Transferencia</option>
+                            <option value="Cheque">Cheque</option>
+                        </select>
                       </div>
+
+                      {/* Selector de Banco para Transferencia */}
+                      {pagoTemporal.metodo === 'Transferencia' && (
+                        <div className="flex-1 min-w-[150px]">
+                           <label className="text-xs text-gray-500">Banco Destino</label>
+                           <select
+                              value={pagoTemporal.cuentaId}
+                              onChange={(e) => setPagoTemporal({ ...pagoTemporal, cuentaId: e.target.value })}
+                              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-green-500"
+                           >
+                              <option value="">Seleccione Banco...</option>
+                              {activeBankAccounts.map(banco => (
+                                <option key={banco._id} value={banco._id}>
+                                  {banco.nombreBanco} ({banco.numeroCuenta})
+                                </option>
+                              ))}
+                           </select>
+                        </div>
+                      )}
+
                       <div className="w-32">
                            <label className="text-xs text-gray-500">Monto (Bs)</label>
                            <input
@@ -1131,8 +1228,9 @@ const VentasPage = ({ userRole }) => {
                       fecha: new Date().toISOString().split('T')[0],
                       metodosPago: [],
                       metodoEntrega: 'Recojo en Tienda',
-                      numFactura: generarNumFactura(),
-                      observaciones: ''
+                      numFactura: '',
+                      observaciones: '',
+                      descuento: 0
                     });
                     setProductoSearchTerm('');
                     setProductoTemporal({
@@ -1338,10 +1436,22 @@ const VentasPage = ({ userRole }) => {
                             ))}
                           </tbody>
                           <tfoot className="bg-gray-50 font-semibold">
-                             <tr>
-                                <td colSpan="5" className="px-4 py-2 text-right text-gray-800">Total Venta:</td>
-                                <td className="px-4 py-2 text-right text-lg text-green-700">Bs. {(selectedVenta.productos.reduce((sum, p) => sum + (p.cantidad * p.precioUnitario), 0)).toFixed(2)}</td>
-                             </tr>
+                              <tr>
+                                <td colSpan="5" className="px-4 py-2 text-right text-gray-700">Subtotal:</td>
+                                <td className="px-4 py-2 text-right text-gray-900">Bs. {(selectedVenta.productos.reduce((sum, p) => sum + (p.cantidad * p.precioUnitario), 0)).toFixed(2)}</td>
+                              </tr>
+                              {selectedVenta.descuento > 0 && (
+                                <tr className="text-red-600">
+                                   <td colSpan="5" className="px-4 py-1 text-right">Descuento Global:</td>
+                                   <td className="px-4 py-1 text-right">- Bs. {selectedVenta.descuento.toFixed(2)}</td>
+                                </tr>
+                              )}
+                              <tr className="bg-green-50">
+                                <td colSpan="5" className="px-4 py-3 text-right text-gray-900 font-bold text-lg">Total Final:</td>
+                                <td className="px-4 py-3 text-right text-lg text-green-700 font-bold">
+                                   Bs. {Math.max(0, (selectedVenta.productos.reduce((sum, p) => sum + (p.cantidad * p.precioUnitario), 0) - (selectedVenta.descuento || 0))).toFixed(2)}
+                                </td>
+                              </tr>
                           </tfoot>
                         </table>
                       </div>

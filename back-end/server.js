@@ -237,6 +237,16 @@ cron.schedule('0 9 * * *', async () => {
     }
 });
 
+// Import WhatsApp Route and Service
+import whatsappRoutes from './routes/whatsapp.routes.js';
+import whatsappService from './services/whatsapp.service.js';
+
+// Init WhatsApp Service
+// whatsappService.initialize();
+
+// WhatsApp Routes
+app.use('/api/whatsapp', whatsappRoutes);
+
 // === SISTEMA DE GENERACIÓN 3D (TRIPO AI) ===
 // Ejecutar cada minuto para verificar tareas pendientes
 cron.schedule('* * * * *', async () => {

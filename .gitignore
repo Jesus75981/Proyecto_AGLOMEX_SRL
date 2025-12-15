@@ -6,3 +6,7 @@ back-end/data
 .DS_Store
 dist
 coverage
+
+# WhatsApp Session Data
+back-end/.wwebjs_auth/
+back-end/.wwebjs_cache/

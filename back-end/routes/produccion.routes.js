@@ -1,5 +1,5 @@
 import express from "express";
-import { crearProduccion, listarProducciones, confirmarProduccion, iniciarProduccion, getEstadisticasProduccion } from "../controllers/produccion.controller.js";
+import { crearProduccion, listarProducciones, confirmarProduccion, iniciarProduccion, getEstadisticasProduccion, actualizarProduccion } from "../controllers/produccion.controller.js";
 
 const router = express.Router();
 
@@ -10,6 +10,7 @@ router.use((req, res, next) => {
 
 router.post("/", crearProduccion);
 router.get("/", listarProducciones);
+router.put("/:id", actualizarProduccion);
 router.patch("/:id/iniciar", iniciarProduccion);
 router.patch("/:id/confirmar", confirmarProduccion);
 

@@ -2,6 +2,9 @@ import Venta from "../models/venta.model.js";
 import ProductoTienda from "../models/productoTienda.model.js";
 import Compra from "../models/compra.model.js";
 import DeudaVenta from "../models/deudaVenta.model.js"; // Importar el modelo de deudas de venta
+
+import BankAccount from "../models/bankAccount.model.js";
+import BankTransaction from "../models/bankTransaction.model.js";
 import { registrarTransaccionFinanciera } from './finanzas.controller.js';
 
 export const registrarVenta = async (req, res) => {
@@ -35,7 +38,7 @@ export const registrarVenta = async (req, res) => {
       montoCredito = totalVenta; // Asumir toda la venta a crédito si no hay métodos de pago
     } else {
       for (const pago of ventaData.metodosPago) {
-        if (!pago.tipo || !["Efectivo", "Transferencia", "Cheque", "Crédito"].includes(pago.tipo)) {
+        if (!pago.tipo || !["Efectivo", "Transferencia", "Cheque"].includes(pago.tipo)) {
           return res.status(400).json({ message: "Tipo de pago no válido." });
         }
         if (pago.monto <= 0 || typeof pago.monto !== 'number') {
@@ -85,7 +88,35 @@ export const registrarVenta = async (req, res) => {
     }
 
     // 5. REGISTRAR TRANSACCIÓN FINANCIERA (SOLO INGRESO REAL)
+    // 5. REGISTRAR TRANSACCIÓN FINANCIERA (SOLO INGRESO REAL) Y ACTUALIZAR BANCOS
     if (totalPagadoDirectamente > 0) {
+      // Registrar cada pago
+      for (const pago of pagosReales) {
+        if (pago.tipo === 'Transferencia' && pago.cuentaId) {
+          // Actualizar Saldo Banco
+          const banco = await BankAccount.findById(pago.cuentaId);
+          if (banco) {
+            banco.saldo += pago.monto;
+            await banco.save();
+
+            // Crear Transacción Bancaria
+            const txBanco = new BankTransaction({
+              cuentaId: banco._id,
+              tipo: 'Deposito',
+              monto: pago.monto,
+              descripcion: `Venta #${ventaGuardada.numVenta}`,
+              fecha: new Date()
+            });
+            await txBanco.save();
+            console.log(`[BANCO] Depósito de ${pago.monto} a ${banco.nombreBanco} por Venta #${ventaGuardada.numVenta}`);
+          }
+        }
+
+        // Registrar en Finanzas Globales (uno por cada pago o uno global? 
+        // El código original hacía uno global. Desglosarlo es mejor tracking, pero mantendré lo simple 
+        // y solo aseguraré que la metadata tenga referencia).
+      }
+
       await registrarTransaccionFinanciera(
         'ingreso',
         'venta_productos',
@@ -484,9 +515,22 @@ export const generarReporteVentas = async (req, res) => {
       query['productos.producto'] = req.body.productoId;
     }
 
+    if (req.body.searchQuery) {
+      const search = req.body.searchQuery;
+      const isNumber = !isNaN(search) && search.trim() !== '';
+      if (isNumber) {
+        query.$or = [
+          { numVenta: Number(search) },
+          { numFactura: { $regex: search, $options: 'i' } }
+        ];
+      } else {
+        query.numFactura = { $regex: search, $options: 'i' };
+      }
+    }
+
     const ventas = await Venta.find(query)
       .populate('cliente', 'nombre empresa')
-      .populate('productos.producto', 'nombre codigo')
+      .populate('productos.producto', 'nombre codigo color idProductoTienda')
       .sort({ fecha: -1 });
 
     // Calcular totales

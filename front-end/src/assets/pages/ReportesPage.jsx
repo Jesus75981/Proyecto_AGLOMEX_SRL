@@ -126,8 +126,10 @@ const ReportesPage = ({ userRole }) => {
             const body = {
                 fechaInicio,
                 fechaFin,
+                date: new Date().toISOString(), // Cache buster or explicit date param if needed
                 [activeTab === 'ventas' ? 'clienteId' : 'proveedorId']: entidadId || undefined,
-                productoId: productoId || undefined
+                productoId: productoId || undefined,
+                searchQuery: searchTerm || undefined
             };
 
             const data = await apiFetch(endpoint, {
@@ -180,7 +182,7 @@ const ReportesPage = ({ userRole }) => {
         reporteData.detalles.forEach(item => {
             // 1. Fila de Encabezado de la Transacción
             tableBody.push([{
-                content: `${new Date(item.fecha).toLocaleDateString()} - ${activeTab === 'ventas' ? 'Venta' : 'Compra'} #${activeTab === 'ventas' ? item.numVenta : item.numCompra}`,
+                content: `${new Date(item.fecha).toLocaleDateString('es-BO', { timeZone: 'UTC' })} - ${activeTab === 'ventas' ? 'Venta' : 'Compra'} #${activeTab === 'ventas' ? item.numVenta : item.numCompra}`,
                 colSpan: 2,
                 styles: { fontStyle: 'bold', fillColor: [240, 240, 240] }
             }, {
@@ -353,6 +355,20 @@ const ReportesPage = ({ userRole }) => {
                             </select>
                         </div>
 
+                        {/* Buscador General (Factura / ID) */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                {activeTab === 'ventas' ? 'Buscar Factura / ID Venta' : 'Buscar ID Compra'}
+                            </label>
+                            <input
+                                type="text"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                placeholder={activeTab === 'ventas' ? "Ej: 1005 o FAC-001" : "Ej: COMP-2023..."}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                        </div>
+
                             {/* Custom Searchable Select */}
                             <div className="relative">
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -499,7 +515,7 @@ const ReportesPage = ({ userRole }) => {
                                             reporteData.detalles.map((item) => (
                                                 <tr key={item._id} className="hover:bg-gray-50">
                                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                        {new Date(item.fecha).toLocaleDateString()}
+                                                        {new Date(item.fecha).toLocaleDateString('es-BO', { timeZone: 'UTC' })}
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                         {activeTab === 'ventas' ? item.numVenta : item.numCompra}
@@ -556,7 +572,7 @@ const ReportesPage = ({ userRole }) => {
                             <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg border border-gray-100">
                                 <div>
                                     <p className="text-sm text-gray-500 uppercase font-bold text-xs">Fecha</p>
-                                    <p className="font-medium text-gray-900">{new Date(selectedItem.fecha).toLocaleDateString()}</p>
+                                    <p className="font-medium text-gray-900">{new Date(selectedItem.fecha).toLocaleDateString('es-BO', { timeZone: 'UTC' })}</p>
                                 </div>
                                 <div>
                                     <p className="text-sm text-gray-500 uppercase font-bold text-xs">{activeTab === 'ventas' ? 'Cliente' : 'Proveedor'}</p>
@@ -623,6 +639,28 @@ const ReportesPage = ({ userRole }) => {
                                              );
                                         })}
                                     </tbody>
+                                    <tfoot className="border-t border-gray-100 bg-gray-50">
+                                       <tr>
+                                           <td colSpan="5" className="px-3 py-2 text-right text-gray-600 text-xs uppercase font-bold">Subtotal:</td>
+                                           <td className="px-3 py-2 text-right font-medium">
+                                               Bs. {selectedItem.productos.reduce((s, p) => s + (p.cantidad * p.precioUnitario), 0).toFixed(2)}
+                                           </td>
+                                       </tr>
+                                       {selectedItem.descuento > 0 && (
+                                           <tr className="text-red-600">
+                                               <td colSpan="5" className="px-3 py-1 text-right text-xs uppercase font-bold">Descuento Global:</td>
+                                               <td className="px-3 py-1 text-right font-medium">
+                                                   - Bs. {selectedItem.descuento.toFixed(2)}
+                                               </td>
+                                           </tr>
+                                       )}
+                                       <tr className="bg-green-50">
+                                           <td colSpan="5" className="px-3 py-2 text-right text-green-800 text-sm uppercase font-bold">Total Final:</td>
+                                           <td className="px-3 py-2 text-right font-bold text-green-700 text-sm">
+                                               Bs. {Math.max(0, (selectedItem.productos.reduce((s, p) => s + (p.cantidad * p.precioUnitario), 0) - (selectedItem.descuento || 0))).toFixed(2)}
+                                           </td>
+                                       </tr>
+                                    </tfoot>
                                 </table>
                             </div>
 

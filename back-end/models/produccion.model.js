@@ -49,9 +49,9 @@ const produccionSchema = new mongoose.Schema({
   },
   // Nuevos campos para progreso automático
   tiempoEstimado: {
-    type: Number, // en horas
+    type: Number, // en dias
     required: true,
-    default: 24 // 24 horas por defecto
+    default: 1 // 1 dia por defecto
   },
   fechaInicio: {
     type: Date,

@@ -92,7 +92,13 @@ export const crearProduccion = async (req, res) => {
 
 export const listarProducciones = async (req, res) => {
   try {
-    const producciones = await Produccion.find().populate("materiales.material productoFinal");
+    const producciones = await Produccion.find()
+      .populate({
+        path: 'materiales.material',
+        populate: { path: 'proveedor' }
+      })
+      .populate("productoFinal")
+      .sort({ createdAt: -1 }); // Sort by newest first usually better
     res.json(producciones);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -130,6 +136,15 @@ export const iniciarProduccion = async (req, res) => {
     produccion.tiempoTranscurrido = 0;
 
     await produccion.save();
+
+    // 🔔 Send WhatsApp Notification
+    if (process.env.OWNER_PHONE_NUMBER) {
+      import('../services/whatsapp.service.js').then(module => {
+        const whatsappService = module.default;
+        const msg = `🔔 *Producción Iniciada*\n\n📋 *Producto:* ${produccion.nombre}\n🔢 *Cantidad:* ${produccion.cantidad}\n📅 *Inicio:* ${new Date().toLocaleString()}\n⏳ *Estimado:* ${produccion.tiempoEstimado} días`;
+        whatsappService.sendMessage(process.env.OWNER_PHONE_NUMBER, msg);
+      });
+    }
 
     res.json({ message: "Producción iniciada y materiales descontados", produccion });
   } catch (error) {
@@ -282,6 +297,109 @@ export const verificarRetrasos = async () => {
     }
   } catch (error) {
     console.error('❌ Error verificando retrasos:', error);
+  }
+};
+
+// Función para editar una orden de producción
+export const actualizarProduccion = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    const produccion = await Produccion.findById(id).populate('materiales.material');
+    if (!produccion) {
+      return res.status(404).json({ message: "Orden de producción no encontrada" });
+    }
+
+    if (produccion.estado === 'Completado') {
+      return res.status(400).json({ message: "No se puede editar una orden completada" });
+    }
+
+    // 1. Si está Pendiente, solo actualizamos los datos (no hay stock involucrado aún)
+    if (produccion.estado === 'Pendiente') {
+      const produccionActualizada = await Produccion.findByIdAndUpdate(id, updateData, { new: true });
+      return res.json({ message: "Orden actualizada correctamente", produccion: produccionActualizada });
+    }
+
+    // 2. Si está En Progreso, debemos gestionar el inventario (diferencias)
+    if (produccion.estado === 'En Progreso') {
+      // Validar y calcular diferencias de materiales
+      const nuevosMateriales = updateData.materiales || [];
+      const viejosMateriales = produccion.materiales || [];
+
+      // Mapa para facilitar búsqueda
+      const mapViejos = {};
+      viejosMateriales.forEach(m => {
+        // m.material es un objeto populado, necesitamos su _id
+        const matId = m.material._id ? m.material._id.toString() : m.material.toString();
+        mapViejos[matId] = m.cantidad;
+      });
+
+      // Validar stock antes de aplicar cambios
+      for (const nuevoMat of nuevosMateriales) {
+        const matId = nuevoMat.material; // Asumimos que viene el ID
+        const nuevaCant = nuevoMat.cantidad;
+        const viejaCant = mapViejos[matId] || 0;
+        const diferencia = nuevaCant - viejaCant;
+
+        if (diferencia > 0) {
+          // Necesitamos más material -> Validar stock
+          const materialDb = await MateriaPrima.findById(matId);
+          if (!materialDb) return res.status(400).json({ message: `Material no encontrado: ${matId}` });
+          if (materialDb.cantidad < diferencia) {
+            return res.status(400).json({
+              message: `Stock insuficiente para actualización: ${materialDb.nombre}. Necesitas ${diferencia} más, tienes ${materialDb.cantidad}.`
+            });
+          }
+        }
+      }
+
+      // Aplicar cambios de inventario
+      // A) Procesar materiales en la nueva lista (Añadir/Aumentar o Disminuir/Devolver)
+      for (const nuevoMat of nuevosMateriales) {
+        const matId = nuevoMat.material;
+        const nuevaCant = nuevoMat.cantidad;
+        const viejaCant = mapViejos[matId] || 0;
+        const diferencia = nuevaCant - viejaCant;
+
+        if (diferencia !== 0) {
+          const materialDb = await MateriaPrima.findById(matId);
+          if (materialDb) {
+            materialDb.cantidad -= diferencia; // Si dif > 0, resta. Si dif < 0, suma (devuelve).
+            await materialDb.save();
+          }
+        }
+        // Eliminar del mapa para saber cuáles sobran (fueron eliminados)
+        delete mapViejos[matId];
+      }
+
+      // B) Procesar materiales que estaban antes pero ya no están (Devolver todo su stock)
+      for (const [matId, cantDevolver] of Object.entries(mapViejos)) {
+        const materialDb = await MateriaPrima.findById(matId);
+        if (materialDb) {
+          materialDb.cantidad += cantDevolver;
+          await materialDb.save();
+        }
+      }
+
+      // Actualizar la orden con los nuevos datos
+      produccion.nombre = updateData.nombre || produccion.nombre;
+      produccion.cantidad = updateData.cantidad || produccion.cantidad; // OJO: Si cambia cantidad output, no recalculamos materiales auto, usuario debe hacerlo.
+      produccion.precioCompra = updateData.precioCompra || produccion.precioCompra;
+      produccion.precioVenta = updateData.precioVenta || produccion.precioVenta;
+      produccion.tiempoEstimado = updateData.tiempoEstimado || produccion.tiempoEstimado;
+      produccion.imagen = updateData.imagen || produccion.imagen;
+      produccion.materiales = nuevosMateriales;
+
+      await produccion.save();
+      return res.json({ message: "Orden en progreso actualizada e inventario ajustado", produccion });
+    }
+
+    res.status(400).json({ message: "Estado de orden no manejado para edición" });
+
+  } catch (error) {
+    console.error("Error actualizando producción:", error);
+    res.status(500).json({ error: error.message });
   }
 };
 
