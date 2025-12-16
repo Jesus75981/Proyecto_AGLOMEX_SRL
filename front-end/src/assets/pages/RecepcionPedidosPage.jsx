@@ -35,9 +35,18 @@ const RecepcionPedidosPage = () => {
       const { pedido, logistica } = response.data;
       setPedidoInfo(pedido);
       setLogisticaInfo(logistica);
-      setMessage('Pedido encontrado. Puede confirmar recepción si ya lo recibió.');
+      setPedidoInfo(pedido);
+      setLogisticaInfo(logistica);
+
+      if (pedido.estado === 'entregado') {
+        setMessage('Este pedido ya ha sido entregado y confirmado.');
+        setShowConfirm(false);
+      } else {
+        setMessage('Pedido encontrado. Puede confirmar recepción si ya lo recibió.');
+        setShowConfirm(true);
+      }
+
       setMessageType('success');
-      setShowConfirm(true);
     } catch (error) {
       console.error('Error:', error);
       if (error.response && error.response.status === 404) {
@@ -223,22 +232,24 @@ const RecepcionPedidosPage = () => {
               </div>
             )}
 
-            {showConfirm && pedidoInfo?.estado !== 'entregado' && (
+            {(showConfirm || pedidoInfo?.estado === 'entregado') && (
               <div className="mt-6">
-                <div className="bg-green-900/30 border border-green-700/50 rounded-lg p-6 text-center">
+                <div className={`border rounded-lg p-6 text-center ${pedidoInfo?.estado === 'entregado' ? 'bg-green-900/30 border-green-700/50' : 'bg-green-900/30 border-green-700/50'}`}>
                   <h3 className="text-xl font-bold text-green-400 mb-4">
-                    ¿Confirmar recepción del pedido?
+                    {pedidoInfo?.estado === 'entregado' ? 'Pedido Completado' : '¿Confirmar recepción del pedido?'}
                   </h3>
                   <p className="text-gray-300 mb-6">
-                    Al confirmar, notificaremos al sistema que has recibido tu pedido correctamente.
+                    {pedidoInfo?.estado === 'entregado'
+                      ? 'Este pedido ya ha sido entregado y la recepción fue confirmada.'
+                      : 'Al confirmar, notificaremos al sistema que has recibido tu pedido correctamente.'}
                   </p>
 
                   <button
                     onClick={handleConfirmarRecepcion}
-                    disabled={loading}
-                    className={`w-full font-bold py-4 px-6 rounded-lg transition-all duration-300 shadow-lg transform hover:scale-[1.02] ${loading
-                      ? 'bg-gray-600 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white text-lg'
+                    disabled={loading || pedidoInfo?.estado === 'entregado'}
+                    className={`w-full font-bold py-4 px-6 rounded-lg transition-all duration-300 shadow-lg transform ${loading || pedidoInfo?.estado === 'entregado'
+                      ? 'bg-green-800 text-green-200 cursor-not-allowed opacity-80'
+                      : 'hover:scale-[1.02] bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white text-lg'
                       }`}
                   >
                     {loading ? (
@@ -250,7 +261,7 @@ const RecepcionPedidosPage = () => {
                         Procesando...
                       </span>
                     ) : (
-                      '✅ Confirmar Recepción con un Clic'
+                      pedidoInfo?.estado === 'entregado' ? '✅ Pedido Confirmado' : 'Confirmar Recepción'
                     )}
                   </button>
                 </div>
@@ -258,7 +269,9 @@ const RecepcionPedidosPage = () => {
                 {/* Información de WhatsApp */}
                 <div className="mt-4 p-4 bg-gray-800/50 border border-gray-700 rounded-lg text-center">
                   <p className="text-gray-400 text-sm">
-                    Recibirás un comprobante automático en tu WhatsApp registrado.
+                    {pedidoInfo?.estado === 'entregado'
+                      ? 'Gracias por confiar en Aglomex SRL.'
+                      : 'Recibirás un comprobante automático en tu WhatsApp registrado.'}
                   </p>
                 </div>
               </div>

@@ -18,7 +18,6 @@ import ReportesDiarios from "./assets/pages/ReportesDiarios.jsx";
 import ReportesPage from "./assets/pages/ReportesPage.jsx";
 import DashboardPage from "./assets/pages/DashboardPage.jsx";
 import CatalogPage from "./assets/pages/CatalogPage.jsx";
-import ThemeToggle from "./components/ThemeToggle.jsx";
 
 // Componente de carga
 const Loading = () => (
@@ -84,7 +83,6 @@ function AppContent() {
 
   return (
     <div className="App">
-      <ThemeToggle />
       <Routes>
         {/* ✅ RUTAS PÚBLICAS */}
         <Route path="/" element={<LandingPage />} />

@@ -41,8 +41,9 @@ const encontrarOCrearProducto = async (itemData, tipoCompra) => {
     }
 
     if (!producto) {
-        if (!nombreProducto || !colorProducto || !categoriaProducto) {
-            throw new Error("Datos insuficientes para crear un nuevo producto. Se requiere nombre, color y categoría.");
+        // Validamos que los datos mínimos estén presentes
+        if (!nombreProducto) {
+            throw new Error("Datos insuficientes para crear un nuevo producto. Se requiere nombre.");
         }
 
         if (tipoCompra === "Producto Terminado" && (!colorProducto || !categoriaProducto)) {
@@ -55,6 +56,7 @@ const encontrarOCrearProducto = async (itemData, tipoCompra) => {
                 const randomSuffix = Math.floor(1000 + Math.random() * 9000);
                 return `${prefix}-${randomSuffix}`;
             };
+
             const idMateriaPrima = generarCodigoInterno(nombreProducto);
 
             const nuevaMateriaPrima = new MateriaPrima({
@@ -360,6 +362,9 @@ export const listarComprasConSaldo = async (req, res) => {
     }
 };
 
+/**
+ * Actualiza una compra existente.
+ */
 export const actualizarCompra = async (req, res) => {
     try {
         const { id } = req.params;
@@ -383,9 +388,12 @@ export const actualizarCompra = async (req, res) => {
 
     } catch (error) {
         console.error("Error al actualizar la compra:", error.message);
-        res.status(500).json({ message: "Error al actualizar la compra.", error: error.message });
+        const statusCode = error.name === 'ValidationError' ? 400 : 500;
+        res.status(statusCode).json({ message: "Error al actualizar la compra.", error: error.message });
     }
 };
+
+// Reporte avanzado de compras
 
 export const generarReporteCompras = async (req, res) => {
     try {
@@ -432,6 +440,9 @@ export const generarReporteCompras = async (req, res) => {
     }
 };
 
+/**
+ * Obtiene una compra específica por ID.
+ */
 export const obtenerCompraPorId = async (req, res) => {
     try {
         const { id } = req.params;
@@ -449,6 +460,9 @@ export const obtenerCompraPorId = async (req, res) => {
     }
 };
 
+/**
+ * Obtener estadísticas de compras para el dashboard
+ */
 export const obtenerEstadisticas = async (req, res) => {
     try {
         const { year, period, month, date } = req.query;
@@ -516,7 +530,7 @@ export const obtenerSiguienteNumeroCompra = async (req, res) => {
 
         res.status(200).json({ siguienteNumero });
     } catch (error) {
-        console.error("Error al obtener siguiente número:", error);
-        res.status(500).json({ message: "Error al generar número", error: error.message });
+        console.error("Error al obtener siguiente número de compra:", error);
+        res.status(500).json({ message: "Error al generar el número de compra", error: error.message });
     }
 };

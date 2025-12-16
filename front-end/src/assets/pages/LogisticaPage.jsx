@@ -457,6 +457,74 @@ const LogisticaPage = ({ userRole }) => {
     }
   };
 
+  // --- NUEVA LÓGICA VENTAS PENDIENTES ---
+  const [ventasPendientes, setVentasPendientes] = useState([]);
+  const [loadingVentasPendientes, setLoadingVentasPendientes] = useState(false);
+
+  const cargarVentasPendientes = async () => {
+    setLoadingVentasPendientes(true);
+    try {
+      const data = await apiFetch('/logistica/ventas/pendientes');
+      setVentasPendientes(data);
+    } catch (error) {
+      console.error('Error cargando ventas pendientes:', error);
+    } finally {
+      setLoadingVentasPendientes(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'ventas_pendientes') {
+      cargarVentasPendientes();
+    }
+  }, [activeTab]);
+
+  const procesarVentaPendiente = (venta) => {
+    // Convertir venta pendiente a formato de envío y abrir formulario
+    const pedidoMapeado = {
+      pedidoNumero: venta.numVenta,
+      cliente: venta.cliente, // Objeto completo
+      productos: venta.productos,
+      metodoEntrega: venta.metodoEntrega || 'Envio Domicilio'
+    };
+
+    // Cambiar a tab de envíos y abrir formulario
+    setActiveTab('envios'); // Cambiar a la pestaña de envíos primero
+
+    // Lógica condicional para Ciudad y Departamento
+    let defaultCiudad = '';
+    let defaultDepartamento = '';
+
+    if (venta.metodoEntrega === 'Envio Domicilio') {
+      defaultCiudad = 'Sucre';
+      defaultDepartamento = 'Chuquisaca';
+    } else {
+      // Para Envio Nacional u otros, dejar vacío o usar datos del cliente si tiene
+      defaultCiudad = '';
+      defaultDepartamento = '';
+    }
+
+    // Pre-poblar el estado del formulario "nuevoEnvio" con TODOS los datos disponibles
+    setNuevoEnvio({
+      pedidoId: venta.numVenta.toString(),
+      cliente: venta.cliente?.nombre || '',
+      calle: venta.cliente?.direccion || '',
+      ciudad: defaultCiudad,
+      departamento: defaultDepartamento,
+      pais: 'Bolivia',
+      productos: venta.productos || [],
+      transportista: '',
+      tipoTransporte: 'Terrestre',
+      metodoEntrega: venta.metodoEntrega || 'Envio Domicilio',
+      costoEnvio: 0,
+      empresaEnvio: ''
+    });
+
+    setShowForm(true);
+    setBusquedaPedido(venta.numVenta.toString());
+  };
+  // ----------------------------------------
+
   if (loading) return <div className="p-6"><SkeletonMetrics /></div>;
 
   return (
@@ -481,14 +549,16 @@ const LogisticaPage = ({ userRole }) => {
           <div className="bg-white rounded-xl shadow-md mb-6">
             <div className="border-b border-gray-200">
               <nav className="flex -mb-px">
-                {['envios', 'transportistas', 'rutas'].map((tab) => (
+                {['envios', 'ventas_pendientes', 'transportistas', 'rutas'].map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
                     className={`py-4 px-6 text-center border-b-2 font-medium text-sm capitalize ${activeTab === tab ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'
                       }`}
                   >
-                    {tab === 'envios' ? '🚚 Envíos' : tab === 'transportistas' ? '🏢 Transportistas' : '🛣️ Rutas'}
+                    {tab === 'envios' ? '🚚 Envíos' :
+                      tab === 'ventas_pendientes' ? '🔔 Ventas Pendientes' :
+                        tab === 'transportistas' ? '🏢 Transportistas' : '🛣️ Rutas'}
                   </button>
                 ))}
               </nav>
@@ -498,12 +568,66 @@ const LogisticaPage = ({ userRole }) => {
           <div className="mb-6">
             <input
               type="text"
-              placeholder={`Buscar en ${activeTab}...`}
+              placeholder={`Buscar en ${activeTab === 'ventas_pendientes' ? 'ventas pendientes' : activeTab}...`}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
+
+          {activeTab === 'ventas_pendientes' && (
+            <div className="bg-white rounded-xl shadow-md p-6">
+              <h2 className="text-2xl font-semibold mb-4 text-orange-600">Ventas Pendientes de Envío</h2>
+              <p className="text-gray-600 mb-6">Estas ventas requieren entrega (Domicilio o Nacional) y aún no tienen envío programado.</p>
+
+              {loadingVentasPendientes ? <SkeletonTable /> : (
+                <div className="overflow-x-auto">
+                  {ventasPendientes.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">No hay ventas pendientes de envío.</div>
+                  ) : (
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-orange-50">
+                          <th className="px-4 py-3 text-left text-xs font-medium text-orange-800 uppercase"># Venta</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-orange-800 uppercase">Cliente</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-orange-800 uppercase">Método Entrega</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-orange-800 uppercase">Fecha Venta</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-orange-800 uppercase">Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {ventasPendientes.filter(v =>
+                          v.cliente?.nombre?.toLowerCase().includes(searchTermLower) ||
+                          v.numVenta.toString().includes(searchTermLower)
+                        ).map((venta) => (
+                          <tr key={venta._id} className="hover:bg-orange-50 transition-colors">
+                            <td className="px-4 py-3 text-sm font-bold text-gray-700">#{venta.numVenta}</td>
+                            <td className="px-4 py-3 text-sm text-gray-600">{venta.cliente?.nombre || 'Consumidor Final'}</td>
+                            <td className="px-4 py-3 text-sm">
+                              <span className="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                                {venta.metodoEntrega}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-500">
+                              {new Date(venta.fecha).toLocaleDateString()}
+                            </td>
+                            <td className="px-4 py-3">
+                              <button
+                                onClick={() => procesarVentaPendiente(venta)}
+                                className="bg-indigo-600 text-white px-3 py-1 rounded text-sm hover:bg-indigo-700 shadow-sm flex items-center"
+                              >
+                                📦 Procesar Envío
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {activeTab === 'envios' && (
             <div className="space-y-6">
@@ -553,7 +677,7 @@ const LogisticaPage = ({ userRole }) => {
                     )}
 
                     <input type="text" placeholder="Cliente" value={nuevoEnvio.cliente} onChange={(e) => setNuevoEnvio({ ...nuevoEnvio, cliente: e.target.value })} className="px-4 py-2 border border-gray-300 rounded-lg" />
-                    <input type="text" placeholder="Calle" value={nuevoEnvio.calle} onChange={(e) => setNuevoEnvio({ ...nuevoEnvio, calle: e.target.value })} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                    <input type="text" placeholder="Calle / Dirección" value={nuevoEnvio.calle} onChange={(e) => setNuevoEnvio({ ...nuevoEnvio, calle: e.target.value })} className="px-4 py-2 border border-gray-300 rounded-lg" />
                     <input type="text" placeholder="Ciudad" value={nuevoEnvio.ciudad} onChange={(e) => setNuevoEnvio({ ...nuevoEnvio, ciudad: e.target.value })} className="px-4 py-2 border border-gray-300 rounded-lg" />
                     <input type="text" placeholder="Departamento" value={nuevoEnvio.departamento} onChange={(e) => setNuevoEnvio({ ...nuevoEnvio, departamento: e.target.value })} className="px-4 py-2 border border-gray-300 rounded-lg" />
                     <select value={nuevoEnvio.tipoTransporte} onChange={(e) => setNuevoEnvio({ ...nuevoEnvio, tipoTransporte: e.target.value })} className="px-4 py-2 border border-gray-300 rounded-lg">
@@ -571,7 +695,10 @@ const LogisticaPage = ({ userRole }) => {
                       <option value="Recojo en Almacen">Recojo en Almacen</option>
                       <option value="Envio Nacional">Envio Nacional</option>
                     </select>
-                    <input type="number" placeholder="Costo Envío" value={nuevoEnvio.costoEnvio} onChange={(e) => setNuevoEnvio({ ...nuevoEnvio, costoEnvio: e.target.value })} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-gray-500">Bs</span>
+                      <input type="number" placeholder="Costo Envío" value={nuevoEnvio.costoEnvio} onChange={(e) => setNuevoEnvio({ ...nuevoEnvio, costoEnvio: e.target.value })} className="w-full pl-10 px-4 py-2 border border-gray-300 rounded-lg" />
+                    </div>
 
                     <div className="md:col-span-2 flex space-x-4">
                       <button onClick={agregarEnvio} className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">Programar Envío</button>
@@ -602,7 +729,7 @@ const LogisticaPage = ({ userRole }) => {
                           <td className="px-4 py-3 text-sm text-gray-500">
                             {envio.empresaEnvio ? <span className="font-semibold text-indigo-600">{envio.empresaEnvio}</span> : envio.transportista}
                           </td>
-                          <td className="px-4 py-3 text-sm font-semibold">${envio.costoEnvio}</td>
+                          <td className="px-4 py-3 text-sm font-semibold">Bs {envio.costoEnvio}</td>
                           <td className="px-4 py-3 text-sm">
                             {envio.estado !== 'Entregado' && (
                               <button onClick={() => cambiarEstadoEnvioAPI(envio.id, 'Entregado')} className="text-indigo-600 hover:text-indigo-900 text-xs">

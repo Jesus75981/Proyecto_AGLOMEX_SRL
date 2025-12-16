@@ -18,6 +18,7 @@ router.get("/estadisticas", obtenerEstadisticas);
 router.get("/con-saldo", listarComprasConSaldo);
 router.get("/siguiente-numero", obtenerSiguienteNumeroCompra);
 router.post("/reportes", generarReporteCompras);
+
 router.get("/:id", obtenerCompraPorId);
 router.put("/:id", actualizarCompra);
 

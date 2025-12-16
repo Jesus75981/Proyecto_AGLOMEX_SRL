@@ -1,5 +1,5 @@
-// controllers/logistica.controller.js
 import Logistica from "../models/logistica.model.js";  // ✅ Usar Logistica (no Pedido)
+import Venta from "../models/venta.model.js"; // Import Venta model
 import Contador from "../models/contador.model.js";
 import ProductoTienda from "../models/productoTienda.model.js";
 import Ruta from "../models/ruta.model.js";
@@ -229,7 +229,7 @@ export const obtenerEstadisticas = async (req, res) => {
         $group: {
           _id: groupBy,
           count: { $sum: 1 },
-          costoTotal: { $sum: "$costoAdicional" }
+          costoTotal: { $sum: "$costoEnvio" } // Changed from costoAdicional to costoEnvio
         }
       },
       {
@@ -248,13 +248,13 @@ export const obtenerEstadisticas = async (req, res) => {
       { $match: matchStage },
       {
         $group: {
-          _id: "$empresaEnvio", // Changed from tipoEntrega to empresaEnvio
+          _id: "$metodoEntrega", // Changed from empresaEnvio to metodoEntrega
           value: { $sum: 1 }
         }
       },
       {
         $project: {
-          name: { $ifNull: ["$_id", "N/A"] },
+          name: { $ifNull: ["$_id", "Desconocido"] },
           value: 1,
           _id: 0
         }
@@ -273,7 +273,7 @@ export const obtenerEstadisticas = async (req, res) => {
         retrasado: pedidos.filter(p => p.estado === 'retrasado').length
       },
       pedidosPorMetodo: pedidosPorMetodo,
-      costoTotalEnvios: pedidos.reduce((sum, p) => sum + (p.costoAdicional || 0), 0),
+      costoTotalEnvios: pedidos.reduce((sum, p) => sum + (p.costoEnvio || 0), 0), // Changed to costoEnvio
       tiempoPromedioEntrega: calcularTiempoPromedio(pedidos),
       tasaEntregaExitosa: pedidos.length > 0 ?
         (pedidos.filter(p => p.estado === 'entregado').length / pedidos.length) * 100 : 0,
@@ -509,6 +509,44 @@ export const getEnviosActivos = async (req, res) => {
     res.json(envios);
   } catch (error) {
     console.error('Error obteniendo envíos activos:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Obtener ventas pendientes de envío (para integración automática)
+export const getVentasPendientesEnvio = async (req, res) => {
+  try {
+    console.log("🔍 Buscando ventas pendientes de envío...");
+
+    // 1. Obtener todas las ventas que requieren envío
+    // Criterios:
+    // - Metodo de entrega: Envio Domicilio OR Envio Nacional
+    // - NO deben estar ya en la colección de Logística
+
+    const ventasCandidatas = await Venta.find({
+      metodoEntrega: { $in: ["Envio Domicilio", "Envio Nacional"] }
+    }).populate('cliente productos.producto');
+
+    console.log(`📋 Ventas candidatas encontradas: ${ventasCandidatas.length}`);
+
+    // 2. Obtener los IDs de pedidos/ventas que YA existen en Logística
+    const pedidosLogistica = await Logistica.find({}, 'pedidoNumero');
+    const numerosPedidoExistentes = pedidosLogistica.map(p => p.pedidoNumero);
+
+    console.log(`📦 Pedidos en logística existentes: ${numerosPedidoExistentes.length}`);
+
+    // 3. Filtrar las ventas que NO están en logística
+    const ventasPendientes = ventasCandidatas.filter(venta => {
+      // Asumimos que numVenta es equivalente a pedidoNumero
+      return !numerosPedidoExistentes.includes(venta.numVenta);
+    });
+
+    console.log(`✨ Ventas realmente pendientes: ${ventasPendientes.length}`);
+
+    res.json(ventasPendientes);
+
+  } catch (error) {
+    console.error('Error obteniendo ventas pendientes:', error);
     res.status(500).json({ error: error.message });
   }
 };

@@ -12,6 +12,26 @@ const API_URL = 'http://localhost:5000/api';
 
 const getAuthToken = () => localStorage.getItem('token');
 
+// --- Suppress Recharts Warnings ---
+// This suppresses the benign "width(-1)" warnings from Recharts having issues with FLex/Grid initial renders
+const originalWarn = console.warn;
+console.warn = (...args) => {
+  const msg = args[0];
+  if (typeof msg === 'string' && (msg.includes('width(-1)') || msg.includes('height(-1)') || msg.includes('minWidth') || msg.includes('minHeight'))) {
+    return;
+  }
+  originalWarn(...args);
+};
+const originalError = console.error;
+console.error = (...args) => {
+  const msg = args[0];
+  if (typeof msg === 'string' && (msg.includes('width(-1)') || msg.includes('height(-1)') || msg.includes('minWidth') || msg.includes('minHeight'))) {
+    return;
+  }
+  originalError(...args);
+};
+
+
 const apiFetch = async (endpoint, options = {}) => {
   const token = getAuthToken();
   const headers = { 'Content-Type': 'application/json', ...options.headers };
@@ -262,14 +282,13 @@ const DashboardPage = ({ userRole }) => {
       <div className="container mx-auto px-4 py-8" id="dashboard-content">
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-4">
-             <button
-                onClick={() => navigate('/home')}
-                className="flex items-center space-x-2 bg-gray-600/10 text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-600/20 transition-colors"
-                title="Volver al Menú Principal"
-             >
-                <span>←</span>
-             </button>
-             <h1 className="text-3xl font-bold text-gray-800">Dashboard Ejecutivo</h1>
+            <button
+              onClick={() => navigate('/home')}
+              className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-2"
+            >
+              <span>←</span> Volver
+            </button>
+            <h1 className="text-3xl font-bold text-gray-800">Dashboard Ejecutivo</h1>
           </div>
           <button
             onClick={handleExportPDF}
@@ -375,7 +394,7 @@ const DashboardPage = ({ userRole }) => {
                   <KPICard title="Ingresos Totales" value={`Bs. ${(ventasData.resumenTotal?.totalIngresos || 0).toLocaleString()}`} icon="💵" color="green" />
                   <KPICard title="Productos Vendidos" value={ventasData.resumenTotal?.totalProductosVendidos || 0} icon="📦" color="purple" />
                   <KPICard
-                    title="Ticket Promedio"
+                    title="Promedio por Venta"
                     value={`Bs. ${(ventasData.resumenTotal?.totalVentas
                       ? (ventasData.resumenTotal.totalIngresos / ventasData.resumenTotal.totalVentas)
                       : 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
@@ -385,42 +404,13 @@ const DashboardPage = ({ userRole }) => {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                    <h3 className="text-lg font-semibold mb-4">Tendencia de Ingresos</h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <AreaChart data={ventasChartData}>
-                        <defs>
-                          <linearGradient id="colorIngresos" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#10B981" stopOpacity={0.1} />
-                            <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                        <XAxis dataKey="mes" stroke="#9CA3AF" />
-                        <YAxis stroke="#9CA3AF" />
-                        <Tooltip content={<CustomTooltip prefix="Bs. " />} />
-                        <Area type="monotone" dataKey="ingresos" stroke="#10B981" strokeWidth={2} fillOpacity={1} fill="url(#colorIngresos)" activeDot={{ r: 6 }} />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                    <h3 className="text-lg font-semibold mb-4">Top Productos Vendidos</h3>
-                    <ResponsiveContainer width="100%" height={300} minHeight={300}>
-                      <BarChart data={ventasData.productosMasVendidos || []} layout="vertical">
-                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5E7EB" />
-                        <XAxis type="number" stroke="#9CA3AF" />
-                        <YAxis dataKey="nombre" type="category" width={100} stroke="#4B5563" tick={{ fontSize: 12 }} />
-                        <Tooltip content={<CustomTooltip />} />
-                        <Bar dataKey="cantidad" fill="#4F46E5" radius={[0, 4, 4, 0]} barSize={20} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-
-                  {/* Gráfico de Ventas por Categoría - NUEVO */}
-                  <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow col-span-1 lg:col-span-2">
-                    <h3 className="text-lg font-semibold mb-4">Ventas por Categoría</h3>
-                    <div className="h-64">
-                      <ResponsiveContainer width="100%" height="100%" minHeight={300}>
+                  <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 min-w-0">
+                    <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
+                      <span className="p-2 bg-blue-100 rounded-lg text-blue-600 font-bold">📊</span>
+                      Tendencia de Ingresos
+                    </h3>
+                    <div className="h-80 w-full">
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={300} debounce={300}>
                         <PieChart>
                           <Pie
                             data={(ventasData.ventasPorCategoria || []).map(i => ({ name: i._id || 'Sin Categoría', value: i.totalVentas }))}
@@ -456,34 +446,44 @@ const DashboardPage = ({ userRole }) => {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                    <h3 className="text-lg font-semibold mb-4">Producción Mensual</h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <LineChart data={produccionChartData}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                        <XAxis dataKey="mes" stroke="#9CA3AF" />
-                        <YAxis stroke="#9CA3AF" />
-                        <Tooltip content={<CustomTooltip />} />
-                        <Line type="monotone" dataKey="unidades" stroke="#F59E0B" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                      </LineChart>
-                    </ResponsiveContainer>
+                  <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 min-w-0">
+                    <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
+                      <span className="p-2 bg-orange-100 rounded-lg text-orange-600 font-bold">📈</span>
+                      Producción Mensual
+                    </h3>
+                    <div className="h-80 w-full">
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={300} debounce={300}>
+                        <LineChart data={produccionChartData}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                          <XAxis dataKey="mes" stroke="#9CA3AF" />
+                          <YAxis stroke="#9CA3AF" />
+                          <Tooltip content={<CustomTooltip />} />
+                          <Line type="monotone" dataKey="unidades" stroke="#F59E0B" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
                   </div>
-                  <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                    <h3 className="text-lg font-semibold mb-4">Estado de Órdenes</h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <PieChart>
-                        <Pie
-                          data={(produccionData.produccionPorEstado || []).map(i => ({ name: i._id, value: i.count }))}
-                          cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value"
-                        >
-                          {(produccionData.produccionPorEstado || []).map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
+                  <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 min-w-0">
+                    <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
+                      <span className="p-2 bg-purple-100 rounded-lg text-purple-600 font-bold">🥧</span>
+                      Estado de Órdenes
+                    </h3>
+                    <div className="h-80 w-full">
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={300} debounce={300}>
+                        <PieChart>
+                          <Pie
+                            data={(produccionData.produccionPorEstado || []).map(i => ({ name: i._id, value: i.count }))}
+                            cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value"
+                          >
+                            {(produccionData.produccionPorEstado || []).map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -526,18 +526,23 @@ const DashboardPage = ({ userRole }) => {
                   <KPICard title={`Utilidad ${selectedYear}`} value={`Bs. ${finanzasData.metrics.utilidadNeta?.toLocaleString() || 0}`} icon="💰" color="blue" />
                 </div>
 
-                <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                  <h3 className="text-lg font-semibold mb-4">Flujo de Caja</h3>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <AreaChart data={cashflowChartData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                      <XAxis dataKey="label" stroke="#9CA3AF" />
-                      <YAxis stroke="#9CA3AF" />
-                      <Tooltip content={<CustomTooltip prefix="Bs. " />} />
-                      <Area type="monotone" dataKey="ingresos" stackId="1" stroke="#10B981" fill="#10B981" fillOpacity={0.6} />
-                      <Area type="monotone" dataKey="egresos" stackId="2" stroke="#EF4444" fill="#EF4444" fillOpacity={0.6} />
-                    </AreaChart>
-                  </ResponsiveContainer>
+                <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 min-w-0">
+                  <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
+                    <span className="p-2 bg-green-100 rounded-lg text-green-600 font-bold">💸</span>
+                    Flujo de Caja
+                  </h3>
+                  <div className="h-80 w-full">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={300} debounce={300}>
+                      <AreaChart data={cashflowChartData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                        <XAxis dataKey="label" stroke="#9CA3AF" />
+                        <YAxis stroke="#9CA3AF" />
+                        <Tooltip content={<CustomTooltip prefix="Bs. " />} />
+                        <Area type="monotone" dataKey="ingresos" stackId="1" stroke="#10B981" fill="#10B981" fillOpacity={0.6} />
+                        <Area type="monotone" dataKey="egresos" stackId="2" stroke="#EF4444" fill="#EF4444" fillOpacity={0.6} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
               </div>
             )}
@@ -559,39 +564,48 @@ const DashboardPage = ({ userRole }) => {
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Gráfico de valor por categoría */}
-                  <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                    <h3 className="text-lg font-semibold mb-4">Valor de Inventario por Categoría</h3>
-                    <ResponsiveContainer width="100%" height={300} minHeight={300}>
-                      <PieChart>
-                        <Pie
-                          data={(inventarioData.metricas.metricasPorCategoria || []).map(i => ({
-                            name: i._id || 'Sin Categoría',
-                            value: i.valorTotal || 0
-                          }))}
-                          cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value"
-                        >
-                          {(inventarioData.metricas.metricasPorCategoria || []).map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip content={<CustomTooltip prefix="Bs. " />} />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
+                  <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 min-w-0">
+                    <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
+                      <span className="p-2 bg-blue-100 rounded-lg text-blue-600 font-bold">📊</span>
+                      Valor por Categoría
+                    </h3>
+                    <div className="h-80 w-full">
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={300} debounce={300}>
+                        <PieChart>
+                          <Pie
+                            data={(inventarioData.metricas.metricasPorCategoria || []).map(i => ({
+                              name: i._id || 'Sin Categoría',
+                              value: i.valorTotal || 0
+                            }))}
+                            cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value"
+                          >
+                            {(inventarioData.metricas.metricasPorCategoria || []).map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip content={<CustomTooltip prefix="Bs. " />} />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
                   </div>
-
-                  {/* Gráfico de Top Productos con Mayor Stock - NUEVO */}
-                  <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                    <h3 className="text-lg font-semibold mb-4">Top Productos con Mayor Stock</h3>
-                    <ResponsiveContainer width="100%" height={300} minHeight={300}>
-                      <BarChart data={inventarioData.topProductosStock || []} layout="vertical">
-                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5E7EB" />
-                        <XAxis type="number" stroke="#9CA3AF" />
-                        <YAxis dataKey="nombre" type="category" width={100} stroke="#4B5563" tick={{ fontSize: 12 }} />
-                        <Tooltip />
-                        <Bar dataKey="cantidad" fill="#10B981" radius={[0, 4, 4, 0]} barSize={20} />
-                      </BarChart>
-                    </ResponsiveContainer>
+                  {/* Gráfico de Top Stock */}
+                  <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 min-w-0">
+                    <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
+                      <span className="p-2 bg-green-100 rounded-lg text-green-600 font-bold">🔼</span>
+                      Top Stock
+                    </h3>
+                    <div className="h-80 w-full">
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={300} debounce={300}>
+                        <BarChart data={inventarioData.topProductosStock || []} layout="vertical">
+                          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5E7EB" />
+                          <XAxis type="number" stroke="#9CA3AF" />
+                          <YAxis dataKey="nombre" type="category" width={100} stroke="#4B5563" tick={{ fontSize: 12 }} />
+                          <Tooltip />
+                          <Bar dataKey="cantidad" fill="#10B981" radius={[0, 4, 4, 0]} barSize={20} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -613,36 +627,52 @@ const DashboardPage = ({ userRole }) => {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                    <h3 className="text-lg font-semibold mb-4">Tendencia de Envíos</h3>
-                    <ResponsiveContainer width="100%" height={300} minHeight={300}>
-                      <LineChart data={logisticaChartData}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                        <XAxis dataKey="label" stroke="#9CA3AF" />
-                        <YAxis stroke="#9CA3AF" />
-                        <Tooltip content={<CustomTooltip />} />
-                        <Line type="monotone" dataKey="envios" stroke="#3B82F6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                      </LineChart>
-                    </ResponsiveContainer>
+                  {/* Tendencia de Envíos */}
+                  <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 min-w-0">
+                    <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
+                      <span className="p-2 bg-indigo-100 rounded-lg text-indigo-600 font-bold">📦</span>
+                      Tendencia de Envíos
+                    </h3>
+                    <div className="h-80 w-full">
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={300} debounce={300}>
+                        <LineChart data={logisticaChartData}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                          <XAxis dataKey="label" stroke="#9CA3AF" />
+                          <YAxis stroke="#9CA3AF" />
+                          <Tooltip content={<CustomTooltip />} />
+                          <Line type="monotone" dataKey="envios" stroke="#3B82F6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
                   </div>
 
-                  <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                    <h3 className="text-lg font-semibold mb-4">Envíos por Método</h3>
-                    <ResponsiveContainer width="100%" height={300} minHeight={300}>
-                      <BarChart data={logisticaData.estadisticas.pedidosPorMetodo || []} layout="vertical">
-                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5E7EB" />
-                        <XAxis type="number" stroke="#9CA3AF" />
-                        <YAxis dataKey="name" type="category" width={100} stroke="#4B5563" tick={{ fontSize: 12 }} />
-                        <Tooltip content={<CustomTooltip />} />
-                        <Bar dataKey="value" fill="#8B5CF6" radius={[0, 4, 4, 0]} barSize={20} />
-                      </BarChart>
-                    </ResponsiveContainer>
+                  {/* Envíos por Método */}
+                  <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 min-w-0">
+                    <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
+                      <span className="p-2 bg-purple-100 rounded-lg text-purple-600 font-bold">🚚</span>
+                      Envíos por Método
+                    </h3>
+                    <div className="h-80 w-full">
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={300} debounce={300}>
+                        <BarChart data={logisticaData.estadisticas.pedidosPorMetodo || []} layout="vertical">
+                          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5E7EB" />
+                          <XAxis type="number" stroke="#9CA3AF" />
+                          <YAxis dataKey="name" type="category" width={100} stroke="#4B5563" tick={{ fontSize: 12 }} />
+                          <Tooltip content={<CustomTooltip />} />
+                          <Bar dataKey="value" fill="#8B5CF6" radius={[0, 4, 4, 0]} barSize={20} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
                   </div>
 
-                  <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow col-span-1 lg:col-span-2">
-                    <h3 className="text-lg font-semibold mb-4">Estado de Pedidos</h3>
-                    <div className="h-64">
-                      <ResponsiveContainer width="100%" height="100%" minHeight={300}>
+                  {/* Estado de Pedidos */}
+                  <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 min-w-0 col-span-1 lg:col-span-2">
+                    <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
+                      <span className="p-2 bg-blue-100 rounded-lg text-blue-600 font-bold">📊</span>
+                      Estado de Pedidos
+                    </h3>
+                    <div className="h-80 w-full">
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={300} debounce={300}>
                         <PieChart>
                           <Pie
                             data={[
@@ -681,47 +711,57 @@ const DashboardPage = ({ userRole }) => {
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Gráfico de Gasto Mensual */}
-                  <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                    <h3 className="text-lg font-semibold mb-4">Gasto Mensual</h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <AreaChart data={comprasChartData}>
-                        <defs>
-                          <linearGradient id="colorGasto" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#EC4899" stopOpacity={0.1} />
-                            <stop offset="95%" stopColor="#EC4899" stopOpacity={0} />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                        <XAxis dataKey="mes" stroke="#9CA3AF" />
-                        <YAxis stroke="#9CA3AF" />
-                        <Tooltip content={<CustomTooltip prefix="Bs. " />} />
-                        <Area type="monotone" dataKey="gasto" stroke="#EC4899" strokeWidth={2} fillOpacity={1} fill="url(#colorGasto)" activeDot={{ r: 6 }} />
-                      </AreaChart>
-                    </ResponsiveContainer>
+                  <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 min-w-0">
+                    <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
+                      <span className="p-2 bg-pink-100 rounded-lg text-pink-600 font-bold">📉</span>
+                      Gasto Mensual
+                    </h3>
+                    <div className="h-80 w-full">
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={300} debounce={300}>
+                        <AreaChart data={comprasChartData}>
+                          <defs>
+                            <linearGradient id="colorGasto" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#EC4899" stopOpacity={0.1} />
+                              <stop offset="95%" stopColor="#EC4899" stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                          <XAxis dataKey="mes" stroke="#9CA3AF" />
+                          <YAxis stroke="#9CA3AF" />
+                          <Tooltip content={<CustomTooltip prefix="Bs. " />} />
+                          <Area type="monotone" dataKey="gasto" stroke="#EC4899" strokeWidth={2} fillOpacity={1} fill="url(#colorGasto)" activeDot={{ r: 6 }} />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
                   </div>
 
                   {/* Gráfico de Compras por Tipo */}
-                  <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                    <h3 className="text-lg font-semibold mb-4">Compras por Tipo</h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <PieChart>
-                        <Pie
-                          data={comprasData.comprasPorTipo.map(i => ({ name: i._id, value: i.count }))}
-                          cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value"
-                        >
-                          {comprasData.comprasPorTipo.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
+                  <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 min-w-0">
+                    <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
+                      <span className="p-2 bg-purple-100 rounded-lg text-purple-600 font-bold">🏷️</span>
+                      Compras por Tipo
+                    </h3>
+                    <div className="h-80 w-full">
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={300} debounce={300}>
+                        <PieChart>
+                          <Pie
+                            data={comprasData.comprasPorTipo.map(i => ({ name: i._id, value: i.count }))}
+                            cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value"
+                          >
+                            {comprasData.comprasPorTipo.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
                   </div>
                 </div>
 
                 {/* Tabla de Compras Recientes */}
-                <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow">
+                <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 min-w-0">
                   <h3 className="text-lg font-semibold mb-4">Compras Recientes</h3>
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
@@ -769,12 +809,11 @@ const DashboardPage = ({ userRole }) => {
                   </div>
                 </div>
               </div>
-            )
-            }
+            )}
           </>
         )}
-      </div >
-    </div >
+      </div>
+    </div>
   );
 };
 export default DashboardPage;

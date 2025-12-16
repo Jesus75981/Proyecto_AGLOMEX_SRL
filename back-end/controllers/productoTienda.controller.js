@@ -62,8 +62,7 @@ export const crearProducto = async (req, res) => {
     }
 
     if (!tipo || tipo.trim().length === 0) {
-      // Si no se envía, se asigna por defecto en el modelo, pero si se envía vacío, validamos.
-      // Opcional: forzar que se envíe siempre.
+      // Si no se envía, se asigna por defecto en el modelo.
     }
 
     if (!color || color.trim().length === 0) {
@@ -184,7 +183,8 @@ export const listarProductos = async (req, res) => {
 
     const filtro = { activo: true };
 
-    // Si se proporciona un tipo en la query string, agregarlo al filtro
+    // HEAD tenía filtro de cantidad > 0. Origin no. 
+    // Mantendremos flexible: Si query string pide tipo, filtrar.
     if (req.query.tipo) {
       filtro.tipo = req.query.tipo;
     }
@@ -195,6 +195,7 @@ export const listarProductos = async (req, res) => {
     }
 
     // Buscar productos con el filtro y popular referencias
+
     const productos = await ProductoTienda.find(filtro).populate("proveedor objeto3D");
     res.json(productos);
   } catch (error) {

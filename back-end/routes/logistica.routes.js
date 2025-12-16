@@ -6,6 +6,7 @@ import {
     update,
     deletePedido,
     getEnviosActivos,
+    getVentasPendientesEnvio, // Import new controller
     updateEstadoEnvio,
     getRutas,
     createRuta,
@@ -26,6 +27,7 @@ router.delete('/:id', deletePedido);
 
 // Rutas específicas para envíos
 router.get('/envios/activos', getEnviosActivos);
+router.get('/ventas/pendientes', getVentasPendientesEnvio); // New route
 router.patch('/envios/:id/estado', updateEstadoEnvio);
 
 // Rutas para rutas de distribución

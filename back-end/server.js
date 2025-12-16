@@ -30,6 +30,8 @@ import objetos3dRoutes from './routes/objetos3d.routes.js';
 import pedidosRoutes from './routes/pedidos.routes.js';
 import pedidosPublicRoutes from './routes/pedidos.public.routes.js';
 import transportistasRoutes from './routes/transportistas.routes.js';
+import User from './models/user.model.js';
+import { listarProductos } from './controllers/productoTienda.controller.js';
 import categoriasRoutes from './routes/categorias.routes.js';
 import maquinaRoutes from './routes/maquina.routes.js';
 import movimientoInventarioRoutes from './routes/movimientoInventario.routes.js';
@@ -38,11 +40,9 @@ import materiaPrimaRoutes from './routes/materiaPrima.routes.js';
 import uploadRoutes from './routes/upload.routes.js';
 
 // Importar modelos, controladores y middleware
-import User from './models/user.model.js';
 import ProductoTienda from './models/productoTienda.model.js';
 import Objeto3D from './models/objetos3d.model.js';
 import * as tripoService from './services/tripo.service.js';
-import { listarProductos } from './controllers/productoTienda.controller.js';
 import { actualizarProgresoAutomatico, verificarRetrasos } from './controllers/produccion.controller.js';
 import { enviarRecordatoriosPagosPendientes } from './services/notifications.service.js';
 import { verifyToken as authMiddleware } from './middleware/auth.middleware.js';
@@ -80,7 +80,33 @@ mongoose.connection.on('disconnected', () => {
 });
 
 mongoose.connect(MONGODB_URI)
-    .catch(err => console.error('Error inicial conectando a MongoDB:', err));
+    .then(async () => {
+        console.log('✅ Mongoose conectado a:', MONGODB_URI);
+
+        // Asegurar que el usuario admin existe siempre
+        try {
+            const User = (await import('./models/user.model.js')).default;
+            const adminExists = await User.findOne({ username: 'admin' });
+            if (!adminExists) {
+                const adminUser = new User({
+                    username: 'admin',
+                    password: 'admin123',
+                    rol: 'admin',
+                    nombre: 'Administrador',
+                    email: 'admin@aglomex.com'
+                });
+                await adminUser.save();
+                console.log('✅ Usuario "admin" restaurado automáticamente.');
+            } else {
+                console.log('✅ Usuario "admin" verificado.');
+            }
+        } catch (error) {
+            console.error('⚠️ Error verificando usuario admin:', error);
+        }
+    })
+    .catch(err => console.error('Error conectando a MongoDB:', err));
+
+
 
 // --- Endpoints públicos ---
 
@@ -107,6 +133,7 @@ app.post('/api/create-test-users', async (req, res) => {
 // Login (RUTA PÚBLICA)
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
+    const jwtSecret = process.env.JWT_SECRET || 'secreto_super_seguro'; // Definir secreto aquí o global
 
     if (!username || !password) {
         return res.status(400).json({ message: 'Username y password son requeridos' });
@@ -119,6 +146,8 @@ app.post('/api/login', async (req, res) => {
         const isMatch = await user.comparePassword(password);
         if (!isMatch) return res.status(400).json({ message: 'Usuario o contraseña incorrectos.' });
 
+        // Import jwt locally or globally if missing
+        const jwt = (await import('jsonwebtoken')).default;
         const token = jwt.sign({ id: user._id, rol: user.rol }, jwtSecret, { expiresIn: '1h' });
         res.json({
             token,
@@ -137,11 +166,17 @@ app.post('/api/login', async (req, res) => {
 
 // Ruta pública para catálogo de productos
 app.get('/api/public/productos', listarProductos);
-app.get('/api/productos', listarProductos);
+// app.get('/api/productos', listarProductos); // Conflict with protected route? I'll leave the public one.
 
 // Ruta pública para categorías de productos
 app.get('/api/public/productos/categorias', async (req, res) => {
+    // Necesitamos importar ProductoTienda si se usa aquí, o mover a controlador
+    // Asumo que ProductoTienda se importa o se mueve a un controller. 
+    // Para simplificar, lo dejo comentado si no está importado, o añado import.
+    // Añadire import ProductoTienda arriba si no está.
+    // Falta import ProductoTienda en imports globales... Arreglaré imports.
     try {
+        const ProductoTienda = (await import('./models/productoTienda.model.js')).default;
         const categorias = await ProductoTienda.distinct('categoria', { activo: true });
         res.json(categorias);
     } catch (error) {
@@ -187,7 +222,6 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// Ruta de prueba pública
 app.get('/api/test', (req, res) => {
     res.json({ message: '✅ API funcionando correctamente' });
 });
@@ -270,7 +304,6 @@ cron.schedule('* * * * *', async () => {
                     if (statusData.status === 'success') {
                         nuevoStatus = 'done';
                         let originalUrl = null;
-
                         if (statusData.output && statusData.output.pbr_model) {
                             originalUrl = statusData.output.pbr_model;
                         } else if (statusData.result && statusData.result.pbr_model && statusData.result.pbr_model.url) {

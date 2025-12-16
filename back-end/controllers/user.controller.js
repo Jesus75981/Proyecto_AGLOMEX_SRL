@@ -20,14 +20,30 @@ export const registrarUsuario = async (req, res) => {
 export const loginUsuario = async (req, res) => {
   try {
     const { username, password } = req.body;
+
+    console.log(`🔑 Intento de login: Usuario="${username}", Password="${password}"`);
+
     const user = await User.findOne({ username });
-    if (!user || !(await user.comparePassword(password))) {
+
+    if (!user) {
+      console.log(`❌ Usuario no encontrado: "${username}"`);
       return res.status(401).json({ error: "Credenciales inválidas" });
     }
+
+    const isMatch = await user.comparePassword(password);
+    console.log(`🔍 Resultado comparación password para "${username}": ${isMatch}`);
+
+    if (!isMatch) {
+      console.log(`❌ Contraseña incorrecta para: "${username}"`);
+      return res.status(401).json({ error: "Credenciales inválidas" });
+    }
+
+    // Importar jwt si faltara, pero se importó arriba.
     const token = jwt.sign({ id: user._id, rol: user.rol }, process.env.JWT_SECRET, { expiresIn: "1d" });
+    console.log(`✅ Login exitoso: "${username}"`);
     res.json({ token, user });
   } catch (error) {
-    console.error("Login Error:", error);
+    console.error('❌ Error en loginUsuario:', error);
     res.status(500).json({ error: "Error interno del servidor" });
   }
 };

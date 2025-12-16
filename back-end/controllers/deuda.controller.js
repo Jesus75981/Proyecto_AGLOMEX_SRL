@@ -6,13 +6,15 @@ import { registrarTransaccionFinanciera } from './finanzas.controller.js';
 
 export const pagarDeuda = async (req, res) => {
     const { id } = req.params;
-    const { monto, tipoPago, referencia } = req.body;
+    const { monto, tipoPago, referencia, cuenta } = req.body;
 
-    if (!monto || !tipoPago) {
-        return res.status(400).json({ message: "El monto y el tipo de pago son obligatorios." });
+    const montoFloat = parseFloat(monto);
+
+    if (!montoFloat || !tipoPago) {
+        return res.status(400).json({ message: "El monto (numérico) y el tipo de pago son obligatorios." });
     }
 
-    if (monto <= 0) {
+    if (montoFloat <= 0) {
         return res.status(400).json({ message: "El monto a pagar debe ser positivo." });
     }
 
@@ -22,24 +24,26 @@ export const pagarDeuda = async (req, res) => {
             return res.status(404).json({ message: "Deuda no encontrada." });
         }
 
-        if (monto > deuda.saldoActual) {
-            return res.status(400).json({ message: `El monto a pagar (${monto}) no puede ser mayor al saldo actual (${deuda.saldoActual}).` });
+        if (montoFloat > deuda.saldoActual + 0.01) { // Adding small tolerance
+            return res.status(400).json({ message: `El monto a pagar (${montoFloat}) no puede ser mayor al saldo actual (${deuda.saldoActual}).` });
         }
 
         // Registrar el pago en el historial
         const nuevoPago = {
-            monto,
+            monto: montoFloat,
             tipoPago,
             referencia: referencia || `Pago a deuda de compra ${deuda.compraId.numCompra}`,
+            cuenta: cuenta, // Guardar la cuenta seleccionada
             fechaPago: new Date()
         };
         deuda.historialPagos.push(nuevoPago);
 
         // Actualizar saldos y estado
-        deuda.montoPagado += monto;
-        deuda.saldoActual -= monto;
+        deuda.montoPagado += montoFloat;
+        deuda.saldoActual -= montoFloat;
 
-        if (deuda.saldoActual === 0) {
+        if (deuda.saldoActual <= 0.01) {
+            deuda.saldoActual = 0;
             deuda.estado = "Pagada";
         } else {
             deuda.estado = "Parcialmente Pagada";
@@ -55,8 +59,9 @@ export const pagarDeuda = async (req, res) => {
             // Agregar el pago al historial de pagos de la compra
             compra.metodosPago.push({
                 tipo: tipoPago,
-                monto: monto,
+                monto: montoFloat,
                 referencia: referencia || `Pago de deuda`,
+                cuenta: cuenta,
                 fechaPago: new Date()
             });
             await compra.save();
@@ -67,13 +72,15 @@ export const pagarDeuda = async (req, res) => {
             'egreso',
             'pago_deuda_compra',
             `Pago de deuda para la compra #${deuda.compraId.numCompra}`,
-            monto,
+            montoFloat,
             deuda.compraId._id,
             'Compra',
             {
                 deudaId: deuda._id,
                 numCompra: deuda.compraId.numCompra,
-                tipoPago: tipoPago
+                tipoPago: tipoPago,
+                cuenta: cuenta, // Incluir cuenta en metadata
+                banco: cuenta // Alias for redundancy if needed
             }
         );
 
@@ -114,9 +121,11 @@ export const listarDeudasVenta = async (req, res) => {
 
 export const pagarDeudaVenta = async (req, res) => {
     const { id } = req.params;
-    const { monto, tipoPago, referencia } = req.body;
+    const { monto, tipoPago, referencia, cuenta } = req.body;
 
-    if (!monto || !tipoPago) {
+    const montoFloat = parseFloat(monto);
+
+    if (!montoFloat || !tipoPago) {
         return res.status(400).json({ message: "El monto y el tipo de pago son obligatorios." });
     }
 
@@ -126,20 +135,21 @@ export const pagarDeudaVenta = async (req, res) => {
             return res.status(404).json({ message: "Deuda no encontrada." });
         }
 
-        if (monto > deuda.saldoActual) {
-            return res.status(400).json({ message: `El monto a pagar (${monto}) excede el saldo pendiente (${deuda.saldoActual}).` });
+        if (montoFloat > deuda.saldoActual + 0.01) {
+            return res.status(400).json({ message: `El monto a pagar (${montoFloat}) excede el saldo pendiente (${deuda.saldoActual}).` });
         }
 
         // Registrar el pago
         deuda.historialPagos.push({
-            monto,
+            monto: montoFloat,
             tipoPago,
             referencia: referencia || `Cobro de venta ${deuda.ventaId.numVenta}`,
+            cuenta: cuenta,
             fechaPago: new Date()
         });
 
-        deuda.montoPagado = (deuda.montoPagado || 0) + parseFloat(monto);
-        deuda.saldoActual -= parseFloat(monto);
+        deuda.montoPagado = (deuda.montoPagado || 0) + montoFloat;
+        deuda.saldoActual -= montoFloat;
 
         if (deuda.saldoActual <= 0.01) {
             deuda.saldoActual = 0;
@@ -157,7 +167,9 @@ export const pagarDeudaVenta = async (req, res) => {
             venta.estado = deuda.estado === "Pagada" ? "Pagada" : "Pendiente";
             venta.metodosPago.push({
                 tipo: tipoPago,
-                monto: parseFloat(monto)
+                monto: montoFloat,
+                cuenta: cuenta,
+                fechaPago: new Date()
             });
             await venta.save();
         }
@@ -167,10 +179,10 @@ export const pagarDeudaVenta = async (req, res) => {
             'ingreso',
             'cobro_venta',
             `Cobro de deuda por venta #${venta.numVenta}`,
-            parseFloat(monto),
+            montoFloat,
             venta._id,
             'Venta',
-            { tipoPago, deudaId: deuda._id }
+            { tipoPago, deudaId: deuda._id, cuenta: cuenta, banco: cuenta }
         );
 
         res.status(200).json({ message: "Cobro registrado exitosamente.", deuda });

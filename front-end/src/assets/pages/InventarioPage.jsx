@@ -57,7 +57,7 @@ const InventarioPage = ({ userRole }) => {
 
   // Estado para nuevo producto
   const [nuevoProducto, setNuevoProducto] = useState({
-    producto: '',
+    nombre: '',
     sku: '',
     codigo: '',
     color: '',
@@ -113,6 +113,7 @@ const InventarioPage = ({ userRole }) => {
   const [showModificarForm, setShowModificarForm] = useState(false);
   const [productoSeleccionadoParaEditar, setProductoSeleccionadoParaEditar] = useState('');
 
+
   // Cargar productos y movimientos
   const cargarProductos = async () => {
     try {
@@ -145,7 +146,7 @@ const InventarioPage = ({ userRole }) => {
   const agregarProducto = async () => {
     try {
       // Validaciones básicas
-      if (!nuevoProducto.producto || !nuevoProducto.sku || !nuevoProducto.precioVenta) {
+      if (!nuevoProducto.nombre || !nuevoProducto.sku || !nuevoProducto.precioVenta) {
         alert('Por favor complete los campos obligatorios');
         return;
       }
@@ -168,7 +169,7 @@ const InventarioPage = ({ userRole }) => {
       await cargarProductos();
       setShowForm(false);
       setNuevoProducto({
-        producto: '', sku: '', codigo: '', color: '', descripcion: '',
+        nombre: '', sku: '', codigo: '', color: '', descripcion: '',
         categoria: '', proveedor: '', cantidad: '', cantidadMinima: '',
         cantidadMaxima: '', ubicacion: '', precioCosto: '', precioVenta: ''
       });
@@ -346,7 +347,7 @@ const InventarioPage = ({ userRole }) => {
 
     // Validación adicional para salidas: verificar stock disponible
     if (nuevoMovimiento.tipo === 'Salida' && nuevoMovimiento.productoId && nuevoMovimiento.cantidad) {
-      const producto = inventario.find(p => p.id === parseInt(nuevoMovimiento.productoId));
+      const producto = inventario.find(p => p._id === nuevoMovimiento.productoId);
       if (producto && parseInt(nuevoMovimiento.cantidad) > producto.cantidad) {
         errores.cantidad = `No hay suficiente stock. Disponible: ${producto.cantidad}`;
       }
@@ -465,8 +466,8 @@ const InventarioPage = ({ userRole }) => {
                     <input
                       type="text"
                       placeholder="Nombre del producto"
-                      value={nuevoProducto.producto}
-                      onChange={(e) => setNuevoProducto({ ...nuevoProducto, producto: e.target.value })}
+                      value={nuevoProducto.nombre}
+                      onChange={(e) => setNuevoProducto({ ...nuevoProducto, nombre: e.target.value })}
                       className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
                     <input
@@ -619,7 +620,7 @@ const InventarioPage = ({ userRole }) => {
                       <input
                         type="text"
                         placeholder="Buscar producto"
-                        value={nuevoMovimiento.productoId ? inventario.find(p => p.id === parseInt(nuevoMovimiento.productoId))?.producto || '' : ''}
+                        value={nuevoMovimiento.productoId ? inventario.find(p => p._id === nuevoMovimiento.productoId)?.nombre || '' : ''}
                         onChange={(e) => {
                           setNuevoMovimiento({ ...nuevoMovimiento, productoId: '' });
                           setProductoSearch(e.target.value);
@@ -631,17 +632,17 @@ const InventarioPage = ({ userRole }) => {
                       />
                       {showProductoDropdown && (
                         <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                          {inventario.filter(prod => prod.producto.toLowerCase().includes(productoSearch.toLowerCase())).map(prod => (
+                          {inventario.filter(prod => prod.nombre && prod.nombre.toLowerCase().includes(productoSearch.toLowerCase())).map(prod => (
                             <div
-                              key={prod.id}
+                              key={prod._id}
                               onClick={() => {
-                                setNuevoMovimiento({ ...nuevoMovimiento, productoId: prod.id.toString() });
-                                setProductoSearch(prod.producto);
+                                setNuevoMovimiento({ ...nuevoMovimiento, productoId: prod._id.toString() });
+                                setProductoSearch(prod.nombre);
                                 setShowProductoDropdown(false);
                               }}
                               className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
                             >
-                              {prod.producto} - Stock: {prod.cantidad}
+                              {prod.nombre} - Stock: {prod.cantidad}
                             </div>
                           ))}
                         </div>
@@ -719,21 +720,17 @@ const InventarioPage = ({ userRole }) => {
                       />
                       {showProductoDropdown && (
                         <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                          {inventario.filter(prod => prod.producto && prod.producto.toLowerCase().includes(productoSeleccionadoParaEditar.toLowerCase())).map(prod => (
+                          {inventario.filter(prod => prod.nombre && prod.nombre.toLowerCase().includes(productoSeleccionadoParaEditar.toLowerCase())).map(prod => (
                             <div
-                              key={prod.id}
+                              key={prod._id}
                               onClick={() => {
-                                setProductoSeleccionadoParaEditar(prod.producto);
-                                if (prod.cantidad === 0) {
-                                  alert("No se puede editar un producto con Stock 0.");
-                                  return;
-                                }
+                                setProductoSeleccionadoParaEditar(prod.nombre);
                                 iniciarEdicion(prod);
                                 setShowEditarProductoForm(false);
                               }}
                               className={`px-4 py-2 cursor-pointer ${prod.cantidad === 0 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'hover:bg-gray-100'}`}
                             >
-                              {prod.producto} - SKU: {prod.sku} {prod.cantidad === 0 ? '(Stock 0 - No editable)' : ''}
+                              {prod.nombre} - SKU: {prod.sku}
                             </div>
                           ))}
                         </div>

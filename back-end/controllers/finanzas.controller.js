@@ -1,4 +1,5 @@
 import Finanzas from '../models/finanzas.model.js';
+import Logistica from '../models/logistica.model.js';
 import Venta from '../models/venta.model.js';
 import Compra from '../models/compra.model.js';
 
@@ -385,7 +386,7 @@ export const getFinancialStatistics = async (req, res) => {
       }
     ]);
 
-    const metrics = metricsAggregation[0] || {
+    let metrics = metricsAggregation[0] || {
       totalIngresos: 0,
       totalEgresos: 0,
       countIngresos: 0,
@@ -393,7 +394,45 @@ export const getFinancialStatistics = async (req, res) => {
       utilidadNeta: 0
     };
 
+    // --- INTEGRACIÓN CON LOGÍSTICA ---
+    // Agregamos los costos de envío como INGRESOS (pagados por cliente)
+    const logisticaMetrics = await Logistica.aggregate([
+      {
+        $match: {
+          fechaPedido: { $gte: startDate, $lte: endDate },
+          estado: { $ne: 'cancelado' } // Solo envíos válidos
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalCostoEnvio: { $sum: "$costoEnvio" },
+          countEnvios: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // Inicializar campo específico para ingresos por envío
+    metrics.ingresosPorEnvio = 0;
+
+    if (logisticaMetrics.length > 0) {
+      const logisticaData = logisticaMetrics[0];
+
+      // Sumar a ingresos totales
+      metrics.totalIngresos += logisticaData.totalCostoEnvio;
+      metrics.countIngresos += logisticaData.countEnvios;
+
+      // Guardar dato específico para desglose
+      metrics.ingresosPorEnvio = logisticaData.totalCostoEnvio;
+
+      // Recalcular utilidad neta
+      metrics.utilidadNeta = metrics.totalIngresos - metrics.totalEgresos;
+    }
+    // -------------------------------
+
     // Cashflow (distribución por periodo)
+    // NOTA: Para simplificar, actualmente no estamos fusionando los costos de logística en el gráfico de Cashflow
+    // Si se requiere exactitud total en el gráfico, se debería hacer una agregación similar y combinar arrays.
     const cashflow = await Finanzas.aggregate([
       {
         $match: {
@@ -583,14 +622,24 @@ export const getAccounts = async (req, res) => {
 };
 
 // Actualizar cuenta (incluyendo Soft Delete y Transferencia de Saldo)
+// Actualizar cuenta (incluyendo Soft Delete y Transferencia de Saldo)
 export const updateAccount = async (req, res) => {
   try {
     const { id } = req.params;
-    const { nombreBanco, isActive, transferToAccountId } = req.body;
+    const { nombreBanco, numeroCuenta, isActive, transferToAccountId } = req.body;
 
     const account = await BankAccount.findById(id);
     if (!account) {
       return res.status(404).json({ message: "Cuenta no encontrada." });
+    }
+
+    // Checking if new numeroCuenta conflicts with another account
+    if (numeroCuenta && numeroCuenta !== account.numeroCuenta) {
+      const existing = await BankAccount.findOne({ numeroCuenta });
+      if (existing) {
+        return res.status(400).json({ message: "Ya existe otra cuenta con este número." });
+      }
+      account.numeroCuenta = numeroCuenta;
     }
 
     // Si se está desactivando y tiene saldo, verificar transferencia

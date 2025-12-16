@@ -64,6 +64,7 @@ const FinanzasPage = ({ userRole }) => {
   const [showAccountForm, setShowAccountForm] = useState(false);
   const [showDepositForm, setShowDepositForm] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState(null);
+  const [editingAccountId, setEditingAccountId] = useState(null);
   const [accountFormData, setAccountFormData] = useState({
     nombreBanco: '',
     numeroCuenta: '',
@@ -133,19 +134,42 @@ const FinanzasPage = ({ userRole }) => {
   const handleCreateAccount = async (e) => {
     e.preventDefault();
     try {
-      await apiFetch('/cuentas', {
-        method: 'POST',
-        data: accountFormData
-      });
+      if (editingAccountId) {
+        // Modo Edición
+        await apiFetch(`/cuentas/${editingAccountId}`, {
+          method: 'PUT',
+          data: accountFormData
+        });
+        alert('Cuenta actualizada exitosamente');
+      } else {
+        // Modo Creación
+        await apiFetch('/cuentas', {
+          method: 'POST',
+          data: accountFormData
+        });
+        alert('Cuenta creada exitosamente');
+      }
+
       setShowAccountForm(false);
+      setEditingAccountId(null);
       setAccountFormData({ nombreBanco: '', numeroCuenta: '', saldoInicial: '' });
       loadBankAccounts();
-      alert('Cuenta creada exitosamente');
     } catch (err) {
-      console.error('Error al crear cuenta:', err);
-      alert('Error al crear la cuenta');
+      console.error('Error al guardar cuenta:', err);
+      alert('Error al guardar la cuenta');
     }
   };
+
+  const handleEditAccount = (account) => {
+    setEditingAccountId(account._id);
+    setAccountFormData({
+      nombreBanco: account.nombreBanco,
+      numeroCuenta: account.numeroCuenta,
+      saldoInicial: account.saldo // In edit mode, this might not be editable or used, but kept for consistency
+    });
+    setShowAccountForm(true);
+  };
+
 
   // Estado para modal de transferencia al cerrar cuenta
   const [showTransferModal, setShowTransferModal] = useState(false);
@@ -752,7 +776,13 @@ const FinanzasPage = ({ userRole }) => {
                         onClick={() => handleUpdateAccountStatus(account)}
                         className={`px-3 py-2 rounded-lg ${account.isActive ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}
                       >
-                        {account.isActive ? 'Dar de Baja' : 'Activar'}
+                        {account.isActive ? 'Baja' : 'Alta'}
+                      </button>
+                      <button
+                        onClick={() => handleEditAccount(account)}
+                        className="px-3 py-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      >
+                        Editar
                       </button>
                     </div>
                     <button
@@ -769,7 +799,7 @@ const FinanzasPage = ({ userRole }) => {
               {showAccountForm && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                   <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
-                    <h3 className="text-xl font-bold text-gray-800 mb-4">Nueva Cuenta Bancaria</h3>
+                    <h3 className="text-xl font-bold text-gray-800 mb-4">{editingAccountId ? 'Editar Cuenta' : 'Nueva Cuenta Bancaria'}</h3>
                     <form onSubmit={handleCreateAccount} className="space-y-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del Banco</label>
@@ -799,11 +829,12 @@ const FinanzasPage = ({ userRole }) => {
                           value={accountFormData.saldoInicial}
                           onChange={(e) => setAccountFormData({ ...accountFormData, saldoInicial: e.target.value })}
                           className="w-full p-2 border border-gray-300 rounded-lg"
+                          disabled={!!editingAccountId} // Disable saldo change during edit to avoid consistency issues
                         />
                       </div>
                       <div className="flex space-x-3 mt-6">
-                        <button type="submit" className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">Crear Cuenta</button>
-                        <button type="button" onClick={() => setShowAccountForm(false)} className="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600">Cancelar</button>
+                        <button type="submit" className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">{editingAccountId ? 'Guardar Cambios' : 'Crear Cuenta'}</button>
+                        <button type="button" onClick={() => { setShowAccountForm(false); setEditingAccountId(null); setAccountFormData({ nombreBanco: '', numeroCuenta: '', saldoInicial: '' }); }} className="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600">Cancelar</button>
                       </div>
                     </form>
                   </div>
@@ -1007,15 +1038,49 @@ const FinanzasPage = ({ userRole }) => {
                   {(pagoDeudaData.tipoPago === 'Transferencia' || pagoDeudaData.tipoPago === 'Cheque') && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        {pagoDeudaData.tipoPago === 'Transferencia' ? 'Cuenta de Banco / Origen' : 'Número de Cheque / Banco'}
+                        {pagoDeudaData.tipoPago === 'Transferencia' ? 'Cuenta de Origen' : 'Banco Emisor'}
                       </label>
-                      <input
-                        type="text"
+                      <select
                         value={pagoDeudaData.cuenta}
                         onChange={(e) => setPagoDeudaData({ ...pagoDeudaData, cuenta: e.target.value })}
                         className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                        placeholder={pagoDeudaData.tipoPago === 'Transferencia' ? "Ej: BNB 123456" : "Ej: Cheque #987654"}
-                      />
+                        required
+                      >
+                        <option value="">-- Seleccionar Cuenta --</option>
+                        {bankAccounts
+                          .filter(acc => acc.isActive)
+                          .map(acc => (
+                            <option key={acc._id} value={`${acc.nombreBanco} - ${acc.numeroCuenta}`}>
+                              {acc.nombreBanco} ({acc.numeroCuenta}) - Saldo: {formatCurrency(acc.saldo)}
+                            </option>
+                          ))
+                        }
+                      </select>
+                      {/* Fallback/Correction: The backend expects 'cuenta' string. 
+                          If we want to link it to the actual bank account ID for automatic deduction, 
+                          we should probably store the ID or handle it. 
+                          
+                          Looking at controller 'registrarPagoDeuda':
+                          It expects 'cuenta' string. 
+                          But 'registrarCompra' handled deductions automatically. 
+                          
+                          Wait, 'registrarPagoDeuda' in 'finanzas.controller.js' line 461 just takes 'cuenta' as string.
+                          It does NOT seem to automatically deduct from BankAccount model unless we update it.
+                          
+                          Let's check 'finanzas.controller.js' again.
+                          Ah, 'registrarPagoDeuda' (line 461) does NOT seem to update bank balance automatically 
+                          like 'registrarCompra' does (lines 309-328 in compras.controller.js).
+                          
+                          However, the user request is just "display banks I have and let me select".
+                          So binding the string value is what they asked for visual selection.
+                          
+                          If I pass the ID, the string in 'finanzas' collection will be an ID, which is ugly.
+                          If I pass "BankName - AccountNum", it looks good in Finanzas history.
+                          
+                          But for accurate accounting, we should ideally deduct from the account...
+                          But that's out of scope of "desplegar los bancos que tengo y me deje seleccionar".
+                          I will stick to filling the string value for now as requested.
+                      */}
                     </div>
                   )}
                   <div>

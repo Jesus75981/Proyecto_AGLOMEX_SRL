@@ -177,6 +177,15 @@ export const confirmarRecepcionPedido = async (req, res) => {
     console.log(`WhatsApp enviado a ${telefonoFinal}: ${whatsappMessage}`);
     console.log(`URL WhatsApp: ${whatsappUrl}`);
 
+    // --- NOTIFICACIÓN AL DUEÑO ---
+    const ownerPhone = "59172876225"; // Número del dueño
+    const ownerMessage = `🔔 *Nuevo Aviso*: El cliente *${nombreFinal}* ha confirmado la recepción del Pedido *#${numero}*.`;
+    const ownerWhatsappUrl = `https://wa.me/${ownerPhone}?text=${encodeURIComponent(ownerMessage)}`;
+
+    console.log(`[SISTEMA] Notificación al Dueño: ${ownerMessage}`);
+    // En un sistema real aquí se llamaría a la API de WhatsApp para el dueño
+    // -----------------------------
+
     res.json({
       message: "Recepción confirmada exitosamente",
       pedido,
