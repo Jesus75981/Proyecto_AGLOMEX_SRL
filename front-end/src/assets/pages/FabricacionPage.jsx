@@ -41,11 +41,15 @@ const FabricacionPage = ({ userRole }) => {
   const [ordenesFabricacion, setOrdenesFabricacion] = useState([]);
   const [materiales, setMateriales] = useState([]);
   const [maquinas, setMaquinas] = useState([]);
+  const [categorias, setCategorias] = useState([]); // Categorias dinámicas
+  const [showCategoriaDropdown, setShowCategoriaDropdown] = useState(false); // Dropdown visibility for categories
   const [loading, setLoading] = useState(true);
 
   // Estado para nueva orden
   const [nuevaOrden, setNuevaOrden] = useState({
     nombre: '',
+    categoria: '', // Nuevo campo
+    marca: '', // Nuevo campo
     cantidad: 1,
     precioCompra: 0,
     precioVenta: 0,
@@ -63,8 +67,12 @@ const FabricacionPage = ({ userRole }) => {
     precioCompra: 0,
     precioVenta: 0,
     unidad: '',
-    unidad: '',
     ubicacion: '',
+    color: '',
+    descripcion: '',
+    marca: '',
+    cajas: '',
+    dimensiones: { alto: '', ancho: '', profundidad: '' },
     imagen: null
   });
 
@@ -99,6 +107,9 @@ const FabricacionPage = ({ userRole }) => {
     costo: 0
   });
 
+  // Estado para editar material
+  const [editingMaterial, setEditingMaterial] = useState(null);
+
   // Estado para WhatsApp
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [whatsappStatus, setWhatsappStatus] = useState('DISCONNECTED');
@@ -112,8 +123,24 @@ const FabricacionPage = ({ userRole }) => {
 
   const cargarDatos = async () => {
     setLoading(true);
-    await Promise.all([cargarOrdenes(), cargarMateriales(), cargarMaquinas()]);
+    setLoading(true);
+    await Promise.all([cargarOrdenes(), cargarMateriales(), cargarMaquinas(), cargarProductos()]);
     setLoading(false);
+  };
+
+  const cargarProductos = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/productos?tipo=Producto Terminado', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const uniqueCategorias = [...new Set(data.map(p => p.categoria).filter(Boolean))];
+        setCategorias(uniqueCategorias);
+      }
+    } catch (error) {
+      console.error('Error cargando productos para categorías:', error);
+    }
   };
 
   const cargarOrdenes = async () => {
@@ -262,6 +289,8 @@ const FabricacionPage = ({ userRole }) => {
         // Reset form
         setNuevaOrden({
           nombre: '',
+          categoria: '',
+          marca: '',
           cantidad: 1,
           precioCompra: 0,
           precioVenta: 0,
@@ -292,6 +321,8 @@ const FabricacionPage = ({ userRole }) => {
 
       setNuevaOrden({
           nombre: orden.nombre,
+          categoria: orden.categoria || '',
+          marca: orden.marca || '',
           cantidad: orden.cantidad,
           precioCompra: orden.precioCompra,
           precioVenta: orden.precioVenta,
@@ -365,29 +396,62 @@ const FabricacionPage = ({ userRole }) => {
   };
 
   // Funciones para materiales (usa endpoint dedicado)
-  const agregarMaterial = async () => {
+  const guardarMaterial = async () => {
     try {
+      if (!nuevoMaterial.nombre || !nuevoMaterial.categoria) {
+          alert("Por favor complete los campos obligatorios (Nombre, Categoría)");
+          return;
+      }
+
       const formData = new FormData();
       formData.append('nombre', nuevoMaterial.nombre);
       formData.append('categoria', nuevoMaterial.categoria);
       formData.append('cantidad', nuevoMaterial.cantidad);
-      formData.append('precioCompra', nuevoMaterial.precioCompra);
-      if (nuevoMaterial.imagen) {
+      formData.append('precioVenta', nuevoMaterial.precioVenta);
+      formData.append('unidad', nuevoMaterial.unidad);
+      formData.append('ubicacion', nuevoMaterial.ubicacion);
+      formData.append('color', nuevoMaterial.color);
+      formData.append('descripcion', nuevoMaterial.descripcion);
+      formData.append('marca', nuevoMaterial.marca);
+      formData.append('cajas', nuevoMaterial.cajas);
+      // Determine if proveedor is object (populated) or string/id
+      const provForSend = (typeof nuevoMaterial.proveedor === 'object' && nuevoMaterial.proveedor !== null) 
+                          ? (nuevoMaterial.proveedor._id || '') 
+                          : (nuevoMaterial.proveedor || '');
+      formData.append('proveedor', provForSend);
+      
+      // Append nested dimensions
+      if (nuevoMaterial.dimensiones) {
+          formData.append('dimensiones.alto', nuevoMaterial.dimensiones.alto || 0);
+          formData.append('dimensiones.ancho', nuevoMaterial.dimensiones.ancho || 0);
+          formData.append('dimensiones.profundidad', nuevoMaterial.dimensiones.profundidad || 0);
+      }
+      
+      if (nuevoMaterial.imagen instanceof File) {
         formData.append('imagen', nuevoMaterial.imagen);
+      } else if (editingMaterial && !nuevoMaterial.imagen) {
+          // Keep existing image logic handled by backend if not provided? 
+          // Usually backend keeps it if not updated.
       }
 
-      const response = await fetch('http://localhost:5000/api/materiaPrima', {
-        method: 'POST',
+      const url = editingMaterial 
+        ? `http://localhost:5000/api/materiaPrima/${editingMaterial._id}`
+        : 'http://localhost:5000/api/materiaPrima';
+      
+      const method = editingMaterial ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method: method,
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
-          // No Content-Type for FormData, browser sets it with boundary
         },
         body: formData
       });
 
       if (response.ok) {
-        alert('✅ Material agregado exitosamente');
+        alert(`✅ Material ${editingMaterial ? 'actualizado' : 'agregado'} exitosamente`);
         setShowForm(false);
+        setEditingMaterial(null);
         cargarMateriales();
         setNuevoMaterial({
           nombre: '',
@@ -398,16 +462,45 @@ const FabricacionPage = ({ userRole }) => {
           precioVenta: 0,
           unidad: '',
           ubicacion: '',
+          color: '',
+          descripcion: '',
+          marca: '',
+          cajas: '',
+          dimensiones: { alto: '', ancho: '', profundidad: '' },
+          proveedor: '',
           imagen: null
         });
       } else {
         const errorData = await response.json();
-        alert(`❌ Error al agregar material: ${errorData.error || errorData.message}`);
+        alert(`❌ Error al ${editingMaterial ? 'actualizar' : 'agregar'} material: ${errorData.error || errorData.message}`);
       }
     } catch (error) {
       console.error('Error:', error);
       alert('❌ Error de conexión');
     }
+  };
+
+  const abrirModalEditarMaterial = (material) => {
+      setEditingMaterial(material);
+      setNuevoMaterial({
+          nombre: material.nombre,
+          categoria: material.categoria,
+          cantidad: material.cantidad,
+          cantidadMinima: material.cantidadMinima || 10,
+          precioCompra: material.precioCompra,
+          precioVenta: material.precioVenta || 0,
+          unidad: material.unidad || '',
+          ubicacion: material.ubicacion || '',
+          color: material.color || '',
+          descripcion: material.descripcion || '',
+          marca: material.marca || '',
+          cajas: material.cajas || '',
+          dimensiones: material.dimensiones || { alto: '', ancho: '', profundidad: '' },
+          // Flatten proveedor if it is an object
+          proveedor: material.proveedor?.nombre || material.proveedor || '', 
+          imagen: material.imagen 
+      });
+      setShowForm(true);
   };
 
   // Funciones para máquinas
@@ -701,6 +794,52 @@ const FabricacionPage = ({ userRole }) => {
                       />
                     </div>
 
+                    <div className="relative">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Categoría *</label>
+                      <input
+                        type="text"
+                        placeholder="Seleccione o escriba nueva categoría"
+                        value={nuevaOrden.categoria}
+                        onChange={(e) => {
+                          setNuevaOrden({ ...nuevaOrden, categoria: e.target.value });
+                          setShowCategoriaDropdown(true);
+                        }}
+                        onFocus={() => setShowCategoriaDropdown(true)}
+                        onBlur={() => setTimeout(() => setShowCategoriaDropdown(false), 200)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      />
+                      {showCategoriaDropdown && (
+                        <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto mt-1">
+                           {categorias.filter(cat => cat.toLowerCase().includes(nuevaOrden.categoria.toLowerCase())).map((cat, idx) => (
+                            <div
+                              key={idx}
+                              onClick={() => {
+                                setNuevaOrden({ ...nuevaOrden, categoria: cat });
+                                setShowCategoriaDropdown(false);
+                              }}
+                              className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm text-gray-700"
+                            >
+                              {cat}
+                            </div>
+                          ))}
+                          {categorias.filter(cat => cat.toLowerCase().includes(nuevaOrden.categoria.toLowerCase())).length === 0 && (
+                              <div className="px-4 py-2 text-sm text-gray-500 italic">Presiona Enter para crear nueva</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Marca</label>
+                      <input
+                        type="text"
+                        value={nuevaOrden.marca}
+                        onChange={(e) => setNuevaOrden({ ...nuevaOrden, marca: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        placeholder="Ej. Aglomex, Genérico..."
+                      />
+                    </div>
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Cantidad *</label>
                       <input
@@ -716,22 +855,14 @@ const FabricacionPage = ({ userRole }) => {
                       <label className="block text-sm font-medium text-gray-700 mb-2">Costo Estimado (Auto)</label>
                       <input
                         type="number"
-                        value={nuevaOrden.precioCompra}
+                        value={Number(nuevaOrden.precioCompra).toFixed(2)}
                         readOnly
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 focus:outline-none"
                         title="Calculado automáticamente según materiales"
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Precio Venta Estimado</label>
-                      <input
-                        type="number"
-                        value={nuevaOrden.precioVenta}
-                        onChange={(e) => setNuevaOrden({ ...nuevaOrden, precioVenta: parseFloat(e.target.value) || 0 })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                      />
-                    </div>
+
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Tiempo Estimado (días)</label>
@@ -751,84 +882,126 @@ const FabricacionPage = ({ userRole }) => {
                     
                     {/* Selector */}
                     {/* Selector Buscable */}
-                    <div className="flex flex-wrap gap-4 items-end mb-4 bg-gray-50 p-4 rounded-lg relative">
-                        <div className="flex-1 min-w-[300px] relative">
-                            <label className="block text-xs font-medium text-gray-600 mb-1">Material (Buscar por Nombre, Color o Código)</label>
-                            
+                    {/* Selector Buscable (Auto-Add) */}
+                    <div className="mb-4 bg-gray-50 p-4 rounded-lg relative">
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Agregar Material (Buscar por Nombre, Color o Código)</label>
+                        <div className="relative">
                             <input
                                 type="text"
                                 value={searchTermMaterial}
                                 onChange={(e) => {
                                     setSearchTermMaterial(e.target.value);
                                     setIsDropdownOpen(true);
-                                    setMaterialSeleccionado(''); 
                                 }}
                                 onFocus={() => setIsDropdownOpen(true)}
-                                placeholder="Escribe para buscar..."
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                                placeholder="Escribe para buscar y click para añadir..."
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 pl-10"
                             />
+                            <div className="absolute left-3 top-2.5 text-gray-400">🔍</div>
+                        </div>
 
-                            {/* Dropdown de Resultados */}
-                            {isDropdownOpen && (
-                                <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                                    {materiales.filter(mat => {
-                                        const term = searchTermMaterial.toLowerCase();
-                                        const nombre = mat.nombre?.toLowerCase() || '';
-                                        const color = mat.color?.toLowerCase() || '';
-                                        const codigo = mat.codigo?.toLowerCase() || '';
-                                        const prov = mat.proveedor?.nombreEmpresa?.toLowerCase() || ''; 
-                                        
-                                        return nombre.includes(term) || color.includes(term) || codigo.includes(term) || prov.includes(term);
-                                    }).map(mat => (
-                                        <li 
-                                            key={mat._id}
-                                            onClick={() => {
-                                                setMaterialSeleccionado(mat._id);
-                                                setSearchTermMaterial(`${mat.nombre} ${mat.color ? `- ${mat.color}` : ''} ${mat.codigo ? `[${mat.codigo}]` : ''}`);
-                                                setIsDropdownOpen(false);
-                                            }}
-                                            className="px-4 py-2 hover:bg-orange-50 cursor-pointer text-sm border-b last:border-b-0"
-                                        >
-                                            <div className="font-medium text-gray-800">
-                                                {mat.nombre} {mat.color && <span className="text-gray-500 text-xs">({mat.color})</span>}
+                        {/* Dropdown de Resultados (Quick Add Multi-Select) */}
+                        {isDropdownOpen && (
+                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto left-0">
+                                {/* Header for bulk actions or close */}
+                                <div className="sticky top-0 bg-gray-100 p-2 flex justify-between items-center border-b z-20">
+                                    <span className="text-xs font-semibold text-gray-500 uppercase">Seleccionar Materiales</span>
+                                    <button 
+                                        onClick={() => setIsDropdownOpen(false)}
+                                        className="text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-1 rounded"
+                                    >
+                                        Listo / Cerrar
+                                    </button>
+                                </div>
+                                <ul className="divide-y divide-gray-100">
+                                {materiales.filter(mat => {
+                                    const term = searchTermMaterial.toLowerCase();
+                                    const nombre = mat.nombre?.toLowerCase() || '';
+                                    const color = mat.color?.toLowerCase() || '';
+                                    const codigo = mat.codigo?.toLowerCase() || '';
+                                    const prov = mat.proveedor?.nombreEmpresa?.toLowerCase() || ''; 
+                                    
+                                    return nombre.includes(term) || color.includes(term) || codigo.includes(term) || prov.includes(term);
+                                }).map(mat => {
+                                    const isAdded = nuevaOrden.materiales.some(m => m.material === mat._id);
+                                    return (
+                                    <li 
+                                        key={mat._id}
+                                        onClick={() => {
+                                            // Quick Add Logic - Multi Select
+                                            if (mat.cantidad <= 0) {
+                                                alert("No hay stock disponible de este material.");
+                                                return;
+                                            }
+
+                                            // Toggle or Append? User said "elegir varios". Usually implies toggling or adding.
+                                            // If already added, maybe just flash it or ignore? 
+                                            // Let's implement toggle behavior (Add/Remove) or just Increment?
+                                            // User said "elegir uno o mas", likely "Check" behavior.
+                                            
+                                            setNuevaOrden(prev => {
+                                                const exists = prev.materiales.find(m => m.material === mat._id);
+                                                let updatedMaterials;
+                                                if (exists) {
+                                                    // Remove if clicked again? Or increment? 
+                                                    // "Elegir" suggests selection state. If I click again, I likely want to unselect OR I'm done.
+                                                    // Let's go with "Toggle" for purely selection, but since we have quantity, maybe just Add is safer?
+                                                    // Use case: I want screws, wood, paint. Click, Click, Click.
+                                                    // If I click screws again, do I want 2 screws or 0? 
+                                                    // Given the "Quantity" input in table, let's assuming clicking ADDS.
+                                                    // But duplicate rows are bad.
+                                                    // Let's Toggle. Red highlight if removing? 
+                                                    // Simpler: If added, remove. If not, add 1.
+                                                    updatedMaterials = prev.materiales.filter(m => m.material !== mat._id);
+                                                } else {
+                                                    updatedMaterials = [...prev.materiales, { material: mat._id, cantidad: 1 }];
+                                                }
+                                                return { ...prev, materiales: updatedMaterials };
+                                            });
+
+                                            // Keep dropdown open!
+                                            // setSearchTermMaterial(''); // Don't clear search if they are picking multiple from same query?
+                                            // Actually, if I typed "tornillo", I want to pick "tornillo 1" and "tornillo 2". So keep search.
+                                        }}
+                                        className={`px-4 py-3 cursor-pointer text-sm flex justify-between items-center transition-colors ${isAdded ? 'bg-orange-50 border-l-4 border-orange-500' : 'hover:bg-gray-50'}`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            {/* Checkbox visual indicator */}
+                                            <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isAdded ? 'bg-orange-500 border-orange-500 text-white' : 'border-gray-300 bg-white'}`}>
+                                                {isAdded && <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>}
                                             </div>
-                                            <div className="text-xs text-gray-500 flex justify-between">
-                                                <span>Stock: {mat.cantidad} | {mat.codigo || 'S/C'}</span>
-                                                <span className="font-semibold text-orange-600">{mat.precioCompra} Bs</span>
+                                            <div>
+                                                <div className="font-medium text-gray-800">
+                                                    {mat.nombre} {mat.color && <span className="text-gray-500 text-xs font-normal">({mat.color})</span>}
+                                                </div>
+                                                <div className="text-xs text-gray-400 font-mono">
+                                                    {mat.codigo || 'S/C'} • {mat.proveedor?.nombreEmpresa || 'Prov.'}
+                                                </div>
                                             </div>
-                                        </li>
-                                    ))}
-                                    {materiales.filter(mat => {
-                                        const term = searchTermMaterial.toLowerCase();
-                                        const nombre = mat.nombre?.toLowerCase() || '';
-                                        const color = mat.color?.toLowerCase() || '';
-                                        const codigo = mat.codigo?.toLowerCase() || '';
-                                        const prov = mat.proveedor?.nombreEmpresa?.toLowerCase() || ''; 
-                                        
-                                        return nombre.includes(term) || color.includes(term) || codigo.includes(term) || prov.includes(term);
-                                    }).length === 0 && (
-                                        <li className="px-4 py-2 text-gray-500 text-sm italic">No se encontraron materiales</li>
-                                    )}
+                                        </div>
+                                        <div className="text-right">
+                                            <div className={`text-xs font-bold ${mat.cantidad > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                                                {mat.cantidad > 0 ? `${mat.cantidad} u.` : 'Agotado'}
+                                            </div>
+                                            <div className="text-xs text-gray-500 font-mono">{mat.precioCompra} Bs</div>
+                                        </div>
+                                    </li>
+                                    );
+                                })}
+                                {materiales.filter(mat => { /* Repeated filter */
+                                     const term = searchTermMaterial.toLowerCase();
+                                    const nombre = mat.nombre?.toLowerCase() || '';
+                                    const color = mat.color?.toLowerCase() || '';
+                                     const codigo = mat.codigo?.toLowerCase() || '';
+                                    return nombre.includes(term) || color.includes(term) || codigo.includes(term);
+                                }).length === 0 && (
+                                    <li className="px-4 py-8 text-center text-gray-500 text-sm italic">
+                                        No se encontraron materiales que coincidan con "{searchTermMaterial}"
+                                    </li>
+                                )}
                                 </ul>
-                            )}
-                        </div>
-                        <div className="w-32">
-                            <label className="block text-xs font-medium text-gray-600 mb-1">Cantidad</label>
-                            <input 
-                                type="number" 
-                                min="1"
-                                value={cantidadMaterialSeleccionada}
-                                onChange={(e) => setCantidadMaterialSeleccionada(parseInt(e.target.value) || 0)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
-                            />
-                        </div>
-                        <button 
-                            onClick={agregarMaterialAOrden}
-                            className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition"
-                            disabled={!materialSeleccionado}
-                        >
-                            + Agregar
-                        </button>
+                            </div>
+                        )}
                     </div>
 
                     {/* Tabla de Materiales Agregados */}
@@ -870,7 +1043,25 @@ const FabricacionPage = ({ userRole }) => {
                                                     ) : '-'}
                                                 </td>
                                                 <td className="px-4 py-2 text-sm text-gray-600 text-right">{precio} Bs</td>
-                                                <td className="px-4 py-2 text-sm text-gray-900 text-right">{item.cantidad}</td>
+                                                <td className="px-4 py-2 text-sm text-gray-900 text-right">
+                                                    <input 
+                                                        type="number"
+                                                        min="1"
+                                                        value={item.cantidad}
+                                                        onChange={(e) => {
+                                                            const newQty = parseInt(e.target.value) || 0;
+                                                            // Optional: Check stock limit
+                                                            if (mat && newQty > mat.cantidad) {
+                                                                // Could alert or just visually warn
+                                                            }
+                                                            const updated = nuevaOrden.materiales.map(m => 
+                                                                m.material === item.material ? { ...m, cantidad: newQty } : m
+                                                            );
+                                                            setNuevaOrden({...nuevaOrden, materiales: updated});
+                                                        }}
+                                                        className="w-20 px-2 py-1 text-right border border-gray-300 rounded focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
+                                                    />
+                                                </td>
                                                 <td className="px-4 py-2 text-sm font-medium text-gray-900 text-right">{(precio * item.cantidad).toFixed(2)} Bs</td>
                                                 <td className="px-4 py-2 text-center">
                                                     <button
@@ -1013,11 +1204,11 @@ const FabricacionPage = ({ userRole }) => {
 
           {activeTab === 'materiales' && (
             <div className="space-y-6">
-              {/* Formulario de Nuevo Material */}
+              {/* Formulario de Nuevo/Editar Material */}
               {showForm && (
                 <div className="bg-white rounded-xl shadow-md p-6">
-                  <h2 className="text-2xl font-semibold text-gray-800 mb-6">Nuevo Material</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <h2 className="text-2xl font-semibold text-gray-800 mb-6">{editingMaterial ? 'Editar Material' : 'Nuevo Material'}</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Nombre *</label>
                       <input
@@ -1025,6 +1216,7 @@ const FabricacionPage = ({ userRole }) => {
                         value={nuevoMaterial.nombre}
                         onChange={(e) => setNuevoMaterial({ ...nuevoMaterial, nombre: e.target.value })}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        placeholder="Nombre del material"
                       />
                     </div>
                     <div>
@@ -1034,46 +1226,189 @@ const FabricacionPage = ({ userRole }) => {
                         value={nuevoMaterial.categoria}
                         onChange={(e) => setNuevoMaterial({ ...nuevoMaterial, categoria: e.target.value })}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                        placeholder="ej. Maderas"
+                        placeholder="ej. Maderas, Telas"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Cantidad Inicial</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Color</label>
+                      <input
+                        type="text"
+                        value={nuevoMaterial.color}
+                        onChange={(e) => setNuevoMaterial({ ...nuevoMaterial, color: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        placeholder="Color"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Stock / Cantidad {editingMaterial && <span className="text-red-500 text-xs ml-2">(No editable)</span>}</label>
                       <input
                         type="number"
                         value={nuevoMaterial.cantidad}
                         onChange={(e) => setNuevoMaterial({ ...nuevoMaterial, cantidad: parseInt(e.target.value) || 0 })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${editingMaterial ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                        disabled={!!editingMaterial}
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Precio Compra</label>
+                       <label className="block text-sm font-medium text-gray-700 mb-2">Stock Mínimo</label>
+                       <input
+                         type="number"
+                         value={nuevoMaterial.cantidadMinima}
+                         onChange={(e) => setNuevoMaterial({ ...nuevoMaterial, cantidadMinima: parseInt(e.target.value) || 0 })}
+                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                       />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Precio Compra {editingMaterial && <span className="text-red-500 text-xs ml-2">(No editable)</span>}</label>
                       <input
                         type="number"
+                        step="0.01"
                         value={nuevoMaterial.precioCompra}
                         onChange={(e) => setNuevoMaterial({ ...nuevoMaterial, precioCompra: parseFloat(e.target.value) || 0 })}
+                        className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${editingMaterial ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                        disabled={!!editingMaterial}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Precio Venta (Opcional)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={nuevoMaterial.precioVenta}
+                        onChange={(e) => setNuevoMaterial({ ...nuevoMaterial, precioVenta: parseFloat(e.target.value) || 0 })}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                       />
                     </div>
                     <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Unidad</label>
+                      <input
+                        type="text"
+                        value={nuevoMaterial.unidad}
+                        onChange={(e) => setNuevoMaterial({ ...nuevoMaterial, unidad: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        placeholder="m, kg, unidad..."
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Ubicación</label>
+                      <input
+                        type="text"
+                        value={nuevoMaterial.ubicacion}
+                        onChange={(e) => setNuevoMaterial({ ...nuevoMaterial, ubicacion: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        placeholder="Estante A1..."
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Marca</label>
+                      <input
+                        type="text"
+                        value={nuevoMaterial.marca}
+                        onChange={(e) => setNuevoMaterial({ ...nuevoMaterial, marca: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        placeholder="Marca"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Cajas</label>
+                      <input
+                        type="text"
+                        value={nuevoMaterial.cajas}
+                        onChange={(e) => setNuevoMaterial({ ...nuevoMaterial, cajas: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        placeholder="Ej. 1 caja 2 sillas"
+                      />
+                    </div>
+                    
+                    <div className="md:col-span-2 lg:col-span-3 grid grid-cols-3 gap-4 border border-gray-200 p-4 rounded-lg bg-gray-50">
+                        <span className="col-span-3 text-sm font-medium text-gray-700">Dimensiones (cm)</span>
+                        <div>
+                            <label className="block text-xs text-gray-500 mb-1">Alto</label>
+                            <input
+                                type="number"
+                                value={nuevoMaterial.dimensiones?.alto}
+                                onChange={(e) => setNuevoMaterial({ ...nuevoMaterial, dimensiones: { ...nuevoMaterial.dimensiones, alto: parseFloat(e.target.value) || 0 } })}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500 mb-1">Ancho</label>
+                            <input
+                                type="number"
+                                value={nuevoMaterial.dimensiones?.ancho}
+                                onChange={(e) => setNuevoMaterial({ ...nuevoMaterial, dimensiones: { ...nuevoMaterial.dimensiones, ancho: parseFloat(e.target.value) || 0 } })}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500 mb-1">Profundidad</label>
+                            <input
+                                type="number"
+                                value={nuevoMaterial.dimensiones?.profundidad}
+                                onChange={(e) => setNuevoMaterial({ ...nuevoMaterial, dimensiones: { ...nuevoMaterial.dimensiones, profundidad: parseFloat(e.target.value) || 0 } })}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                            />
+                        </div>
+                    </div>
+                     <div className="lg:col-span-3">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Proveedor</label>
+                       {/* Dropdown or Input for Proveedor - Using Input for simple consistency first or dropdown if providers are loaded */}
+                       {/* Checking if providers are loaded in this component. Usually fetched. */}
+                       {/* Assuming 'proveedores' state exists or I should add it. Let's check state. */}
+                       {/* Using simple input for now as per minimal change pattern unless I see providers state */}
+                      <input
+                        type="text"
+                        value={nuevoMaterial.proveedor || ''} 
+                        onChange={(e) => setNuevoMaterial({ ...nuevoMaterial, proveedor: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        placeholder="Nombre del Proveedor"
+                      />
+                    </div>
+                     <div className="lg:col-span-3">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Descripción</label>
+                      <input
+                        type="text"
+                        value={nuevoMaterial.descripcion}
+                        onChange={(e) => setNuevoMaterial({ ...nuevoMaterial, descripcion: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      />
+                    </div>
+
+                    <div className="lg:col-span-3">
                       <label className="block text-sm font-medium text-gray-700 mb-2">Imagen</label>
                       <input
                         type="file"
                         accept="image/*"
-                        onChange={(e) => setNuevoMaterial({ ...nuevoMaterial, imagen: e.target.files[0] })}
+                         onChange={(e) => setNuevoMaterial({ ...nuevoMaterial, imagen: e.target.files[0] })}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                       />
                     </div>
                   </div>
                   <div className="flex space-x-4 mt-6">
                     <button
-                      onClick={agregarMaterial}
+                      onClick={guardarMaterial}
                       className="bg-green-600 text-white py-3 px-6 rounded-lg hover:bg-green-700 transition duration-200 font-semibold"
                     >
-                      Guardar Material
+                      {editingMaterial ? 'Actualizar Material' : 'Guardar Material'}
                     </button>
                     <button
-                      onClick={() => setShowForm(false)}
+                      onClick={() => {
+                        setShowForm(false);
+                        setEditingMaterial(null);
+                        setNuevoMaterial({
+                          nombre: '',
+                          categoria: '',
+                          cantidad: 0,
+                          cantidadMinima: 10,
+                          precioCompra: 0,
+                          precioVenta: 0,
+                          unidad: '',
+                          ubicacion: '',
+                          color: '',
+                          descripcion: '',
+                          imagen: null
+                        });
+                      }}
                       className="bg-gray-500 text-white py-3 px-6 rounded-lg hover:bg-gray-600 transition duration-200 font-semibold"
                     >
                       Cancelar
@@ -1082,43 +1417,90 @@ const FabricacionPage = ({ userRole }) => {
                 </div>
               )}
 
-              <div className="bg-white rounded-xl shadow-md p-6">
-                <h2 className="text-2xl font-semibold text-gray-800 mb-6">Inventario de Materiales</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {materialesFiltrados.map((material) => (
-                    <div key={material._id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">
-                      <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-semibold text-lg text-gray-800">{material.nombre}</h3>
-                        <span className={`px-2 py-1 text-xs rounded-full ${material.cantidad > 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                          {material.cantidad > 0 ? 'Disponible' : 'Agotado'}
-                        </span>
-                      </div>
-                      
-                      {/* Imagen del Material */}
-                      {material.imagen && (
-                        <div className="mb-4 w-full h-32 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
-                           <img 
-                              src={`http://localhost:5000${material.imagen}`} 
-                              alt={material.nombre} 
-                              className="w-full h-full object-contain"
-                           />
-                        </div>
-                      )}
-
-                      <p className="text-sm text-gray-500 mb-4">{material.categoria}</p>
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Stock:</span>
-                          <span className="font-medium">{material.cantidad}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Precio Compra:</span>
-                          <span className="font-medium">{material.precioCompra} Bs</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+              {/* Tabla de Materiales (Estilo Inventario Productos Terminados) */}
+              <div className="bg-white rounded-xl shadow-md p-6 overflow-hidden">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-semibold text-gray-800">Inventario de Materiales</h2>
                 </div>
+                
+                 <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Material</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código (Auto)</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Marca</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Color</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cajas</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prov.</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NIT/Cód.</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ubicación</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {materialesFiltrados.map((item) => {
+                         let estadoColor = item.cantidad > item.cantidadMinima ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+                        return (
+                          <tr key={item._id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-normal max-w-xs">
+                              <div className="flex items-center">
+                                <div className="h-10 w-10 flex-shrink-0">
+                                  {item.imagen ? (
+                                    <img className="h-10 w-10 rounded-full object-cover cursor-pointer hover:scale-150 transition-transform" 
+                                         src={`http://localhost:5000${item.imagen}`} alt="" 
+                                    />
+                                  ) : (
+                                    <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">📦</div>
+                                  )}
+                                </div>
+                                <div className="ml-4 overflow-hidden">
+                                  <div className="text-sm font-medium text-gray-900">{item.nombre}</div>
+                                  <div className="text-sm text-gray-500 italic truncate max-w-[150px]" title={item.descripcion}>{item.descripcion}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono bg-gray-50 rounded">
+                                {item.idMateriaPrima || <span className="text-xs text-gray-400">Sin ID</span>}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.categoria}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.marca || '-'}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {item.color ? (
+                                    <span className="flex items-center gap-1">
+                                        <div className="w-3 h-3 rounded-full border border-gray-300" style={{backgroundColor: item.color}}></div>
+                                        {item.color}
+                                    </span>
+                                ) : '-'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.cajas || '-'}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {item.dimensiones ? `${item.dimensiones.alto || 0}x${item.dimensiones.ancho || 0}x${item.dimensiones.profundidad || 0}` : '-'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${estadoColor}`}>
+                                {item.cantidad} {item.unidad}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Bs. {item.precioCompra}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.proveedor?.nombre || item.proveedor || '-'}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.proveedor?.nit || '-'}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.ubicacion || '-'}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium flex space-x-3">
+                              <button onClick={() => abrirModalEditarMaterial(item)} className="text-indigo-600 hover:text-indigo-900 font-bold">
+                                ✏️ Editar
+                              </button>
+                               {/* Add Delete button if needed, existing code didn't list it in grid but common practice */}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  </div>
               </div>
             </div>
           )}

@@ -17,10 +17,21 @@ export const crearMateriaPrima = async (req, res) => {
 
     const idMateriaPrima = generarCodigoInterno(req.body.nombre);
 
+    // Helper for nested dimensions
+    let dimensiones = req.body.dimensiones;
+    if (!dimensiones && (req.body['dimensiones.alto'] || req.body['dimensiones.ancho'] || req.body['dimensiones.profundidad'])) {
+      dimensiones = {
+        alto: Number(req.body['dimensiones.alto'] || 0),
+        ancho: Number(req.body['dimensiones.ancho'] || 0),
+        profundidad: Number(req.body['dimensiones.profundidad'] || 0)
+      };
+    }
+
     // 2. Combinar los datos del body con el código generado
     const materiaPrimaData = {
       ...req.body,
       idMateriaPrima: idMateriaPrima,
+      dimensiones: dimensiones || req.body.dimensiones,
       imagen: req.file ? `/uploads/${req.file.filename}` : '',
     };
 
@@ -56,7 +67,22 @@ export const listarMateriasPrimas = async (req, res) => {
 
 export const actualizarMateriaPrima = async (req, res) => {
   try {
-    const materiaPrima = await MateriaPrima.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const updateData = { ...req.body };
+
+    // Parse dimensions if flattened
+    if (!updateData.dimensiones && (req.body['dimensiones.alto'] || req.body['dimensiones.ancho'] || req.body['dimensiones.profundidad'])) {
+      updateData.dimensiones = {
+        alto: Number(req.body['dimensiones.alto'] || 0),
+        ancho: Number(req.body['dimensiones.ancho'] || 0),
+        profundidad: Number(req.body['dimensiones.profundidad'] || 0)
+      };
+    }
+
+    if (req.file) {
+      updateData.imagen = `/uploads/${req.file.filename}`;
+    }
+
+    const materiaPrima = await MateriaPrima.findByIdAndUpdate(req.params.id, updateData, { new: true });
     if (!materiaPrima) {
       return res.status(404).json({ message: "Materia prima no encontrada" });
     }

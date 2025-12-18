@@ -206,7 +206,7 @@ app.use('/api/transportistas', authMiddleware, transportistasRoutes);
 app.use('/api/alertas', authMiddleware, alertasRoutes);
 app.use('/api/materiaPrima', authMiddleware, materiaPrimaRoutes);
 app.use('/api/upload', authMiddleware, uploadRoutes);
-app.use('/api/usuarios', usersRoutes);
+app.use('/api/usuarios', authMiddleware, usersRoutes);
 app.use('/api/deudas', deudaRoutes);
 app.use('/api/categorias', categoriasRoutes);
 app.use('/api/maquinas', maquinaRoutes);

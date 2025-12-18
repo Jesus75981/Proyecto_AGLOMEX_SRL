@@ -62,6 +62,9 @@ const InventarioPage = ({ userRole }) => {
     codigo: '',
     color: '',
     descripcion: '',
+    marca: '',
+    cajas: '',
+    dimensiones: { alto: '', ancho: '', profundidad: '' },
     categoria: '',
     proveedor: '',
     cantidad: '',
@@ -95,7 +98,7 @@ const InventarioPage = ({ userRole }) => {
     marca: '',
     cajas: '',
     ubicacion: '',
-    tamano: '',
+    dimensiones: { alto: '', ancho: '', profundidad: '' },
     codigo: '',
     precioCompra: '',
     precioVenta: '',
@@ -145,36 +148,48 @@ const InventarioPage = ({ userRole }) => {
   // Agregar Producto
   const agregarProducto = async () => {
     try {
-      // Validaciones básicas
-      if (!nuevoProducto.nombre || !nuevoProducto.sku || !nuevoProducto.precioVenta) {
-        alert('Por favor complete los campos obligatorios');
+      // Validaciones básicas (Nombre y Precio Venta son mínimos)
+      if (!nuevoProducto.nombre || !nuevoProducto.precioVenta) {
+        alert('Por favor complete los campos obligatorios (Nombre, Precio Venta)');
         return;
       }
 
-      const token = getAuthToken();
-      const payload = {
-        nombre: nuevoProducto.producto, // Backend espera "nombre"
-        sku: nuevoProducto.sku,
-        codigo: nuevoProducto.codigo,
-        color: nuevoProducto.color,
-        descripcion: nuevoProducto.descripcion,
-        categoria: nuevoProducto.categoria,
-        proveedor: nuevoProducto.proveedor,
-        cantidad: nuevoProducto.cantidad,
-        cantidadMinima: nuevoProducto.cantidadMinima,
-        cantidadMaxima: nuevoProducto.cantidadMaxima,
-        ubicacion: nuevoProducto.ubicacion,
-        precioCompra: nuevoProducto.precioCosto, // Backend espera "precioCompra"
-        precioVenta: nuevoProducto.precioVenta
-      };
+      const formData = new FormData();
+      formData.append('nombre', nuevoProducto.nombre);
+      formData.append('sku', nuevoProducto.sku || ''); // Auto-generated usually, but form has it?
+      formData.append('codigo', nuevoProducto.codigo || '');
+      formData.append('color', nuevoProducto.color || '');
+      formData.append('descripcion', nuevoProducto.descripcion || '');
+      formData.append('categoria', nuevoProducto.categoria || '');
+      formData.append('proveedor', nuevoProducto.proveedor || ''); // Might need ID lookup if schema requires ObjectId
+      formData.append('cantidad', nuevoProducto.cantidad || 0);
+      formData.append('cantidadMinima', nuevoProducto.cantidadMinima || 0);
+      formData.append('cantidadMaxima', nuevoProducto.cantidadMaxima || 0);
+      formData.append('ubicacion', nuevoProducto.ubicacion || '');
+      formData.append('precioCompra', nuevoProducto.precioCosto || 0);
+      formData.append('precioVenta', nuevoProducto.precioVenta || 0);
+      formData.append('tipo', 'Producto Terminado'); // Force type
+      
+      // New fields
+      formData.append('marca', nuevoProducto.marca || '');
+      formData.append('cajas', nuevoProducto.cajas || '');
+      if (nuevoProducto.dimensiones) {
+          formData.append('dimensiones.alto', nuevoProducto.dimensiones.alto || 0);
+          formData.append('dimensiones.ancho', nuevoProducto.dimensiones.ancho || 0);
+          formData.append('dimensiones.profundidad', nuevoProducto.dimensiones.profundidad || 0);
+      }
 
+      if (selectedImageFile) {
+        formData.append('imagen', selectedImageFile);
+      }
+
+      const token = getAuthToken();
       const response = await fetch(`${API_URL}/productos`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': token ? `Bearer ${token}` : undefined,
         },
-        body: JSON.stringify(payload)
+        body: formData
       });
 
       if (!response.ok) {
@@ -187,13 +202,17 @@ const InventarioPage = ({ userRole }) => {
       setNuevoProducto({
         nombre: '', sku: '', codigo: '', color: '', descripcion: '',
         categoria: '', proveedor: '', cantidad: '', cantidadMinima: '',
-        cantidadMaxima: '', ubicacion: '', precioCosto: '', precioVenta: ''
+        cantidadMaxima: '', ubicacion: '', precioCosto: '', precioVenta: '',
+        marca: '', cajas: '', dimensiones: { alto: '', ancho: '', profundidad: '' }
       });
+      setSelectedImageFile(null);
     } catch (err) {
       console.error('Error agregando producto:', err);
       alert('Error al agregar producto: ' + err.message);
     }
   };
+
+
 
   // Eliminar Producto
   const eliminarProducto = async (id) => {
@@ -242,7 +261,7 @@ const InventarioPage = ({ userRole }) => {
       marca: productoCompleto.marca || '',
       cajas: productoCompleto.cajas || '',
       ubicacion: productoCompleto.ubicacion || '',
-      tamano: productoCompleto.tamano || '',
+      dimensiones: productoCompleto.dimensiones || { alto: '', ancho: '', profundidad: '' },
       codigo: productoCompleto.idProductoTienda || '',
       precioCompra: productoCompleto.precioCompra || '',
       precioVenta: productoCompleto.precioVenta || '',
@@ -291,8 +310,12 @@ const InventarioPage = ({ userRole }) => {
         formData.append('categoria', modificarProducto.categoria);
         formData.append('marca', modificarProducto.marca);
         formData.append('cajas', modificarProducto.cajas);
+        if (modificarProducto.dimensiones) {
+             formData.append('dimensiones.alto', modificarProducto.dimensiones.alto || 0);
+             formData.append('dimensiones.ancho', modificarProducto.dimensiones.ancho || 0);
+             formData.append('dimensiones.profundidad', modificarProducto.dimensiones.profundidad || 0);
+        }
         formData.append('ubicacion', modificarProducto.ubicacion);
-        formData.append('tamano', modificarProducto.tamano);
         formData.append('idProductoTienda', modificarProducto.codigo);
         formData.append('precioCompra', parseFloat(modificarProducto.precioCompra));
         formData.append('precioVenta', parseFloat(modificarProducto.precioVenta));
@@ -322,7 +345,7 @@ const InventarioPage = ({ userRole }) => {
           marca: modificarProducto.marca,
           cajas: modificarProducto.cajas,
           ubicacion: modificarProducto.ubicacion,
-          tamano: modificarProducto.tamano,
+          dimensiones: modificarProducto.dimensiones,
           idProductoTienda: modificarProducto.codigo,
           precioCompra: parseFloat(modificarProducto.precioCompra),
           precioVenta: parseFloat(modificarProducto.precioVenta),
@@ -592,6 +615,45 @@ const InventarioPage = ({ userRole }) => {
                     />
                     <input
                       type="text"
+                      placeholder="Marca"
+                      value={nuevoProducto.marca}
+                      onChange={(e) => setNuevoProducto({ ...nuevoProducto, marca: e.target.value })}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Cajas (Ej: 1 caja)"
+                      value={nuevoProducto.cajas}
+                      onChange={(e) => setNuevoProducto({ ...nuevoProducto, cajas: e.target.value })}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                     <div className="md:col-span-2 lg:col-span-3 grid grid-cols-3 gap-4 border border-gray-100 p-3 rounded-lg bg-white">
+                        <span className="col-span-3 text-sm font-medium text-gray-500">Dimensiones (cm)</span>
+                        <input
+                            type="number"
+                            placeholder="Alto"
+                            value={nuevoProducto.dimensiones?.alto}
+                            onChange={(e) => setNuevoProducto({ ...nuevoProducto, dimensiones: { ...nuevoProducto.dimensiones, alto: parseFloat(e.target.value) || 0 } })}
+                            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                        />
+                        <input
+                            type="number"
+                            placeholder="Ancho"
+                            value={nuevoProducto.dimensiones?.ancho}
+                            onChange={(e) => setNuevoProducto({ ...nuevoProducto, dimensiones: { ...nuevoProducto.dimensiones, ancho: parseFloat(e.target.value) || 0 } })}
+                            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                        />
+                         <input
+                            type="number"
+                            placeholder="Profundidad"
+                            value={nuevoProducto.dimensiones?.profundidad}
+                            onChange={(e) => setNuevoProducto({ ...nuevoProducto, dimensiones: { ...nuevoProducto.dimensiones, profundidad: parseFloat(e.target.value) || 0 } })}
+                            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                        />
+                    </div>
+                    
+                    <input
+                      type="text"
                       placeholder="Almacén"
                       value={nuevoProducto.ubicacion}
                       onChange={(e) => setNuevoProducto({ ...nuevoProducto, ubicacion: e.target.value })}
@@ -613,6 +675,14 @@ const InventarioPage = ({ userRole }) => {
                       onChange={(e) => setNuevoProducto({ ...nuevoProducto, precioVenta: parseFloat(e.target.value) || 0 })}
                       className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
+                    <div className="md:col-span-3">
+                       <label className="block text-sm font-medium text-gray-700 mb-1">Imagen del Producto</label>
+                       <input
+                         type="file"
+                         onChange={(e) => setSelectedImageFile(e.target.files[0])}
+                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                       />
+                    </div>
 
                     <div className="md:col-span-3 flex space-x-4">
                       <button
@@ -818,13 +888,32 @@ const InventarioPage = ({ userRole }) => {
                       onChange={(e) => setModificarProducto({ ...modificarProducto, ubicacion: e.target.value })}
                       className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
-                    <input
-                      type="text"
-                      placeholder="Tamaño"
-                      value={modificarProducto.tamano}
-                      onChange={(e) => setModificarProducto({ ...modificarProducto, tamano: e.target.value })}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
+                    
+                    <div className="md:col-span-2 lg:col-span-3 grid grid-cols-3 gap-4 border border-gray-100 p-3 rounded-lg bg-white">
+                        <span className="col-span-3 text-sm font-medium text-gray-500">Dimensiones (cm)</span>
+                        <input
+                            type="number"
+                            placeholder="Alto"
+                            value={modificarProducto.dimensiones?.alto}
+                            onChange={(e) => setModificarProducto({ ...modificarProducto, dimensiones: { ...modificarProducto.dimensiones, alto: parseFloat(e.target.value) || 0 } })}
+                            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                        />
+                        <input
+                            type="number"
+                            placeholder="Ancho"
+                            value={modificarProducto.dimensiones?.ancho}
+                            onChange={(e) => setModificarProducto({ ...modificarProducto, dimensiones: { ...modificarProducto.dimensiones, ancho: parseFloat(e.target.value) || 0 } })}
+                            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                        />
+                         <input
+                            type="number"
+                            placeholder="Profundidad"
+                            value={modificarProducto.dimensiones?.profundidad}
+                            onChange={(e) => setModificarProducto({ ...modificarProducto, dimensiones: { ...modificarProducto.dimensiones, profundidad: parseFloat(e.target.value) || 0 } })}
+                            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                        />
+                    </div>
+                    
                     <input
                       type="text"
                       placeholder="Código"
@@ -884,10 +973,14 @@ const InventarioPage = ({ userRole }) => {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKU</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código Proveedor</th>
                         {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>}
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Marca</th>
+                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cajas</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dimens.</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Color</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
                         {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo</th>}
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio Venta</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proveedor</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
                         {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>}
                       </tr>
@@ -908,7 +1001,7 @@ const InventarioPage = ({ userRole }) => {
 
                         return (
                           <tr key={item._id}>
-                            <td className="px-6 py-4 whitespace-nowrap">
+                            <td className="px-6 py-4 whitespace-normal max-w-xs">
                               <div className="flex items-center">
                                 <div className="h-10 w-10 flex-shrink-0">
                                   {item.imagen ? (
@@ -921,13 +1014,18 @@ const InventarioPage = ({ userRole }) => {
                                 </div>
                                 <div className="ml-4">
                                   <div className="text-sm font-medium text-gray-900">{item.nombre}</div>
-                                  <div className="text-sm text-gray-500">{item.descripcion}</div>
+                                  <div className="text-sm text-gray-500 italic truncate max-w-[150px]" title={item.descripcion}>{item.descripcion}</div>
                                 </div>
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.idProductoTienda}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.codigo || '-'}</td>
                             {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.categoria}</td>}
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.marca || '-'}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.cajas || '-'}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {item.dimensiones ? `${item.dimensiones.alto || 0}x${item.dimensiones.ancho || 0}x${item.dimensiones.profundidad || 0}` : '-'}
+                            </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.color || '-'}</td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-900">{item.cantidad}</div>
@@ -935,6 +1033,7 @@ const InventarioPage = ({ userRole }) => {
                             </td>
                             {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Bs. {item.precioCompra || 0}</td>}
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Bs. {item.precioVenta || 0}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.proveedor?.nombre || item.proveedor || '-'}</td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${estadoColor}`}>
                                 {estado}

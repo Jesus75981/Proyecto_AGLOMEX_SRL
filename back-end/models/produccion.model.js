@@ -14,6 +14,14 @@ const produccionSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  categoria: {
+    type: String,
+    required: true
+  },
+  marca: {
+    type: String,
+    default: ""
+  },
   cantidad: {
     type: Number,
     required: true

@@ -1,7 +1,8 @@
 import User from "../models/user.model.js";
 import jwt from "jsonwebtoken";
+import bcrypt from "bcrypt";
 
-// Registro
+// Registro (Público o Admin)
 export const registrarUsuario = async (req, res) => {
   try {
     const user = new User(req.body);
@@ -21,30 +22,82 @@ export const loginUsuario = async (req, res) => {
   try {
     const { username, password } = req.body;
 
-    console.log(`🔑 Intento de login: Usuario="${username}", Password="${password}"`);
+    console.log(`🔑 Intento de login: Usuario="${username}"`);
 
     const user = await User.findOne({ username });
 
     if (!user) {
-      console.log(`❌ Usuario no encontrado: "${username}"`);
       return res.status(401).json({ error: "Credenciales inválidas" });
     }
 
     const isMatch = await user.comparePassword(password);
-    console.log(`🔍 Resultado comparación password para "${username}": ${isMatch}`);
 
     if (!isMatch) {
-      console.log(`❌ Contraseña incorrecta para: "${username}"`);
       return res.status(401).json({ error: "Credenciales inválidas" });
     }
 
-    // Importar jwt si faltara, pero se importó arriba.
-    const token = jwt.sign({ id: user._id, rol: user.rol }, process.env.JWT_SECRET, { expiresIn: "1d" });
-    console.log(`✅ Login exitoso: "${username}"`);
+    const token = jwt.sign({ id: user._id, rol: user.rol, nombre: user.nombre }, process.env.JWT_SECRET, { expiresIn: "1d" });
     res.json({ token, user });
   } catch (error) {
     console.error('❌ Error en loginUsuario:', error);
     res.status(500).json({ error: "Error interno del servidor" });
+  }
+};
+
+// === CRUD DE USUARIOS (Para Admin) ===
+
+// Obtener todos los usuarios
+export const getUsers = async (req, res) => {
+  try {
+    // Opcional: Filtrar para no enviar passwords ni otros datos sensibles si no se quiere
+    const users = await User.find().select('-password');
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Actualizar usuario
+export const updateUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { password, ...updateData } = req.body;
+
+    // Si se envía password, hay que encriptarlo manualmente si no usamos el pre-save hook correctamente con findByIdAndUpdate
+    // El pre-save hook SOLO funciona con .save(), NO con findByIdAndUpdate.
+    // Así que si actualizamos password, debemos hashearlo aqui o buscar, modificar y salvar.
+
+    let user = await User.findById(id);
+    if (!user) return res.status(404).json({ error: "Usuario no encontrado" });
+
+    // Actualizar campos básicos
+    if (updateData.username) user.username = updateData.username;
+    if (updateData.nombre) user.nombre = updateData.nombre;
+    if (updateData.rol) user.rol = updateData.rol;
+
+    // Actualizar password si se envió
+    if (password && password.trim() !== '') {
+      // El hook pre-save se encargará de hashearlo al hacer user.save()
+      // SIEMPRE que modifiquemos user.password directamente
+      user.password = password;
+    }
+
+    await user.save(); // Esto dispara el pre('save') en el modelo si se modificó el password
+
+    res.json({ message: "Usuario actualizado correctamente", user });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Eliminar usuario
+export const deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await User.findByIdAndDelete(id);
+    res.json({ message: "Usuario eliminado correctamente" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 };
 

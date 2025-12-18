@@ -111,7 +111,7 @@ const LoginPage = ({ onLogin }) => {
               className="shadow-sm appearance-none border border-gray-700 bg-gray-900 rounded-lg w-full py-3 px-4 text-white leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-200"
               id="username"
               type="text"
-              placeholder="dueno, tienda o stock"
+              placeholder="Ingresa tu usuario"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               disabled={isLoading}
@@ -126,7 +126,7 @@ const LoginPage = ({ onLogin }) => {
               className="shadow-sm appearance-none border border-gray-700 bg-gray-900 rounded-lg w-full py-3 px-4 text-white leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-200"
               id="password"
               type="password"
-              placeholder="admin123"
+              placeholder="Ingresa tu contraseña"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={isLoading}
@@ -161,34 +161,8 @@ const LoginPage = ({ onLogin }) => {
           </button>
         </div>
 
-        {/* Información de usuarios de prueba */}
-        <div className="mt-6 p-4 bg-gray-900 rounded-lg border border-gray-700">
-          <h3 className="text-white text-sm font-semibold mb-2 text-center">
-            Usuarios de Prueba:
-          </h3>
-          <div className="text-xs text-gray-400 space-y-1">
-            <div className="flex justify-between">
-              <span>Admin:</span>
-              <span className="text-orange-400">dueno / admin123</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Ventas:</span>
-              <span className="text-orange-400">tienda / admin123</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Inventario:</span>
-              <span className="text-orange-400">stock / admin123</span>
-            </div>
-          </div>
-
-          <button
-            onClick={createTestUsers}
-            className="w-full mt-3 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 py-1 px-2 rounded transition-colors duration-200"
-            type="button"
-          >
-            Crear Usuarios de Prueba
-          </button>
-        </div>
+        {/* Información de usuarios de prueba - REMOVIDO POR SEGURIDAD */} 
+        {/* <div className="mt-6 p-4 bg-gray-900 rounded-lg border border-gray-700"> ... </div> */}
 
         {/* Información de conexión */}
         <div className="mt-4 text-center">

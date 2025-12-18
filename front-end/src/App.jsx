@@ -18,6 +18,7 @@ import ReportesDiarios from "./assets/pages/ReportesDiarios.jsx";
 import ReportesPage from "./assets/pages/ReportesPage.jsx";
 import DashboardPage from "./assets/pages/DashboardPage.jsx";
 import CatalogPage from "./assets/pages/CatalogPage.jsx";
+import UsuariosPage from "./assets/pages/UsuariosPage.jsx";
 
 // Componente de carga
 const Loading = () => (
@@ -108,6 +109,8 @@ function AppContent() {
                 <Route path="/reportes-diarios" element={<ReportesDiarios userRole={userRole} />} />
                 <Route path="/reportes" element={<ReportesPage userRole={userRole} />} />
                 <Route path="/dashboard" element={<DashboardPage userRole={userRole} />} />
+                {/* Admin Only */}
+                {userRole === 'admin' && <Route path="/usuarios" element={<UsuariosPage userRole={userRole} />} />}
               </>
             )}
 

@@ -500,12 +500,22 @@ const ComprasPage = ({ userRole }) => {
       formData.append('color', nuevoProducto.color);
       formData.append('marca', nuevoProducto.marca || '');
       formData.append('ubicacion', nuevoProducto.ubicacion || '');
+      // Ensure proveedor is sent as ID
       formData.append('proveedor', nuevoProducto.proveedor || '');
       formData.append('codigo', nuevoProducto.codigo);
       formData.append('cajas', nuevoProducto.cajas);
-      formData.append('dimensiones[alto]', nuevoProducto.dimensiones.alto);
-      formData.append('dimensiones[ancho]', nuevoProducto.dimensiones.ancho);
-      formData.append('dimensiones[profundidad]', nuevoProducto.dimensiones.profundidad);
+      
+      // Flatten dimensions
+      formData.append('dimensiones[alto]', nuevoProducto.dimensiones.alto || 0);
+      formData.append('dimensiones[ancho]', nuevoProducto.dimensiones.ancho || 0);
+      formData.append('dimensiones[profundidad]', nuevoProducto.dimensiones.profundidad || 0);
+
+      // Also append flattened keys for backend consistency if controller expects dimensions.alto directly from body or file
+      // My controller check was req.body['dimensiones.alto']
+      formData.append('dimensiones.alto', nuevoProducto.dimensiones.alto || 0);
+      formData.append('dimensiones.ancho', nuevoProducto.dimensiones.ancho || 0);
+      formData.append('dimensiones.profundidad', nuevoProducto.dimensiones.profundidad || 0);
+
 
       if (selectedImageFile) {
         formData.append('imagen', selectedImageFile);
@@ -518,7 +528,7 @@ const ComprasPage = ({ userRole }) => {
          // Campos requeridos por MateriaPrima que el formulario no tiene
          formData.append('precioCompra', 0);
          formData.append('precioVenta', 0);
-         // Convertir dimensiones a string tamano
+         // Convertir dimensiones a string tamano if needed for legacy support, but dimensions obj is superior
          const dims = [
              nuevoProducto.dimensiones.alto ? `${nuevoProducto.dimensiones.alto}cm` : '',
              nuevoProducto.dimensiones.ancho ? `${nuevoProducto.dimensiones.ancho}cm` : '',

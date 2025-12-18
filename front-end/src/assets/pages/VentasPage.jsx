@@ -1008,13 +1008,15 @@ const VentasPage = ({ userRole }) => {
                   {/* Carrito de Compras */}
                   {nuevaVenta.productos.length > 0 && (
                     <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
-                      <h3 className="text-lg font-semibold text-gray-800 mb-4">Carrito de Compras</h3>
+                      <h3 className="text-lg font-semibold text-gray-800 mb-4">Carrito de Ventas</h3>
 
                       <div className="overflow-x-auto">
                         <table className="w-full">
                           <thead>
                             <tr className="bg-gray-50">
+                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Código</th>
                               <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Color</th>
                               <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cantidad</th>
                               <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Precio Unit.</th>
                               <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
@@ -1024,8 +1026,14 @@ const VentasPage = ({ userRole }) => {
                           <tbody>
                             {nuevaVenta.productos.map((item, index) => (
                               <tr key={index} className="border-t border-gray-200">
+                                <td className="px-4 py-2 text-sm text-gray-500 font-mono">
+                                  {item.productoCodigo || 'S/C'}
+                                </td>
                                 <td className="px-4 py-2 text-sm font-medium text-gray-900">
                                   {item.productoNombre}
+                                </td>
+                                <td className="px-4 py-2 text-sm text-gray-500">
+                                  {item.productoColor || '-'}
                                 </td>
                                 <td className="px-4 py-2 text-sm text-gray-500">
                                   {item.cantidad}
@@ -1130,6 +1138,7 @@ const VentasPage = ({ userRole }) => {
                             Bs. {nuevaVenta.metodosPago.reduce((s, p) => s + p.monto, 0).toFixed(2)}
                           </span>
                       </div>
+                    </div>
                       <div>
                           {(() => {
                             const totalPagado = nuevaVenta.metodosPago.reduce((s, p) => s + p.monto, 0);

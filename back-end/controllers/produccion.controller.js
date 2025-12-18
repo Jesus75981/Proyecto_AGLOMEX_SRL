@@ -62,9 +62,20 @@ export const crearProduccion = async (req, res) => {
       // Clean payload if necessary? Mongoose handles it.
       // Generate unique order number
       const numeroOrden = await getNextSequenceValue('produccionNumero');
+
+      // Generate optimized short correlative code
+      // Format: AAA-0000 (Category Prefix - Sequence Number)
+      const prefix = req.body.categoria
+        ? req.body.categoria.substring(0, 3).toUpperCase()
+        : 'PRO';
+      const codigoCorrelativo = `${prefix}-${String(numeroOrden).padStart(4, '0')}`;
+
       const produccion = new Produccion({
         ...req.body,
-        numeroOrden
+        numeroOrden,
+        idProduccion: codigoCorrelativo, // Override timestamp-based ID
+        categoria: req.body.categoria,
+        marca: req.body.marca
       });
       await produccion.save();
       console.log('Production created successfully:', produccion._id);

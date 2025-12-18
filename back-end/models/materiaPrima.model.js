@@ -60,6 +60,31 @@ const materiaPrimaSchema = new mongoose.Schema({
   codigo: {
     type: String,
     default: ""
+  },
+  cantidadMinima: {
+    type: Number,
+    default: 10
+  },
+  cantidadMaxima: {
+    type: Number,
+    default: 100
+  },
+  marca: {
+    type: String,
+    default: ""
+  },
+  cajas: {
+    type: String,
+    default: ""
+  },
+  unidad: {
+    type: String,
+    default: "unidad"
+  },
+  dimensiones: {
+    alto: { type: Number, default: 0 },
+    ancho: { type: Number, default: 0 },
+    profundidad: { type: Number, default: 0 }
   }
 }, { timestamps: true });
 

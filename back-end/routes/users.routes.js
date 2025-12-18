@@ -1,18 +1,12 @@
 import express from "express";
-import User from "../models/user.model.js";
+import * as userCtrl from "../controllers/user.controller.js";
 
 const router = express.Router();
 
-// Listar usuarios
-router.get("/", async (req, res) => {
-  const users = await User.find();
-  res.json(users);
-});
-
-// Eliminar usuario
-router.delete("/:id", async (req, res) => {
-  await User.findByIdAndDelete(req.params.id);
-  res.json({ message: "Usuario eliminado" });
-});
+// CRUD Usuarios
+router.get("/", userCtrl.getUsers);           // Obtener todos
+router.post("/", userCtrl.registrarUsuario);  // Crear nuevo (reusa registrar)
+router.put("/:id", userCtrl.updateUser);      // Actualizar
+router.delete("/:id", userCtrl.deleteUser);   // Eliminar
 
 export default router;

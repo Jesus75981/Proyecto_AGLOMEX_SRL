@@ -80,10 +80,21 @@ export const crearProducto = async (req, res) => {
     // 2. Generar el código interno usando el nombre (requerido)
     const idProductoTienda = generarCodigoInterno(req.body.nombre);
 
+    // Helper for nested dimensions (Simple check for flat keys)
+    let dimensiones = req.body.dimensiones;
+    if (!dimensiones && (req.body['dimensiones.alto'] || req.body['dimensiones.ancho'] || req.body['dimensiones.profundidad'])) {
+      dimensiones = {
+        alto: Number(req.body['dimensiones.alto'] || 0),
+        ancho: Number(req.body['dimensiones.ancho'] || 0),
+        profundidad: Number(req.body['dimensiones.profundidad'] || 0)
+      };
+    }
+
     // 3. Combinar los datos del body con el código generado, excluyendo campos no deseados
     const productoData = {
       ...req.body,
       idProductoTienda: idProductoTienda,
+      dimensiones: dimensiones || req.body.dimensiones,
       // Adjust path to be accessible via URL if needed contextually, 
       // but tripo service needs to know where it is locally.
       // Remote was using /uploads/filename. We'll stick to that convention relative to public/
@@ -230,11 +241,24 @@ export const actualizarProducto = async (req, res) => {
         } else if (['precioCompra', 'precioVenta'].includes(key)) {
           const parsed = parseFloat(req.body[key]);
           updateData[key] = isNaN(parsed) ? 0 : parsed;
+        } else if (key.startsWith('dimensiones.')) {
+          // Skip flat dimensions keys here, handled below
         } else {
           updateData[key] = req.body[key];
         }
       }
     });
+
+    // Parse flattened dimensions explicitly
+    if (req.body['dimensiones.alto'] || req.body['dimensiones.ancho'] || req.body['dimensiones.profundidad']) {
+      updateData.dimensiones = {
+        alto: Number(req.body['dimensiones.alto'] || 0),
+        ancho: Number(req.body['dimensiones.ancho'] || 0),
+        profundidad: Number(req.body['dimensiones.profundidad'] || 0)
+      };
+    } else if (req.body.dimensiones) {
+      updateData.dimensiones = req.body.dimensiones;
+    }
 
     // Asegurar que 'tipo' se actualice si está presente
     if (req.body.tipo) {
