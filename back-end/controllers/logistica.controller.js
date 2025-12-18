@@ -524,7 +524,7 @@ export const getVentasPendientesEnvio = async (req, res) => {
     // - NO deben estar ya en la colección de Logística
 
     const ventasCandidatas = await Venta.find({
-      metodoEntrega: { $in: ["Envio Domicilio", "Envio Nacional"] }
+      metodoEntrega: { $in: ["Envio Domicilio", "Envio Nacional", "Recojo Tienda", "Recojo Almacen"] }
     }).populate('cliente productos.producto');
 
     console.log(`📋 Ventas candidatas encontradas: ${ventasCandidatas.length}`);

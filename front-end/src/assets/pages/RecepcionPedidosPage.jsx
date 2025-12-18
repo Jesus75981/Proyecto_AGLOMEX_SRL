@@ -31,7 +31,7 @@ const RecepcionPedidosPage = () => {
     setShowConfirm(false);
 
     try {
-      const response = await axios.get(`http://localhost:5000/api/pedidos-public/numero/${pedidoNumero.trim()}`);
+      const response = await axios.get(`http://localhost:5000/api/pedidos-publico/numero/${pedidoNumero.trim()}`);
       const { pedido, logistica } = response.data;
       setPedidoInfo(pedido);
       setLogisticaInfo(logistica);
@@ -73,7 +73,7 @@ const RecepcionPedidosPage = () => {
     setMessage('');
 
     try {
-      const response = await axios.post('http://localhost:5000/api/pedidos-public/confirmar-recepcion', {
+      const response = await axios.post('http://localhost:5000/api/pedidos-publico/confirmar-recepcion', {
         pedidoNumero: pedidoNumero.trim()
       });
 

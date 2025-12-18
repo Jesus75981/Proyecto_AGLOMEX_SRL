@@ -429,6 +429,48 @@ export const getFinancialStatistics = async (req, res) => {
       metrics.utilidadNeta = metrics.totalIngresos - metrics.totalEgresos;
     }
     // -------------------------------
+    // --- INTEGRACIÓN: VENTAS FACTURADAS VS RECIEBOS ---
+    const ventasBreakdown = await Venta.aggregate([
+      {
+        $match: {
+          fecha: { $gte: startDate, $lte: endDate },
+          estado: { $ne: 'Anulado' } // Ensure voided sales are excluded
+        }
+      },
+      {
+        $group: {
+          _id: "$tipoComprobante", // Group by 'Factura' or 'Recibo'
+          total: {
+            $sum: {
+              $ifNull: ["$totalVenta", // Try to use totalVenta first if available in schema (it's not, use products sum)
+                { $reduce: { input: "$productos", initialValue: 0, in: { $add: ["$$value", "$$this.precioTotal"] } } }
+              ]
+            }
+          },
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    metrics.resumenFiscal = {
+      facturado: 0,
+      recibo: 0,
+      impuestoEstimado: 0
+    };
+
+    ventasBreakdown.forEach(item => {
+      if (item._id === 'Factura') {
+        metrics.resumenFiscal.facturado = item.total;
+      } else {
+        metrics.resumenFiscal.recibo += item.total; // Default to Recibo for others
+      }
+    });
+
+    // Estimate Tax (e.g. 13% IVA + 3% IT = ~16% or just 13% based on user preference? User said "no tenemos credito fiscal", implying informal environment).
+    // Let's just provide the totals for decision making. User can interpret tax.
+    // But if they want "Impuesto Estimado" I'll set it as 13% of Facturado for reference.
+    metrics.resumenFiscal.impuestoEstimado = metrics.resumenFiscal.facturado * 0.13;
+    // -------------------------------
 
     // Cashflow (distribución por periodo)
     // NOTA: Para simplificar, actualmente no estamos fusionando los costos de logística en el gráfico de Cashflow

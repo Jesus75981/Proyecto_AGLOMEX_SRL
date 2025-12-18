@@ -24,7 +24,12 @@ const maquinaSchema = new mongoose.Schema({
     },
     proximoMantenimiento: {
         type: Date
-    }
+    },
+    historialMantenimiento: [{
+        fecha: { type: Date, default: Date.now },
+        costo: { type: Number, required: true },
+        descripcion: { type: String, required: true }
+    }]
 }, { timestamps: true });
 
 export default mongoose.model("Maquina", maquinaSchema);

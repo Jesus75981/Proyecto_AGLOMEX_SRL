@@ -38,3 +38,20 @@ export const eliminarMaquina = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 };
+
+export const agregarMantenimiento = async (req, res) => {
+    try {
+        const { fecha, costo, descripcion } = req.body;
+        const maquina = await Maquina.findById(req.params.id);
+        if (!maquina) return res.status(404).json({ message: "Máquina no encontrada" });
+
+        maquina.historialMantenimiento.push({ fecha, costo, descripcion });
+        maquina.ultimoMantenimiento = fecha || new Date();
+        maquina.estado = 'En mantenimiento'; // Optionally auto-update status
+
+        await maquina.save();
+        res.json(maquina);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};

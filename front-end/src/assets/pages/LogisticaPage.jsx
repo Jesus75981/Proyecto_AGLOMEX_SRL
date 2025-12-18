@@ -24,6 +24,11 @@ const apiFetch = async (endpoint, options = {}) => {
   const response = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
 
   if (!response.ok) {
+    if (response.status === 401) {
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+      throw new Error('Sesión expirada. Redirigiendo al login...');
+    }
     const errorData = await response.json();
     throw new Error(errorData.message || errorData.error || 'Error en la petición a la API');
   }
@@ -251,12 +256,16 @@ const LogisticaPage = ({ userRole }) => {
   };
 
   const seleccionarPedido = (pedido) => {
+    const esRecojo = pedido.metodoEntrega?.toLowerCase().includes('recojo');
     setNuevoEnvio({
       ...nuevoEnvio,
       pedidoId: pedido.pedidoNumero.toString(),
       cliente: pedido.cliente?.nombre || '',
       productos: pedido.productos || [],
-      metodoEntrega: pedido.metodoEntrega || 'Envio Domicilio' // ✅ Auto-select delivery method
+      metodoEntrega: pedido.metodoEntrega || 'Envio Domicilio',
+      transportista: esRecojo ? 'Cliente' : '',
+      empresaEnvio: esRecojo ? 'Cliente' : '',
+      costoEnvio: 0
     });
     setBusquedaPedido(pedido.pedidoNumero.toString());
     setMostrarDropdownPedidos(false);
@@ -577,8 +586,8 @@ const LogisticaPage = ({ userRole }) => {
 
           {activeTab === 'ventas_pendientes' && (
             <div className="bg-white rounded-xl shadow-md p-6">
-              <h2 className="text-2xl font-semibold mb-4 text-orange-600">Ventas Pendientes de Envío</h2>
-              <p className="text-gray-600 mb-6">Estas ventas requieren entrega (Domicilio o Nacional) y aún no tienen envío programado.</p>
+              <h2 className="text-2xl font-semibold mb-4 text-orange-600">Ventas Pendientes</h2>
+              <p className="text-gray-600 mb-6">Estas ventas requieren entrega o recojo y aún no tienen logística programada.</p>
 
               {loadingVentasPendientes ? <SkeletonTable /> : (
                 <div className="overflow-x-auto">
@@ -591,6 +600,7 @@ const LogisticaPage = ({ userRole }) => {
                           <th className="px-4 py-3 text-left text-xs font-medium text-orange-800 uppercase"># Venta</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-orange-800 uppercase">Cliente</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-orange-800 uppercase">Método Entrega</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-orange-800 uppercase">Monto Pagado / Total</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-orange-800 uppercase">Fecha Venta</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-orange-800 uppercase">Acción</th>
                         </tr>
@@ -599,28 +609,41 @@ const LogisticaPage = ({ userRole }) => {
                         {ventasPendientes.filter(v =>
                           v.cliente?.nombre?.toLowerCase().includes(searchTermLower) ||
                           v.numVenta.toString().includes(searchTermLower)
-                        ).map((venta) => (
-                          <tr key={venta._id} className="hover:bg-orange-50 transition-colors">
-                            <td className="px-4 py-3 text-sm font-bold text-gray-700">#{venta.numVenta}</td>
-                            <td className="px-4 py-3 text-sm text-gray-600">{venta.cliente?.nombre || 'Consumidor Final'}</td>
-                            <td className="px-4 py-3 text-sm">
-                              <span className="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
-                                {venta.metodoEntrega}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-500">
-                              {new Date(venta.fecha).toLocaleDateString()}
-                            </td>
-                            <td className="px-4 py-3">
-                              <button
-                                onClick={() => procesarVentaPendiente(venta)}
-                                className="bg-indigo-600 text-white px-3 py-1 rounded text-sm hover:bg-indigo-700 shadow-sm flex items-center"
-                              >
-                                📦 Procesar Envío
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
+                        ).map((venta) => {
+                          const totalVenta = venta.productos?.reduce((sum, p) => sum + (p.precioTotal || (p.cantidad * p.precioUnitario)), 0) || 0;
+                          const totalPagado = venta.metodosPago?.reduce((sum, p) => sum + p.monto, 0) || 0;
+                          return (
+                            <tr key={venta._id} className="hover:bg-orange-50 transition-colors">
+                              <td className="px-4 py-3 text-sm font-bold text-gray-700">#{venta.numVenta}</td>
+                              <td className="px-4 py-3 text-sm text-gray-600">{venta.cliente?.nombre || 'Consumidor Final'}</td>
+                              <td className="px-4 py-3 text-sm">
+                                <span className="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                                  {venta.metodoEntrega}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-sm">
+                                <div className="flex flex-col">
+                                  <span className="text-green-600 font-semibold">Pagado: Bs. {totalPagado.toFixed(2)}</span>
+                                  <span className="text-gray-500 text-xs">Total: Bs. {totalVenta.toFixed(2)}</span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-500">
+                                {new Date(venta.fecha).toLocaleDateString()}
+                              </td>
+                              <td className="px-4 py-3">
+                                <button
+                                  onClick={() => procesarVentaPendiente(venta)}
+                                  className={`px-3 py-1 rounded text-sm text-white shadow-sm flex items-center ${venta.metodoEntrega?.toLowerCase().includes('recojo')
+                                      ? 'bg-purple-600 hover:bg-purple-700'
+                                      : 'bg-indigo-600 hover:bg-indigo-700'
+                                    }`}
+                                >
+                                  {venta.metodoEntrega?.toLowerCase().includes('recojo') ? '🏢 Procesar Recojo' : '📦 Procesar Envío'}
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   )}
@@ -684,11 +707,53 @@ const LogisticaPage = ({ userRole }) => {
                       <option value="Terrestre">Terrestre</option>
                       <option value="Aéreo">Aéreo</option>
                     </select>
-                    <select value={nuevoEnvio.transportista} onChange={(e) => setNuevoEnvio({ ...nuevoEnvio, transportista: e.target.value })} className="px-4 py-2 border border-gray-300 rounded-lg">
-                      <option value="">Transportista (Interno)</option>
-                      {transportistas.map(t => <option key={t._id} value={t.nombre}>{t.nombre}</option>)}
-                    </select>
-                    <input type="text" placeholder="Empresa de Envío (Externa)" value={nuevoEnvio.empresaEnvio} onChange={(e) => setNuevoEnvio({ ...nuevoEnvio, empresaEnvio: e.target.value })} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                    {/* Selección de Tipo de Transportista - Ocultar si es Recojo */}
+                    {!nuevoEnvio.metodoEntrega?.toLowerCase().includes('recojo') && (
+                      <>
+                        <div className="md:col-span-2 flex gap-4 p-2 bg-white rounded-lg border border-gray-200">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="tipoTransportistaSelect"
+                              checked={!nuevoEnvio.empresaEnvio && nuevoEnvio.transportista !== undefined}
+                              onChange={() => setNuevoEnvio({ ...nuevoEnvio, empresaEnvio: '', transportista: '' })}
+                              className="text-indigo-600 focus:ring-indigo-500"
+                            />
+                            <span className="text-sm font-medium text-gray-700">Transportista Registrado</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="tipoTransportistaSelect"
+                              checked={nuevoEnvio.empresaEnvio !== ''}
+                              onChange={() => setNuevoEnvio({ ...nuevoEnvio, transportista: '', empresaEnvio: ' ' })}
+                              className="text-indigo-600 focus:ring-indigo-500"
+                            />
+                            <span className="text-sm font-medium text-gray-700">Otro / Externo (Ocasional)</span>
+                          </label>
+                        </div>
+
+                        {!nuevoEnvio.empresaEnvio ? (
+                          <select
+                            value={nuevoEnvio.transportista}
+                            onChange={(e) => setNuevoEnvio({ ...nuevoEnvio, transportista: e.target.value })}
+                            className="px-4 py-2 border border-gray-300 rounded-lg w-full"
+                          >
+                            <option value="">Seleccionar Transportista...</option>
+                            {transportistas.map(t => <option key={t._id} value={t.nombre}>{t.nombre}</option>)}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            placeholder="Nombre de la Empresa o Transportista"
+                            value={nuevoEnvio.empresaEnvio.trim()}
+                            onChange={(e) => setNuevoEnvio({ ...nuevoEnvio, empresaEnvio: e.target.value })}
+                            className="px-4 py-2 border border-blue-300 rounded-lg w-full focus:ring-2 focus:ring-blue-500 bg-blue-50"
+                            autoFocus
+                          />
+                        )}
+                      </>
+                    )}
                     <select value={nuevoEnvio.metodoEntrega} onChange={(e) => setNuevoEnvio({ ...nuevoEnvio, metodoEntrega: e.target.value })} className="px-4 py-2 border border-gray-300 rounded-lg">
                       <option value="Envio Domicilio">Envio Domicilio</option>
                       <option value="Recojo en Tienda">Recojo en Tienda</option>
@@ -697,7 +762,14 @@ const LogisticaPage = ({ userRole }) => {
                     </select>
                     <div className="relative">
                       <span className="absolute left-3 top-2 text-gray-500">Bs</span>
-                      <input type="number" placeholder="Costo Envío" value={nuevoEnvio.costoEnvio} onChange={(e) => setNuevoEnvio({ ...nuevoEnvio, costoEnvio: e.target.value })} className="w-full pl-10 px-4 py-2 border border-gray-300 rounded-lg" />
+                      <input
+                        type="number"
+                        placeholder="Costo Envío"
+                        value={nuevoEnvio.costoEnvio}
+                        onChange={(e) => setNuevoEnvio({ ...nuevoEnvio, costoEnvio: e.target.value })}
+                        className="w-full pl-10 px-4 py-2 border border-gray-300 rounded-lg"
+                        disabled={nuevoEnvio.metodoEntrega?.toLowerCase().includes('recojo')}
+                      />
                     </div>
 
                     <div className="md:col-span-2 flex space-x-4">

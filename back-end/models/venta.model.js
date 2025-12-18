@@ -64,6 +64,11 @@ const ventaSchema = new mongoose.Schema({
     enum: ["Envio Domicilio", "Recojo en Tienda", "Recojo en Almacen", "Envio Nacional"],
     default: "Recojo en Tienda"
   },
+  tipoComprobante: {
+    type: String,
+    enum: ["Factura", "Recibo"],
+    default: "Recibo" // Default to Recibo if not specified (informal)
+  },
   numFactura: { type: String, required: true },
   observaciones: String
 }, { timestamps: true });

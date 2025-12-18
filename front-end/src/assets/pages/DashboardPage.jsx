@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  LineChart, Line, PieChart, Pie, Cell, Area, AreaChart, ComposedChart
+  LineChart, Line, PieChart, Pie, Cell, Area, AreaChart, ComposedChart, ReferenceLine
 } from 'recharts';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -39,6 +39,11 @@ const apiFetch = async (endpoint, options = {}) => {
 
   const response = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
   if (!response.ok) {
+    if (response.status === 401) {
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+      throw new Error('Sesión expirada. Redirigiendo al login...');
+    }
     const errorData = await response.json();
     throw new Error(errorData.message || errorData.error || 'Error en la petición a la API');
   }
@@ -122,7 +127,7 @@ const DashboardPage = ({ userRole }) => {
 
   // Datos
   const [ventasData, setVentasData] = useState({ ventasMensuales: [], ventasAnuales: [], productosMasVendidos: [] });
-  const [produccionData, setProduccionData] = useState({ estadisticasGenerales: {}, produccionMensual: [], produccionPorEstado: [], eficienciaProduccion: [] });
+  const [produccionData, setProduccionData] = useState({ estadisticasGenerales: {}, produccionMensual: [], produccionPorEstado: [], eficienciaProduccion: [], maquinaStats: [] });
   const [finanzasData, setFinanzasData] = useState({ metrics: {}, cashflow: [], resumenTotal: {} });
   const [inventarioData, setInventarioData] = useState({ metricas: {}, alertas: [] });
   const [logisticaData, setLogisticaData] = useState({ estadisticas: {}, pedidosRecientes: [] });
@@ -167,8 +172,19 @@ const DashboardPage = ({ userRole }) => {
 
       // 2. Producción
       if (activeTab === 'produccion') {
-        const res = await apiFetch(`/produccion/estadisticas?${queryString}`, { headers });
-        setProduccionData(res);
+        const [res, maquinasRes] = await Promise.all([
+          apiFetch(`/produccion/estadisticas?${queryString}`, { headers }),
+          apiFetch('/maquinas', { headers })
+        ]);
+
+        // Calculate machine stats manually
+        const mStats = [
+          { name: 'Operativa', value: maquinasRes.filter(m => m.estado === 'Operativa').length },
+          { name: 'En mantenimiento', value: maquinasRes.filter(m => m.estado === 'En mantenimiento').length },
+          { name: 'Fuera de servicio', value: maquinasRes.filter(m => m.estado === 'Fuera de servicio').length }
+        ].filter(item => item.value > 0);
+
+        setProduccionData({ ...res, maquinaStats: mStats });
       }
 
       // 3. Finanzas
@@ -181,11 +197,13 @@ const DashboardPage = ({ userRole }) => {
       // 4. Inventario
       if (activeTab === 'inventario') {
         // Inventory usually snapshot-based, but we could add params if backend supports history
-        const [metricasRes, alertasRes] = await Promise.all([
+        const [metricasRes, alertasRes, ventasRes] = await Promise.all([
           apiFetch('/alertas/metricas', { headers }),
-          apiFetch('/alertas/stock', { headers })
+          apiFetch('/alertas/stock', { headers }),
+          apiFetch(`/ventas/estadisticas?${queryString}`, { headers }) // Fetch sales data for "Productos en Tendencia"
         ]);
         setInventarioData({ metricas: metricasRes, alertas: alertasRes.alertas || [] });
+        setVentasData(ventasRes); // Set sales data to populate the chart
       }
 
       // 5. Logistica
@@ -211,14 +229,59 @@ const DashboardPage = ({ userRole }) => {
     const element = document.getElementById('dashboard-content');
     try {
       setLoading(true);
-      const canvas = await html2canvas(element, { scale: 2 });
+      // Generate canvas with high resolution and clean up UI elements
+      const canvas = await html2canvas(element, {
+        scale: 3, // Higher scale for better quality
+        useCORS: true,
+        logging: false,
+        onclone: (clonedDoc) => {
+          // Hide all buttons (Navigation tabs, Back, Export, Module links) to clean up the report
+          const buttons = clonedDoc.querySelectorAll('button');
+          buttons.forEach(btn => btn.style.display = 'none');
+
+          // Optional: Add specific print styling to the cloned dashboard-content
+          const content = clonedDoc.getElementById('dashboard-content');
+          if (content) {
+            content.style.padding = '0';
+            content.style.boxShadow = 'none';
+          }
+        }
+      });
+
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      const pdfHeight = pdf.internal.pageSize.getHeight();
 
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`reporte_dashboard_${activeTab}_${selectedYear}.pdf`);
+      // -- Header --
+      pdf.setFillColor(247, 248, 250); // Light gray header background
+      pdf.rect(0, 0, pdfWidth, 25, 'F');
+
+      pdf.setFontSize(20);
+      pdf.setTextColor(33, 33, 33);
+      pdf.setFont('helvetica', 'bold');
+      const title = `Reporte Ejecutivo: ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}`;
+      pdf.text(title, 10, 16);
+
+      pdf.setFontSize(10);
+      pdf.setTextColor(100);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`Generado el: ${new Date().toLocaleString()} | Año: ${selectedYear}`, 10, 22);
+
+      // -- Footer --
+      pdf.setFontSize(8);
+      pdf.setTextColor(150);
+      pdf.text("Este documento es un reporte generado automáticamente por el sistema.", pdfWidth / 2, pdfHeight - 10, { align: 'center' });
+
+      // -- Content Image --
+      const margin = 10;
+      const contentWidth = pdfWidth - (margin * 2);
+      const imgProps = pdf.getImageProperties(imgData);
+      const contentHeight = (imgProps.height * contentWidth) / imgProps.width;
+
+      pdf.addImage(imgData, 'PNG', margin, 30, contentWidth, contentHeight);
+
+      pdf.save(`Reporte_Dashboard_${activeTab}_${selectedYear}.pdf`);
     } catch (err) {
       console.error("Error exportando PDF:", err);
       setError("Error al exportar el PDF");
@@ -262,7 +325,8 @@ const DashboardPage = ({ userRole }) => {
   const cashflowChartData = (finanzasData.cashflow || []).map(item => ({
     label: formatCashflowLabel(item),
     ingresos: item.ingresos,
-    egresos: item.egresos
+    egresos: item.egresos,
+    neto: item.ingresos - item.egresos // Calculated field for net flow chart
   }));
 
   const comprasChartData = (comprasData.comprasMensuales || []).map(item => ({
@@ -299,14 +363,15 @@ const DashboardPage = ({ userRole }) => {
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex flex-wrap gap-2 mb-6">
-          {['ventas', 'produccion', 'finanzas', 'inventario', 'logistica', 'compras'].map(tab => (
+        {/* Navigation Tabs */}
+        <div className="flex flex-wrap justify-center gap-4 mb-8 bg-white p-2 rounded-2xl shadow-sm border border-gray-100 max-w-fit mx-auto">
+          {['ventas', 'finanzas', 'produccion', 'inventario', 'compras', 'logistica'].map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === tab
-                ? 'bg-indigo-600 text-white shadow-md'
-                : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+              className={`px-6 py-2 rounded-xl font-semibold transition-all duration-300 transform ${activeTab === tab
+                ? 'bg-indigo-600 text-white shadow-lg scale-105'
+                : 'bg-transparent text-gray-500 hover:bg-gray-50 hover:text-indigo-600'
                 }`}
             >
               {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -486,64 +551,144 @@ const DashboardPage = ({ userRole }) => {
                     </div>
                   </div>
                 </div>
+
+                {/* Maquinaria Chart */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                  <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 min-w-0">
+                    <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
+                      <span className="p-2 bg-gray-100 rounded-lg text-gray-600 font-bold">🔧</span>
+                      Estado de Maquinaria
+                    </h3>
+                    <div className="h-80 w-full">
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={300} debounce={300}>
+                        <PieChart>
+                          <Pie
+                            data={produccionData.maquinaStats}
+                            cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value"
+                          >
+                            {produccionData.maquinaStats.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.name === 'Operativa' ? '#10B981' : entry.name === 'En mantenimiento' ? '#F59E0B' : '#EF4444'} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
+
               </div>
             )}
 
             {/* --- FINANZAS --- */}
             {activeTab === 'finanzas' && (
               <div className="space-y-6 animate-fade-in">
-                <div className="mb-8">
-                  <h3 className="text-xl font-semibold text-gray-700 mb-4">Balance General (Histórico)</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="bg-green-50 p-6 rounded-xl border border-green-100 shadow-sm">
-                      <p className="text-sm font-medium text-green-600 mb-1">Total Ingresos</p>
-                      <h3 className="text-3xl font-bold text-green-700">Bs. {finanzasData.resumenTotal.ingresos?.toLocaleString() || 0}</h3>
-                    </div>
-                    <div className="bg-red-50 p-6 rounded-xl border border-red-100 shadow-sm">
-                      <p className="text-sm font-medium text-red-600 mb-1">Total Egresos</p>
-                      <h3 className="text-3xl font-bold text-red-700">Bs. {finanzasData.resumenTotal.egresos?.toLocaleString() || 0}</h3>
-                    </div>
-                    <div className={`p-6 rounded-xl border shadow-sm ${(finanzasData.resumenTotal.balance || 0) >= 0
-                      ? 'bg-blue-50 border-blue-100'
-                      : 'bg-orange-50 border-orange-100'
-                      }`}>
-                      <p className={`text-sm font-medium mb-1 ${(finanzasData.resumenTotal.balance || 0) >= 0 ? 'text-blue-600' : 'text-orange-600'
-                        }`}>Balance Total</p>
-                      <h3 className={`text-3xl font-bold ${(finanzasData.resumenTotal.balance || 0) >= 0 ? 'text-blue-700' : 'text-orange-700'
-                        }`}>Bs. {finanzasData.resumenTotal.balance?.toLocaleString() || 0}</h3>
+                {/* Top Row: KPI Cards (Barras Arriba) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <KPICard title="Total Ingresos" value={`Bs. ${finanzasData.resumenTotal.ingresos?.toLocaleString() || 0}`} icon="📈" color="green" />
+                  <KPICard title="Total Egresos" value={`Bs. ${finanzasData.resumenTotal.egresos?.toLocaleString() || 0}`} icon="📉" color="red" />
+                  <KPICard title="Utilidad Neta" value={`Bs. ${(finanzasData.resumenTotal.ingresos - finanzasData.resumenTotal.egresos).toLocaleString() || 0}`} icon="💰" color="blue" />
+                  <div className={`p-6 rounded-xl border shadow-sm transition-transform hover:scale-105 ${(finanzasData.resumenTotal.balance || 0) >= 0 ? 'bg-indigo-50 border-indigo-100' : 'bg-orange-50 border-orange-100'}`}>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="text-sm font-medium mb-1 opacity-80">Balance General</p>
+                        <h3 className={`text-2xl font-bold ${(finanzasData.resumenTotal.balance || 0) >= 0 ? 'text-indigo-700' : 'text-orange-700'}`}>
+                          Bs. {finanzasData.resumenTotal.balance?.toLocaleString() || 0}
+                        </h3>
+                      </div>
+                      <span className="text-3xl p-2 bg-white bg-opacity-30 rounded-lg">⚖️</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="flex justify-between items-center">
-                  <h2 className="text-2xl font-bold text-gray-800">Estadísticas del Año {selectedYear}</h2>
-                  <ModuleLink to="/finanzas" label="Detalle Finanzas" icon="💹" color="green" />
-                </div>
+                {/* Middle Row: Charts */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Left: Financial Evolution (2/3 width) */}
+                  <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+                    <div className="flex justify-between items-center mb-6">
+                      <h3 className="text-lg font-semibold flex items-center gap-2">
+                        <span className="p-2 bg-green-100 rounded-lg text-green-600 font-bold">📊</span>
+                        Evolución Financiera ({selectedYear})
+                      </h3>
+                      <div className="flex gap-2 text-sm">
+                        <span className="flex items-center gap-1"><div className="w-3 h-3 bg-green-500 rounded-full"></div> Ingresos</span>
+                        <span className="flex items-center gap-1"><div className="w-3 h-3 bg-red-500 rounded-full"></div> Egresos</span>
+                      </div>
+                    </div>
+                    <div className="h-96 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={cashflowChartData} barGap={0} barCategoryGap="20%">
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                          <XAxis dataKey="label" stroke="#9CA3AF" tick={{ fontSize: 12 }} />
+                          <YAxis stroke="#9CA3AF" tick={{ fontSize: 12 }} />
+                          <Tooltip cursor={{ fill: '#F3F4F6' }} content={<CustomTooltip prefix="Bs. " />} />
+                          <Legend iconType="circle" />
+                          <Bar dataKey="ingresos" name="Ingresos" fill="url(#colorIngresosBar)" radius={[4, 4, 0, 0]} animationDuration={1000}>
+                            <defs>
+                              <linearGradient id="colorIngresosBar" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#34D399" stopOpacity={1} />
+                                <stop offset="100%" stopColor="#10B981" stopOpacity={1} />
+                              </linearGradient>
+                            </defs>
+                          </Bar>
+                          <Bar dataKey="egresos" name="Egresos" fill="url(#colorEgresosBar)" radius={[4, 4, 0, 0]} animationDuration={1000}>
+                            <defs>
+                              <linearGradient id="colorEgresosBar" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#F87171" stopOpacity={1} />
+                                <stop offset="100%" stopColor="#EF4444" stopOpacity={1} />
+                              </linearGradient>
+                            </defs>
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <KPICard title={`Ingresos ${selectedYear}`} value={`Bs. ${finanzasData.metrics.totalIngresos?.toLocaleString() || 0}`} icon="📈" color="green" />
-                  <KPICard title={`Egresos ${selectedYear}`} value={`Bs. ${finanzasData.metrics.totalEgresos?.toLocaleString() || 0}`} icon="📉" color="red" />
-                  <KPICard title={`Utilidad ${selectedYear}`} value={`Bs. ${finanzasData.metrics.utilidadNeta?.toLocaleString() || 0}`} icon="💰" color="blue" />
-                </div>
-
-                <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 min-w-0">
-                  <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
-                    <span className="p-2 bg-green-100 rounded-lg text-green-600 font-bold">💸</span>
-                    Flujo de Caja
-                  </h3>
-                  <div className="h-80 w-full">
-                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={300} debounce={300}>
-                      <AreaChart data={cashflowChartData}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                        <XAxis dataKey="label" stroke="#9CA3AF" />
-                        <YAxis stroke="#9CA3AF" />
-                        <Tooltip content={<CustomTooltip prefix="Bs. " />} />
-                        <Area type="monotone" dataKey="ingresos" stackId="1" stroke="#10B981" fill="#10B981" fillOpacity={0.6} />
-                        <Area type="monotone" dataKey="egresos" stackId="2" stroke="#EF4444" fill="#EF4444" fillOpacity={0.6} />
-                      </AreaChart>
-                    </ResponsiveContainer>
+                  {/* Right: Cash Flow (1/3 width) - "A lado derecho se vea flujo de caja" */}
+                  <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 flex flex-col">
+                    <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
+                      <span className="p-2 bg-blue-100 rounded-lg text-blue-600 font-bold">💸</span>
+                      Flujo de Caja Neto
+                    </h3>
+                    <div className="flex-grow">
+                      <ResponsiveContainer width="100%" height="100%" minHeight={300}>
+                        <BarChart data={cashflowChartData}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                          <XAxis dataKey="label" stroke="#9CA3AF" tick={{ fontSize: 10 }} interval={0} />
+                          <YAxis stroke="#9CA3AF" tick={{ fontSize: 10 }} />
+                          <Tooltip cursor={{ fill: 'transparent' }} content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              return (
+                                <div className="bg-white p-3 border border-gray-100 shadow-xl rounded-lg">
+                                  <p className="font-bold text-gray-700 mb-1">{payload[0].payload.label}</p>
+                                  <p className={`text-sm font-semibold ${payload[0].value >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    Neto: Bs. {payload[0].value.toLocaleString()}
+                                  </p>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                          />
+                          <ReferenceLine y={0} stroke="#9CA3AF" />
+                          <Bar dataKey="neto" name="Flujo Neto" radius={[4, 4, 0, 0]} animationDuration={1200}>
+                            {cashflowChartData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.neto >= 0 ? '#10B981' : '#EF4444'} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-100">
+                      <p className="text-sm text-gray-500 mb-1 text-center">Balance del Período</p>
+                      <p className={`text-2xl font-bold text-center ${(finanzasData.resumenTotal.balance || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        Bs. {finanzasData.resumenTotal.balance?.toLocaleString() || 0}
+                      </p>
+                    </div>
                   </div>
                 </div>
+
               </div>
             )}
 
@@ -590,19 +735,37 @@ const DashboardPage = ({ userRole }) => {
                     </div>
                   </div>
                   {/* Gráfico de Top Stock */}
+                  {/* Gráfico de Productos en Tendencia */}
                   <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 min-w-0">
                     <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
-                      <span className="p-2 bg-green-100 rounded-lg text-green-600 font-bold">🔼</span>
-                      Top Stock
+                      <span className="p-2 bg-purple-100 rounded-lg text-purple-600 font-bold">🔥</span>
+                      Productos en Tendencia
                     </h3>
                     <div className="h-80 w-full">
                       <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={300} debounce={300}>
-                        <BarChart data={inventarioData.topProductosStock || []} layout="vertical">
+                        <BarChart data={ventasData.productosMasVendidos || []} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                           <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5E7EB" />
                           <XAxis type="number" stroke="#9CA3AF" />
-                          <YAxis dataKey="nombre" type="category" width={100} stroke="#4B5563" tick={{ fontSize: 12 }} />
-                          <Tooltip />
-                          <Bar dataKey="cantidad" fill="#10B981" radius={[0, 4, 4, 0]} barSize={20} />
+                          <YAxis dataKey="_id" type="category" width={120} stroke="#4B5563" tick={{ fontSize: 11 }} />
+                          <Tooltip content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              return (
+                                <div className="bg-white p-2 border border-blue-100 shadow-lg rounded-lg">
+                                  <p className="font-bold text-gray-700">{payload[0].payload._id}</p>
+                                  <p className="text-sm text-blue-600">Vendidos: {payload[0].value}</p>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                          />
+                          <Bar dataKey="cantidadVendida" name="Cantidad" fill="#8B5CF6" radius={[0, 4, 4, 0]} barSize={20}>
+                            {
+                              (ventasData.productosMasVendidos || []).map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={index < 3 ? '#8B5CF6' : '#A78BFA'} />
+                              ))
+                            }
+                          </Bar>
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -813,7 +976,7 @@ const DashboardPage = ({ userRole }) => {
           </>
         )}
       </div>
-    </div>
+    </div >
   );
 };
 export default DashboardPage;

@@ -22,6 +22,11 @@ const apiFetch = async (endpoint, options = {}) => {
   const response = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
 
   if (!response.ok) {
+    if (response.status === 401) {
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+      throw new Error('Sesión expirada. Redirigiendo al login...');
+    }
     const errorData = await response.json();
     throw new Error(errorData.message || errorData.error || 'Error en la petición a la API');
   }
@@ -108,7 +113,9 @@ const VentasPage = ({ userRole }) => {
     metodoEntrega: 'Recojo en Tienda', // ✅ Default delivery method
     numFactura: generarNumFactura(),
     observaciones: '',
-    descuento: 0 // Global discount
+    observaciones: '',
+    descuento: 0, // Global discount
+    tipoComprobante: 'Recibo' // Default informal
   });
 
   // Estados temporales para agregar productos al carrito
@@ -537,6 +544,7 @@ const VentasPage = ({ userRole }) => {
         metodosPago: nuevaVenta.metodosPago.length > 0 ? nuevaVenta.metodosPago : [{ tipo: 'Efectivo', monto: totalVenta }], // Fallback a efectivo si no hay pagos
         metodoEntrega: nuevaVenta.metodoEntrega,
         numFactura: nuevaVenta.numFactura,
+        tipoComprobante: nuevaVenta.tipoComprobante, // Send to backend
         observaciones: nuevaVenta.observaciones,
         descuento: nuevaVenta.descuento,
         estado: (nuevaVenta.metodosPago.reduce((acc, p) => acc + p.monto, 0) >= totalVenta) ? 'Pagada' : 'Pendiente',
@@ -1165,8 +1173,11 @@ const VentasPage = ({ userRole }) => {
                           fecha: new Date().toISOString().split('T')[0],
                           metodosPago: [],
                           metodoEntrega: 'Recojo en Tienda',
+                          metodosPago: [],
+                          metodoEntrega: 'Recojo en Tienda',
                           numFactura: generarNumFactura(),
-                          observaciones: ''
+                          observaciones: '',
+                          tipoComprobante: 'Recibo'
                         });
                         setProductoSearchTerm('');
                         setProductoTemporal({
@@ -1317,7 +1328,8 @@ const VentasPage = ({ userRole }) => {
                             {selectedVenta.estado}
                           </span>
                           <div className="mt-2 text-sm text-gray-600">
-                            <p>Factura/Recibo: <span className="font-mono font-medium">{selectedVenta.numFactura}</span></p>
+                            <p>Tipo: <span className="font-bold">{selectedVenta.tipoComprobante || 'Recibo'}</span></p>
+                            <p>Nº: <span className="font-mono font-medium">{selectedVenta.numFactura}</span></p>
                             <p>Entrega: {selectedVenta.metodoEntrega}</p>
                           </div>
                         </div>

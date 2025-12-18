@@ -80,13 +80,44 @@ const FinanzasPage = ({ userRole }) => {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [accountTransactions, setAccountTransactions] = useState([]);
 
+  // Estados para Maquinaria
+  const [maquinarias, setMaquinarias] = useState([]);
+  const [showMaquinaForm, setShowMaquinaForm] = useState(false);
+  const [maquinaFormData, setMaquinaFormData] = useState({
+    nombre: '',
+    tipo: '',
+    estado: 'Operativa',
+    costo: ''
+  });
+  const [expandedMaquina, setExpandedMaquina] = useState(null);
+  const [showMantenimientoForm, setShowMantenimientoForm] = useState(false);
+  const [mantenimientoFormData, setMantenimientoFormData] = useState({
+    fecha: new Date().toISOString().split('T')[0],
+    costo: '',
+    descripcion: ''
+  });
+
+  // Filtros Transacciones
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
+  const [filterMinAmount, setFilterMinAmount] = useState('');
+  const [filterMaxAmount, setFilterMaxAmount] = useState('');
+  const [fiscalMetrics, setFiscalMetrics] = useState(null); // New state for fiscal summary
+
   // Cargar transacciones al montar el componente
   useEffect(() => {
     loadTransactions();
     loadDeudas();
     loadBankAccounts();
     loadBankAccounts();
+    loadMaquinas();
   }, [userRole]);
+
+  useEffect(() => {
+    if (activeTab === 'transacciones') {
+      loadFiscalMetrics();
+    }
+  }, [activeTab, filterStartDate, filterEndDate]);
 
   const loadTransactions = async () => {
     try {
@@ -386,6 +417,98 @@ const FinanzasPage = ({ userRole }) => {
     }
   };
 
+
+
+  // --- Funciones Maquinaria ---
+  const loadMaquinas = async () => {
+    try {
+      const data = await apiFetch('/api/maquinas');
+      setMaquinarias(data);
+    } catch (err) {
+      console.error('Error al cargar maquinarias:', err);
+    }
+  };
+
+  const handleCreateMaquina = async (e) => {
+    e.preventDefault();
+    try {
+      await apiFetch('/api/maquinas', {
+        method: 'POST',
+        data: {
+          ...maquinaFormData,
+          costo: parseFloat(maquinaFormData.costo)
+        }
+      });
+      setShowMaquinaForm(false);
+      setMaquinaFormData({ nombre: '', tipo: '', estado: 'Operativa', costo: '' });
+      loadMaquinas();
+      alert('Maquinaria registrada exitosamente');
+    } catch (err) {
+      console.error('Error al registrar maquinaria:', err);
+      alert('Error al registrar maquinaria');
+    }
+  };
+
+  const handleDeleteMaquina = async (id) => {
+    if (!confirm('¿Estás seguro de eliminar esta maquinaria?')) return;
+    try {
+      await apiFetch(`/api/maquinas/${id}`, { method: 'DELETE' });
+      loadMaquinas();
+    } catch (err) {
+      console.error('Error al eliminar maquinaria:', err);
+      alert('Error al eliminar');
+    }
+  };
+
+  const loadFiscalMetrics = async () => {
+    try {
+      const queryParams = new URLSearchParams();
+      // If filters are set, use them. If not, maybe default to current month or year?
+      // For decision making, "All Time" might be heavy. Let's default to Year if no dates.
+      if (filterStartDate) queryParams.append('startDate', filterStartDate);
+      if (filterEndDate) queryParams.append('endDate', filterEndDate);
+      // If no start/end provided, backend defaults to Year.
+
+      const data = await apiFetch(`/estadisticas?${queryParams.toString()}`);
+      if (data && data.metrics && data.metrics.resumenFiscal) {
+        setFiscalMetrics(data.metrics.resumenFiscal);
+      }
+    } catch (err) {
+      console.error('Error al cargar métricas fiscales:', err);
+    }
+  };
+
+  const handleRegistrarMantenimiento = async (e) => {
+    e.preventDefault();
+    try {
+      await apiFetch(`/api/maquinas/${expandedMaquina}/mantenimiento`, {
+        method: 'POST',
+        data: {
+          ...mantenimientoFormData,
+          costo: parseFloat(mantenimientoFormData.costo)
+        }
+      });
+      setShowMantenimientoForm(false);
+      setMantenimientoFormData({ fecha: new Date().toISOString().split('T')[0], costo: '', descripcion: '' });
+      loadMaquinas(); // reload to update status/history
+      alert('Mantenimiento registrado');
+    } catch (err) {
+      console.error(err);
+      alert('Error al registrar mantenimiento');
+    }
+  };
+
+  const getCategoryIcon = (desc) => {
+    const d = desc.toLowerCase();
+    if (d.includes('compra') || d.includes('material')) return '🛒';
+    if (d.includes('servicio') || d.includes('luz') || d.includes('agua')) return '💡';
+    if (d.includes('mantenimiento') || d.includes('reparacion')) return '🛠️';
+    if (d.includes('venta') || d.includes('ingreso')) return '💰';
+    if (d.includes('transporte') || d.includes('flete')) return '🚚';
+    if (d.includes('pago') || d.includes('sueldo')) return '💸';
+    return '📄';
+  };
+
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('es-BO', {
       style: 'currency',
@@ -459,6 +582,12 @@ const FinanzasPage = ({ userRole }) => {
           >
             Cuentas Bancarias
           </button>
+          <button
+            onClick={() => setActiveTab('maquinaria')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'maquinaria' ? 'bg-purple-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+          >
+            Maquinaria
+          </button>
         </div>
 
         {/* Contenido Principal */}
@@ -483,6 +612,57 @@ const FinanzasPage = ({ userRole }) => {
                 className={`px-3 py-1 rounded-full text-sm ${activeSubTab === 'egreso' ? 'bg-red-600 text-white' : 'bg-gray-200 text-gray-700'}`}
               >
                 Egresos (Compras)
+              </button>
+            </div>
+
+
+
+            {/* --- Resumen Fiscal para Toma de Decisiones --- */}
+            {fiscalMetrics && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div className="bg-white p-4 rounded-xl shadow-sm border-l-4 border-blue-500">
+                  <p className="text-sm text-gray-500 mb-1">Ventas Facturadas (Oficial)</p>
+                  <h3 className="text-2xl font-bold text-gray-800">{formatCurrency(fiscalMetrics.facturado || 0)}</h3>
+                  <p className="text-xs text-blue-500 mt-1">Con Factura</p>
+                </div>
+                <div className="bg-white p-4 rounded-xl shadow-sm border-l-4 border-orange-500">
+                  <p className="text-sm text-gray-500 mb-1">Ventas con Recibo (Interno)</p>
+                  <h3 className="text-2xl font-bold text-gray-800">{formatCurrency(fiscalMetrics.recibo || 0)}</h3>
+                  <p className="text-xs text-orange-500 mt-1">Sin Factura</p>
+                </div>
+                <div className="bg-white p-4 rounded-xl shadow-sm border-l-4 border-purple-500">
+                  <p className="text-sm text-gray-500 mb-1">Total Ventas (Periodo)</p>
+                  <h3 className="text-2xl font-bold text-gray-800">{formatCurrency((fiscalMetrics.facturado || 0) + (fiscalMetrics.recibo || 0))}</h3>
+                  <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+                    <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${((fiscalMetrics.facturado || 0) / ((fiscalMetrics.facturado || 0) + (fiscalMetrics.recibo || 0) || 1)) * 100}%` }}></div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {((fiscalMetrics.facturado || 0) / ((fiscalMetrics.facturado || 0) + (fiscalMetrics.recibo || 0) || 1) * 100).toFixed(1)}% Facturado
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Filtros Avanzados */}
+            <div className="bg-white p-4 rounded-lg shadow-sm mb-4 flex flex-wrap gap-4 items-end animate-fade-in">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Desde</label>
+                <input type="date" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} className="p-2 border rounded-md text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Hasta</label>
+                <input type="date" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} className="p-2 border rounded-md text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Monto Min</label>
+                <input type="number" value={filterMinAmount} onChange={e => setFilterMinAmount(e.target.value)} className="p-2 border rounded-md text-sm w-24" placeholder="0" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Monto Max</label>
+                <input type="number" value={filterMaxAmount} onChange={e => setFilterMaxAmount(e.target.value)} className="p-2 border rounded-md text-sm w-24" placeholder="Max" />
+              </div>
+              <button onClick={() => { setFilterStartDate(''); setFilterEndDate(''); setFilterMinAmount(''); setFilterMaxAmount(''); }} className="text-sm text-gray-500 hover:text-orange-500 underline">
+                Limpiar
               </button>
             </div>
             {/* Formulario */}
@@ -605,7 +785,18 @@ const FinanzasPage = ({ userRole }) => {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {transactions
-                        .filter(t => activeSubTab === 'todos' ? true : t.type === activeSubTab)
+                        .filter(t => {
+                          if (activeSubTab !== 'todos' && t.type !== activeSubTab) return false;
+
+                          const tDate = new Date(t.date);
+                          if (filterStartDate && tDate < new Date(filterStartDate)) return false;
+                          if (filterEndDate && tDate > new Date(filterEndDate)) return false;
+
+                          if (filterMinAmount && t.amount < parseFloat(filterMinAmount)) return false;
+                          if (filterMaxAmount && t.amount > parseFloat(filterMaxAmount)) return false;
+
+                          return true;
+                        })
                         .map((transaction) => (
                           <tr key={transaction._id} className="hover:bg-gray-50">
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -620,6 +811,7 @@ const FinanzasPage = ({ userRole }) => {
                               </span>
                             </td>
                             <td className="px-6 py-4 text-sm text-gray-900">
+                              <span className="mr-2">{getCategoryIcon(transaction.description)}</span>
                               {transaction.description}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -807,7 +999,8 @@ const FinanzasPage = ({ userRole }) => {
                           type="text"
                           value={accountFormData.nombreBanco}
                           onChange={(e) => setAccountFormData({ ...accountFormData, nombreBanco: e.target.value })}
-                          className="w-full p-2 border border-gray-300 rounded-lg"
+                          className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                          placeholder="Ej: Banco Mercantil"
                           required
                         />
                       </div>
@@ -817,7 +1010,8 @@ const FinanzasPage = ({ userRole }) => {
                           type="text"
                           value={accountFormData.numeroCuenta}
                           onChange={(e) => setAccountFormData({ ...accountFormData, numeroCuenta: e.target.value })}
-                          className="w-full p-2 border border-gray-300 rounded-lg"
+                          className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                          placeholder="Ej: 12345678"
                           required
                         />
                       </div>
@@ -828,107 +1022,27 @@ const FinanzasPage = ({ userRole }) => {
                           step="0.01"
                           value={accountFormData.saldoInicial}
                           onChange={(e) => setAccountFormData({ ...accountFormData, saldoInicial: e.target.value })}
-                          className="w-full p-2 border border-gray-300 rounded-lg"
-                          disabled={!!editingAccountId} // Disable saldo change during edit to avoid consistency issues
+                          className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                          placeholder="0.00"
+                          required={!editingAccountId}
+                          disabled={!!editingAccountId}
                         />
                       </div>
-                      <div className="flex space-x-3 mt-6">
-                        <button type="submit" className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">{editingAccountId ? 'Guardar Cambios' : 'Crear Cuenta'}</button>
-                        <button type="button" onClick={() => { setShowAccountForm(false); setEditingAccountId(null); setAccountFormData({ nombreBanco: '', numeroCuenta: '', saldoInicial: '' }); }} className="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600">Cancelar</button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
-
-              {/* Modal Depósito */}
-              {showDepositForm && selectedAccount && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                  <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
-                    <h3 className="text-xl font-bold text-gray-800 mb-4">Realizar Depósito</h3>
-                    <p className="text-sm text-gray-600 mb-4">Cuenta: <strong>{selectedAccount.nombreBanco} - {selectedAccount.numeroCuenta}</strong></p>
-                    <form onSubmit={handleDepositSubmit} className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Monto a Depositar</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={depositFormData.monto}
-                          onChange={(e) => setDepositFormData({ ...depositFormData, monto: e.target.value })}
-                          className="w-full p-2 border border-gray-300 rounded-lg"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
-                        <input
-                          type="text"
-                          value={depositFormData.descripcion}
-                          onChange={(e) => setDepositFormData({ ...depositFormData, descripcion: e.target.value })}
-                          className="w-full p-2 border border-gray-300 rounded-lg"
-                          placeholder="Ej: Depósito de ventas del día"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Comprobante (URL/Imagen)</label>
-                        {/* En un futuro, cambiar a input file y subir a servidor */}
-                        <input
-                          type="text"
-                          value={depositFormData.comprobanteUrl}
-                          onChange={(e) => setDepositFormData({ ...depositFormData, comprobanteUrl: e.target.value })}
-                          className="w-full p-2 border border-gray-300 rounded-lg"
-                          placeholder="URL del comprobante (opcional)"
-                        />
-                      </div>
-                      <div className="flex space-x-3 mt-6">
-                        <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Confirmar Depósito</button>
-                        <button type="button" onClick={() => setShowDepositForm(false)} className="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600">Cancelar</button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
-
-              {/* Modal Transferencia por Cierre */}
-              {showTransferModal && accountToClose && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                  <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
-                    <h3 className="text-xl font-bold text-gray-800 mb-4">Transferir Fondos y Cerrar</h3>
-                    <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                      <p className="text-sm text-yellow-800">
-                        La cuenta <strong>{accountToClose.nombreBanco}</strong> tiene un saldo de <strong>{formatCurrency(accountToClose.saldo)}</strong>.
-                        Para darla de baja, debes transferir estos fondos a otra cuenta activa.
-                      </p>
-                    </div>
-                    <form onSubmit={handleConfirmDeactivation} className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Cuenta Destino</label>
-                        <select
-                          value={targetAccountId}
-                          onChange={(e) => setTargetAccountId(e.target.value)}
-                          className="w-full p-2 border border-gray-300 rounded-lg"
-                          required
+                      <div className="flex space-x-3 mt-4">
+                        <button
+                          type="submit"
+                          className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition-colors"
                         >
-                          <option value="">-- Seleccionar Cuenta --</option>
-                          {bankAccounts
-                            .filter(acc => acc.isActive && acc._id !== accountToClose._id)
-                            .map(acc => (
-                              <option key={acc._id} value={acc._id}>
-                                {acc.nombreBanco} - {acc.numeroCuenta}
-                              </option>
-                            ))
-                          }
-                        </select>
-                      </div>
-                      <div className="flex space-x-3 mt-6">
-                        <button type="submit" className="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700">Transferir y Cerrar</button>
+                          Guardar
+                        </button>
                         <button
                           type="button"
                           onClick={() => {
-                            setShowTransferModal(false);
-                            setAccountToClose(null);
+                            setShowAccountForm(false);
+                            setEditingAccountId(null);
+                            setAccountFormData({ nombreBanco: '', numeroCuenta: '', saldoInicial: '' });
                           }}
-                          className="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600"
+                          className="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600 transition-colors"
                         >
                           Cancelar
                         </button>
@@ -937,67 +1051,348 @@ const FinanzasPage = ({ userRole }) => {
                   </div>
                 </div>
               )}
+            </div>
+          )}
 
-              {/* Modal Historial */}
-              {showHistoryModal && selectedAccount && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                  <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
-                    <div className="flex justify-between items-center mb-4">
-                      <h3 className="text-xl font-bold text-gray-800">Historial de Movimientos</h3>
-                      <button onClick={() => setShowHistoryModal(false)} className="text-gray-500 hover:text-gray-700">✕</button>
-                    </div>
-                    <div className="mb-4">
-                      <p className="text-sm text-gray-600">Cuenta: <strong>{selectedAccount.nombreBanco} - {selectedAccount.numeroCuenta}</strong></p>
-                      <p className="text-sm text-gray-600">Saldo Actual: <strong>{formatCurrency(selectedAccount.saldo)}</strong></p>
-                    </div>
+        {/* --- MAQUINARIA TAB --- */}
+        {activeTab === 'maquinaria' && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-bold text-gray-800">Activos y Maquinaria</h2>
+                <p className="text-gray-500 text-sm">Registro de valor de maquinaria y equipos</p>
+              </div>
+              <button
+                onClick={() => setShowMaquinaForm(true)}
+                className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors shadow-md"
+              >
+                + Nueva Maquinaria
+              </button>
+            </div>
 
-                    <div className="overflow-y-auto flex-1">
-                      {accountTransactions.length === 0 ? (
-                        <p className="text-center text-gray-500 py-8">No hay movimientos registrados.</p>
-                      ) : (
-                        <table className="w-full">
-                          <thead className="bg-gray-50 sticky top-0">
-                            <tr>
-                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
-                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
-                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descripción</th>
-                              <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Monto</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-200">
-                            {accountTransactions.map((tx) => (
-                              <tr key={tx._id}>
-                                <td className="px-4 py-2 text-sm text-gray-900">{new Date(tx.fecha).toLocaleDateString()}</td>
-                                <td className="px-4 py-2 text-sm">
-                                  <span className={`px-2 py-1 rounded-full text-xs ${tx.tipo === 'Depósito' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                    {tx.tipo}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-2 text-sm text-gray-500">{tx.descripcion}</td>
-                                <td className={`px-4 py-2 text-sm text-right font-medium ${tx.tipo === 'Depósito' ? 'text-green-600' : 'text-red-600'}`}>
-                                  {tx.tipo === 'Depósito' ? '+' : '-'}{formatCurrency(tx.monto)}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      )}
-                    </div>
+            {/* Resumen de Valor */}
+            <div className="bg-white p-6 rounded-xl shadow-lg border-l-4 border-purple-500">
+              <h3 className="text-gray-500 text-sm font-medium uppercase">Valor Total en Maquinaria</h3>
+              <p className="text-3xl font-bold text-gray-800">{formatCurrency(maquinarias.reduce((acc, m) => acc + (m.costo || 0), 0))}</p>
+            </div>
 
-                    <div className="mt-4 pt-4 border-t flex justify-end">
-                      <button
-                        onClick={() => setShowHistoryModal(false)}
-                        className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600"
-                      >
-                        Cerrar
-                      </button>
+            {/* Lista de Maquinarias */}
+            <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Costo (Valor)</th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {maquinarias.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" className="px-6 py-8 text-center text-gray-500 italic">No hay maquinarias registradas</td>
+                    </tr>
+                  ) : (
+                    maquinarias.map((maquina) => (
+                      <React.Fragment key={maquina._id}>
+                        <tr className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{maquina.nombre}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{maquina.tipo}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2 py-1 text-xs rounded-full ${maquina.estado === 'Operativa' ? 'bg-green-100 text-green-800' :
+                              maquina.estado === 'En mantenimiento' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
+                              }`}>
+                              {maquina.estado}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-gray-700">{formatCurrency(maquina.costo || 0)}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                            <button onClick={() => setExpandedMaquina(expandedMaquina === maquina._id ? null : maquina._id)} className="text-blue-600 hover:text-blue-900 mr-3">
+                              {expandedMaquina === maquina._id ? 'Ocultar' : 'Historial'}
+                            </button>
+                            <button onClick={() => { setExpandedMaquina(maquina._id); setShowMantenimientoForm(true); }} className="text-purple-600 hover:text-purple-900 mr-3">
+                              Mantenimiento
+                            </button>
+                            <button onClick={() => handleDeleteMaquina(maquina._id)} className="text-red-600 hover:text-red-900">
+                              Eliminar
+                            </button>
+                          </td>
+                        </tr>
+                        {expandedMaquina === maquina._id && (
+                          <tr className="bg-gray-50">
+                            <td colSpan="5" className="px-6 py-4">
+                              <div className="text-sm">
+                                <h4 className="font-semibold mb-2">Historial de Mantenimiento</h4>
+                                {maquina.historialMantenimiento && maquina.historialMantenimiento.length > 0 ? (
+                                  <ul className="space-y-2">
+                                    {maquina.historialMantenimiento.map((mant, idx) => (
+                                      <li key={idx} className="flex justify-between items-center border-b pb-1">
+                                        <span>{new Date(mant.fecha).toLocaleDateString()}: {mant.descripcion}</span>
+                                        <span className="font-bold text-red-600">-{formatCurrency(mant.costo)}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                ) : (
+                                  <p className="text-gray-500 italic">No hay registros de mantenimiento.</p>
+                                )}
+
+                                <div className="mt-2 text-xs text-gray-500">
+                                  Último mantenimiento: {maquina.ultimoMantenimiento ? new Date(maquina.ultimoMantenimiento).toLocaleDateString() : 'N/A'}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Formulario Modal Maquinaria */}
+            {showMaquinaForm && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md">
+                  <h2 className="text-xl font-bold mb-4 text-gray-800">Registrar Maquinaria</h2>
+                  <form onSubmit={handleCreateMaquina} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+                      <input type="text" required className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                        value={maquinaFormData.nombre} onChange={e => setMaquinaFormData({ ...maquinaFormData, nombre: e.target.value })} placeholder="Ej. Sierra de Mesa" />
                     </div>
-                  </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+                      <select required className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                        value={maquinaFormData.tipo} onChange={e => setMaquinaFormData({ ...maquinaFormData, tipo: e.target.value })}>
+                        <option value="">Seleccionar Tipo</option>
+                        <option value="Corte">Corte</option>
+                        <option value="Ensamblaje">Ensamblaje</option>
+                        <option value="Acabado">Acabado</option>
+                        <option value="Otro">Otro</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Costo / Valor (Bs.)</label>
+                      <input type="number" required min="0" step="0.01" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                        value={maquinaFormData.costo} onChange={e => setMaquinaFormData({ ...maquinaFormData, costo: e.target.value })} placeholder="0.00" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+                      <select className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                        value={maquinaFormData.estado} onChange={e => setMaquinaFormData({ ...maquinaFormData, estado: e.target.value })}>
+                        <option value="Operativa">Operativa</option>
+                        <option value="En mantenimiento">En mantenimiento</option>
+                        <option value="Fuera de servicio">Fuera de servicio</option>
+                      </select>
+                    </div>
+                    <div className="flex gap-4 pt-2">
+                      <button type="button" onClick={() => setShowMaquinaForm(false)} className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300">Cancelar</button>
+                      <button type="submit" className="flex-1 bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700">Guardar</button>
+                    </div>
+                  </form>
                 </div>
-              )}
+              </div>
+            )}
+
+            {/* Modal Registrar Mantenimiento */}
+            {showMantenimientoForm && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md">
+                  <h2 className="text-xl font-bold mb-4 text-gray-800">Registrar Mantenimiento</h2>
+                  <form onSubmit={handleRegistrarMantenimiento} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
+                      <input type="date" required className="w-full p-2 border rounded-lg"
+                        value={mantenimientoFormData.fecha} onChange={e => setMantenimientoFormData({ ...mantenimientoFormData, fecha: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                      <input type="text" required className="w-full p-2 border rounded-lg"
+                        value={mantenimientoFormData.descripcion} onChange={e => setMantenimientoFormData({ ...mantenimientoFormData, descripcion: e.target.value })} placeholder="Ej. Cambio de Aceite" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Costo (Bs.)</label>
+                      <input type="number" required min="0" step="0.01" className="w-full p-2 border rounded-lg"
+                        value={mantenimientoFormData.costo} onChange={e => setMantenimientoFormData({ ...mantenimientoFormData, costo: e.target.value })} placeholder="0.00" />
+                    </div>
+
+                    <div className="flex gap-4 pt-2">
+                      <button type="button" onClick={() => setShowMantenimientoForm(false)} className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300">Cancelar</button>
+                      <button type="submit" className="flex-1 bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700">Registrar</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+
+          </div>
+        )
+        }
+
+
+        {/* Modal Depósito */}
+        {
+          showDepositForm && selectedAccount && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
+                <h3 className="text-xl font-bold text-gray-800 mb-4">Realizar Depósito</h3>
+                <p className="text-sm text-gray-600 mb-4">Cuenta: <strong>{selectedAccount.nombreBanco} - {selectedAccount.numeroCuenta}</strong></p>
+                <form onSubmit={handleDepositSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Monto a Depositar</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={depositFormData.monto}
+                      onChange={(e) => setDepositFormData({ ...depositFormData, monto: e.target.value })}
+                      className="w-full p-2 border border-gray-300 rounded-lg"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                    <input
+                      type="text"
+                      value={depositFormData.descripcion}
+                      onChange={(e) => setDepositFormData({ ...depositFormData, descripcion: e.target.value })}
+                      className="w-full p-2 border border-gray-300 rounded-lg"
+                      placeholder="Ej: Depósito de ventas del día"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Comprobante (URL/Imagen)</label>
+                    {/* En un futuro, cambiar a input file y subir a servidor */}
+                    <input
+                      type="text"
+                      value={depositFormData.comprobanteUrl}
+                      onChange={(e) => setDepositFormData({ ...depositFormData, comprobanteUrl: e.target.value })}
+                      className="w-full p-2 border border-gray-300 rounded-lg"
+                      placeholder="URL del comprobante (opcional)"
+                    />
+                  </div>
+                  <div className="flex space-x-3 mt-6">
+                    <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Confirmar Depósito</button>
+                    <button type="button" onClick={() => setShowDepositForm(false)} className="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600">Cancelar</button>
+                  </div>
+                </form>
+              </div>
             </div>
           )
         }
+
+        {/* Modal Transferencia por Cierre */}
+        {
+          showTransferModal && accountToClose && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
+                <h3 className="text-xl font-bold text-gray-800 mb-4">Transferir Fondos y Cerrar</h3>
+                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-sm text-yellow-800">
+                    La cuenta <strong>{accountToClose.nombreBanco}</strong> tiene un saldo de <strong>{formatCurrency(accountToClose.saldo)}</strong>.
+                    Para darla de baja, debes transferir estos fondos a otra cuenta activa.
+                  </p>
+                </div>
+                <form onSubmit={handleConfirmDeactivation} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Cuenta Destino</label>
+                    <select
+                      value={targetAccountId}
+                      onChange={(e) => setTargetAccountId(e.target.value)}
+                      className="w-full p-2 border border-gray-300 rounded-lg"
+                      required
+                    >
+                      <option value="">-- Seleccionar Cuenta --</option>
+                      {bankAccounts
+                        .filter(acc => acc.isActive && acc._id !== accountToClose._id)
+                        .map(acc => (
+                          <option key={acc._id} value={acc._id}>
+                            {acc.nombreBanco} - {acc.numeroCuenta}
+                          </option>
+                        ))
+                      }
+                    </select>
+                  </div>
+                  <div className="flex space-x-3 mt-6">
+                    <button type="submit" className="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700">Transferir y Cerrar</button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowTransferModal(false);
+                        setAccountToClose(null);
+                      }}
+                      className="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )
+        }
+
+        {/* Modal Historial */}
+        {
+          showHistoryModal && selectedAccount && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-xl font-bold text-gray-800">Historial de Movimientos</h3>
+                  <button onClick={() => setShowHistoryModal(false)} className="text-gray-500 hover:text-gray-700">✕</button>
+                </div>
+                <div className="mb-4">
+                  <p className="text-sm text-gray-600">Cuenta: <strong>{selectedAccount.nombreBanco} - {selectedAccount.numeroCuenta}</strong></p>
+                  <p className="text-sm text-gray-600">Saldo Actual: <strong>{formatCurrency(selectedAccount.saldo)}</strong></p>
+                </div>
+
+                <div className="overflow-y-auto flex-1">
+                  {accountTransactions.length === 0 ? (
+                    <p className="text-center text-gray-500 py-8">No hay movimientos registrados.</p>
+                  ) : (
+                    <table className="w-full">
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descripción</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Monto</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {accountTransactions.map((tx) => (
+                          <tr key={tx._id}>
+                            <td className="px-4 py-2 text-sm text-gray-900">{new Date(tx.fecha).toLocaleDateString()}</td>
+                            <td className="px-4 py-2 text-sm">
+                              <span className={`px-2 py-1 rounded-full text-xs ${tx.tipo === 'Depósito' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                {tx.tipo}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2 text-sm text-gray-500">{tx.descripcion}</td>
+                            <td className={`px-4 py-2 text-sm text-right font-medium ${tx.tipo === 'Depósito' ? 'text-green-600' : 'text-red-600'}`}>
+                              {tx.tipo === 'Depósito' ? '+' : '-'}{formatCurrency(tx.monto)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+
+                <div className="mt-4 pt-4 border-t flex justify-end">
+                  <button
+                    onClick={() => setShowHistoryModal(false)}
+                    className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )
+        }
+
 
         {/* Modal de Pago de Deuda */}
         {
@@ -1111,9 +1506,10 @@ const FinanzasPage = ({ userRole }) => {
                 </form>
               </div>
             </div>
-          )}
-      </div>
-    </div>
+          )
+        }
+      </div >
+    </div >
   );
 };
 
