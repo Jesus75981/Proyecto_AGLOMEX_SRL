@@ -60,69 +60,79 @@ const HomePage = ({ userRole, onLogout }) => {
           </Link>
 
           {/* Purchases Card */}
-          <Link to="/compras" className="group transform transition-all duration-300 hover:scale-105">
-            <div className="flex flex-col items-center p-8 bg-white rounded-2xl shadow-xl border-t-4 border-orange-500">
-              <span className="text-4xl text-orange-500 mb-4 transition-transform duration-300 group-hover:rotate-6">
-                🛍️
-              </span>
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">Compras</h2>
-              <p className="text-sm text-gray-500 text-center">
-                Registra las compras a proveedores y gestiona el inventario.
-              </p>
-            </div>
-          </Link>
+          {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && (
+            <Link to="/compras" className="group transform transition-all duration-300 hover:scale-105">
+              <div className="flex flex-col items-center p-8 bg-white rounded-2xl shadow-xl border-t-4 border-orange-500">
+                <span className="text-4xl text-orange-500 mb-4 transition-transform duration-300 group-hover:rotate-6">
+                  🛍️
+                </span>
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">Compras</h2>
+                <p className="text-sm text-gray-500 text-center">
+                  Registra las compras a proveedores y gestiona el inventario.
+                </p>
+              </div>
+            </Link>
+          )}
 
           {/* Manufacturing Card */}
-          <Link to="/fabricacion" className="group transform transition-all duration-300 hover:scale-105">
-            <div className="flex flex-col items-center p-8 bg-white rounded-2xl shadow-xl border-t-4 border-orange-500">
-              <span className="text-4xl text-orange-500 mb-4 transition-transform duration-300 group-hover:rotate-6">
-                🛠️
-              </span>
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">Fabricación</h2>
-              <p className="text-sm text-gray-500 text-center">
-                Crea productos nuevos a partir de insumos.
-              </p>
-            </div>
-          </Link>
+          {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && (
+            <Link to="/fabricacion" className="group transform transition-all duration-300 hover:scale-105">
+              <div className="flex flex-col items-center p-8 bg-white rounded-2xl shadow-xl border-t-4 border-orange-500">
+                <span className="text-4xl text-orange-500 mb-4 transition-transform duration-300 group-hover:rotate-6">
+                  🛠️
+                </span>
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">Fabricación</h2>
+                <p className="text-sm text-gray-500 text-center">
+                  Crea productos nuevos a partir de insumos.
+                </p>
+              </div>
+            </Link>
+          )}
 
           {/* ✅ LOGÍSTICA CARD - AGREGADA */}
-          <Link to="/logistica" className="group transform transition-all duration-300 hover:scale-105">
-            <div className="flex flex-col items-center p-8 bg-white rounded-2xl shadow-xl border-t-4 border-orange-500">
-              <span className="text-4xl text-orange-500 mb-4 transition-transform duration-300 group-hover:rotate-6">
-                🚚
-              </span>
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">Logística</h2>
-              <p className="text-sm text-gray-500 text-center">
-                Gestiona pedidos, envíos y distribución de productos.
-              </p>
-            </div>
-          </Link>
+          {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && (
+            <Link to="/logistica" className="group transform transition-all duration-300 hover:scale-105">
+              <div className="flex flex-col items-center p-8 bg-white rounded-2xl shadow-xl border-t-4 border-orange-500">
+                <span className="text-4xl text-orange-500 mb-4 transition-transform duration-300 group-hover:rotate-6">
+                  🚚
+                </span>
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">Logística</h2>
+                <p className="text-sm text-gray-500 text-center">
+                  Gestiona pedidos, envíos y distribución de productos.
+                </p>
+              </div>
+            </Link>
+          )}
 
           {/* Advanced Reports Card */}
-          <Link to="/reportes" className="group transform transition-all duration-300 hover:scale-105">
-            <div className="flex flex-col items-center p-8 bg-white rounded-2xl shadow-xl border-t-4 border-orange-500">
-              <span className="text-4xl text-orange-500 mb-4 transition-transform duration-300 group-hover:rotate-6">
-                📖
-              </span>
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">Reportes</h2>
-              <p className="text-sm text-gray-500 text-center">
-                Reportes avanzados de ventas y compras (Diario, Mensual, Anual).
-              </p>
-            </div>
-          </Link>
+          {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && (
+            <Link to="/reportes" className="group transform transition-all duration-300 hover:scale-105">
+              <div className="flex flex-col items-center p-8 bg-white rounded-2xl shadow-xl border-t-4 border-orange-500">
+                <span className="text-4xl text-orange-500 mb-4 transition-transform duration-300 group-hover:rotate-6">
+                  📖
+                </span>
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">Reportes</h2>
+                <p className="text-sm text-gray-500 text-center">
+                  Reportes avanzados de ventas y compras (Diario, Mensual, Anual).
+                </p>
+              </div>
+            </Link>
+          )}
 
           {/* Dashboard Ejecutivo Card */}
-          <Link to="/dashboard" className="group transform transition-all duration-300 hover:scale-105">
-            <div className="flex flex-col items-center p-8 bg-white rounded-2xl shadow-xl border-t-4 border-orange-500">
-              <span className="text-4xl text-orange-500 mb-4 transition-transform duration-300 group-hover:rotate-6">
-                💹
-              </span>
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">Dashboard Ejecutivo</h2>
-              <p className="text-sm text-gray-500 text-center">
-                Visualiza gráficas de ventas y producción.
-              </p>
-            </div>
-          </Link>
+          {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && (
+            <Link to="/dashboard" className="group transform transition-all duration-300 hover:scale-105">
+              <div className="flex flex-col items-center p-8 bg-white rounded-2xl shadow-xl border-t-4 border-orange-500">
+                <span className="text-4xl text-orange-500 mb-4 transition-transform duration-300 group-hover:rotate-6">
+                  💹
+                </span>
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">Dashboard Ejecutivo</h2>
+                <p className="text-sm text-gray-500 text-center">
+                  Visualiza gráficas de ventas y producción.
+                </p>
+              </div>
+            </Link>
+          )}
 
           {/* Inventory Card */}
           <Link to="/inventario" className="group transform transition-all duration-300 hover:scale-105">

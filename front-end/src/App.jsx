@@ -97,15 +97,22 @@ function AppContent() {
           <>
             <Route path="/home" element={<HomePage userRole={userRole} onLogout={handleLogout} />} />
             <Route path="/ventas" element={<VentasPage userRole={userRole} />} />
-            <Route path="/compras" element={<ComprasPage userRole={userRole} />} />
             <Route path="/inventario" element={<InventarioPage userRole={userRole} />} />
-            <Route path="/fabricacion" element={<FabricacionPage userRole={userRole} />} />
-            <Route path="/finanzas" element={<FinanzasPage userRole={userRole} />} />
-            <Route path="/logistica" element={<LogisticaPage userRole={userRole} />} />
-            <Route path="/admin-catalogo" element={<AdminCatalogPage userRole={userRole} />} />
-            <Route path="/reportes-diarios" element={<ReportesDiarios userRole={userRole} />} />
-            <Route path="/reportes" element={<ReportesPage userRole={userRole} />} />
-            <Route path="/dashboard" element={<DashboardPage userRole={userRole} />} />
+            
+            {/* Rutas restringidas para Rol 'Tienda' */}
+            {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && (
+              <>
+                <Route path="/compras" element={<ComprasPage userRole={userRole} />} />
+                <Route path="/fabricacion" element={<FabricacionPage userRole={userRole} />} />
+                <Route path="/finanzas" element={<FinanzasPage userRole={userRole} />} />
+                <Route path="/logistica" element={<LogisticaPage userRole={userRole} />} />
+                <Route path="/admin-catalogo" element={<AdminCatalogPage userRole={userRole} />} />
+                <Route path="/reportes-diarios" element={<ReportesDiarios userRole={userRole} />} />
+                <Route path="/reportes" element={<ReportesPage userRole={userRole} />} />
+                <Route path="/dashboard" element={<DashboardPage userRole={userRole} />} />
+              </>
+            )}
+
             {/* AGREGADO: Fallback para rutas inválidas cuando logueado - redirige a home */}
             <Route path="*" element={<Navigate to="/home" replace />} />
           </>

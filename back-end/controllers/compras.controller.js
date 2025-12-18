@@ -132,16 +132,24 @@ export const registrarCompra = async (req, res) => {
             today.getDate().toString().padStart(2, '0');
         const prefix = `COMP-${dateStr}-`;
 
-        const ultimaCompraDelDia = await Compra.findOne({
-            numCompra: { $regex: `^${prefix}` }
-        }).sort({ numCompra: -1 });
+        // GENERACIÓN DE CÓDIGO DE COMPRA GLOBAL SECUENCIAL
+        // Buscar la última compra registrada EN GENERAL (no solo del día)
+        const ultimaCompra = await Compra.findOne().sort({ fecha: -1, _id: -1 });
 
         let nextNum = 1;
-        if (ultimaCompraDelDia && ultimaCompraDelDia.numCompra) {
-            const lastNumStr = ultimaCompraDelDia.numCompra.split('-')[2];
-            const lastNum = parseInt(lastNumStr, 10);
-            nextNum = lastNum + 1;
+        if (ultimaCompra && ultimaCompra.numCompra) {
+            // Intentar extraer el número del final (asumiendo formato COMP-YYYYMMDD-XXXX)
+            const parts = ultimaCompra.numCompra.split('-');
+            const lastNumStr = parts[parts.length - 1]; // Tomar la última parte
+
+            // Verificar si es un número válido
+            if (!isNaN(lastNumStr)) {
+                nextNum = parseInt(lastNumStr, 10) + 1;
+            }
         }
+
+        // Mantener el prefijo de fecha actual, pero usar el número secuencial global
+        // COMP-20251216-0006 (El 0006 es global, no se reinicia hoy)
         datosCompra.numCompra = `${prefix}${nextNum.toString().padStart(4, '0')}`;
 
         if (!datosCompra.tipoCompra || !["Materia Prima", "Producto Terminado"].includes(datosCompra.tipoCompra)) {
@@ -503,15 +511,24 @@ export const obtenerSiguienteNumeroCompra = async (req, res) => {
             today.getDate().toString().padStart(2, '0');
         const prefix = `COMP-${dateStr}-`;
 
-        const ultimaCompraDelDia = await Compra.findOne({
-            numCompra: { $regex: `^${prefix}` }
-        }).sort({ numCompra: -1 });
+        // Lógica de secuencia GLOBAL
+        // 1. Obtener la última compra creada en todo el sistema
+        const ultimaCompra = await Compra.findOne({}).sort({ fecha: -1, _id: -1 });
 
         let nextNum = 1;
-        if (ultimaCompraDelDia && ultimaCompraDelDia.numCompra) {
-            const lastNumStr = ultimaCompraDelDia.numCompra.split('-')[2];
-            nextNum = parseInt(lastNumStr, 10) + 1;
+        if (ultimaCompra && ultimaCompra.numCompra) {
+            // 2. Extraer el último número de secuencia
+            const parts = ultimaCompra.numCompra.split('-');
+            const lastNumStr = parts[parts.length - 1]; // Asume que el ID siempre termina en -NUMBER
+
+            if (!isNaN(lastNumStr)) {
+                nextNum = parseInt(lastNumStr, 10) + 1;
+            }
         }
+
+        // 3. Generar el nuevo ID usando el prefijo de hoy + el siguiente número global
+        // Esto asegura que el ID tenga la fecha de hoy, pero el correlativo siga subiendo.
+        // Ejemplo: Ayer COMP-20251215-0100 -> Hoy COMP-20251216-0101
         const siguienteNumero = `${prefix}${nextNum.toString().padStart(4, '0')}`;
 
         res.status(200).json({ siguienteNumero });

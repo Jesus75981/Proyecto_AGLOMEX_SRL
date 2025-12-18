@@ -151,13 +151,29 @@ const InventarioPage = ({ userRole }) => {
       }
 
       const token = getAuthToken();
+      const payload = {
+        nombre: nuevoProducto.producto, // Backend espera "nombre"
+        sku: nuevoProducto.sku,
+        codigo: nuevoProducto.codigo,
+        color: nuevoProducto.color,
+        descripcion: nuevoProducto.descripcion,
+        categoria: nuevoProducto.categoria,
+        proveedor: nuevoProducto.proveedor,
+        cantidad: nuevoProducto.cantidad,
+        cantidadMinima: nuevoProducto.cantidadMinima,
+        cantidadMaxima: nuevoProducto.cantidadMaxima,
+        ubicacion: nuevoProducto.ubicacion,
+        precioCompra: nuevoProducto.precioCosto, // Backend espera "precioCompra"
+        precioVenta: nuevoProducto.precioVenta
+      };
+
       const response = await fetch(`${API_URL}/productos`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': token ? `Bearer ${token}` : undefined,
         },
-        body: JSON.stringify(nuevoProducto)
+        body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
@@ -450,12 +466,14 @@ const InventarioPage = ({ userRole }) => {
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-2xl font-semibold text-gray-800">Gestión de Productos</h2>
                   <div className="flex space-x-3">
-                    <button
-                      onClick={() => setShowEditarProductoForm(!showEditarProductoForm)}
-                      className="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition duration-200"
-                    >
-                      {showEditarProductoForm ? 'Cancelar Editar' : 'Editar Producto'}
-                    </button>
+                    {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && (
+                      <button
+                        onClick={() => setShowEditarProductoForm(!showEditarProductoForm)}
+                        className="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition duration-200"
+                      >
+                        {showEditarProductoForm ? 'Cancelar Editar' : 'Editar Producto'}
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -868,13 +886,13 @@ const InventarioPage = ({ userRole }) => {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKU</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código Proveedor</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
+                        {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>}
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Color</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo</th>
+                        {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo</th>}
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio Venta</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                        {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>}
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -912,23 +930,25 @@ const InventarioPage = ({ userRole }) => {
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.idProductoTienda}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.codigo || '-'}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.categoria}</td>
+                            {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.categoria}</td>}
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.color || '-'}</td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-900">{item.cantidad}</div>
                               <div className="text-xs text-gray-500">Min: {item.cantidadMinima || 5}</div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Bs. {item.precioCompra || 0}</td>
+                            {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Bs. {item.precioCompra || 0}</td>}
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Bs. {item.precioVenta || 0}</td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${estadoColor}`}>
                                 {estado}
                               </span>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                              <button onClick={() => iniciarEdicion(item)} className="text-indigo-600 hover:text-indigo-900 mr-4">Editar</button>
-                              <button onClick={() => eliminarProducto(item._id)} className="text-red-600 hover:text-red-900">Eliminar</button>
-                            </td>
+                            {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && (
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <button onClick={() => iniciarEdicion(item)} className="text-indigo-600 hover:text-indigo-900 mr-4">Editar</button>
+                                <button onClick={() => eliminarProducto(item._id)} className="text-red-600 hover:text-red-900">Eliminar</button>
+                              </td>
+                            )}
                           </tr>
                         );
                       })}
