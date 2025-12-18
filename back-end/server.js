@@ -276,7 +276,15 @@ import whatsappRoutes from './routes/whatsapp.routes.js';
 import whatsappService from './services/whatsapp.service.js';
 
 // Init WhatsApp Service
-// whatsappService.initialize();
+// Start slightly delayed to prevent blocking main server startup
+setTimeout(() => {
+    console.log('⏳ Iniciando servicio de WhatsApp en segundo plano...');
+    try {
+        whatsappService.initialize();
+    } catch (error) {
+        console.error('❌ Error al iniciar WhatsApp service:', error);
+    }
+}, 10000); // 10 seconds delay
 
 // WhatsApp Routes
 app.use('/api/whatsapp', whatsappRoutes);

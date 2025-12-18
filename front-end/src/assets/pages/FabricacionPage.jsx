@@ -63,7 +63,9 @@ const FabricacionPage = ({ userRole }) => {
     precioCompra: 0,
     precioVenta: 0,
     unidad: '',
-    ubicacion: ''
+    unidad: '',
+    ubicacion: '',
+    imagen: null
   });
 
   // Estado para selección de material en el formulario de orden
@@ -365,17 +367,22 @@ const FabricacionPage = ({ userRole }) => {
   // Funciones para materiales (usa endpoint dedicado)
   const agregarMaterial = async () => {
     try {
+      const formData = new FormData();
+      formData.append('nombre', nuevoMaterial.nombre);
+      formData.append('categoria', nuevoMaterial.categoria);
+      formData.append('cantidad', nuevoMaterial.cantidad);
+      formData.append('precioCompra', nuevoMaterial.precioCompra);
+      if (nuevoMaterial.imagen) {
+        formData.append('imagen', nuevoMaterial.imagen);
+      }
+
       const response = await fetch('http://localhost:5000/api/materiaPrima', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
+          // No Content-Type for FormData, browser sets it with boundary
         },
-        body: JSON.stringify({
-          ...nuevoMaterial,
-          // Materia Prima controller generates ID automatically if not provided, or uses nombre
-          // We don't need 'tipo' or 'codigo' here as strict as ProductoTienda
-        })
+        body: formData
       });
 
       if (response.ok) {
@@ -390,10 +397,12 @@ const FabricacionPage = ({ userRole }) => {
           precioCompra: 0,
           precioVenta: 0,
           unidad: '',
-          ubicacion: ''
+          ubicacion: '',
+          imagen: null
         });
       } else {
-        alert('❌ Error al agregar material');
+        const errorData = await response.json();
+        alert(`❌ Error al agregar material: ${errorData.error || errorData.message}`);
       }
     } catch (error) {
       console.error('Error:', error);
@@ -864,11 +873,12 @@ const FabricacionPage = ({ userRole }) => {
                                                 <td className="px-4 py-2 text-sm text-gray-900 text-right">{item.cantidad}</td>
                                                 <td className="px-4 py-2 text-sm font-medium text-gray-900 text-right">{(precio * item.cantidad).toFixed(2)} Bs</td>
                                                 <td className="px-4 py-2 text-center">
-                                                    <button 
+                                                    <button
                                                         onClick={() => eliminarMaterialDeOrden(item.material)}
-                                                        className="text-red-600 hover:text-red-900 text-sm font-medium"
+                                                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                        title="Eliminar"
                                                     >
-                                                        Eliminar
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                                     </button>
                                                 </td>
                                             </tr>
@@ -919,7 +929,7 @@ const FabricacionPage = ({ userRole }) => {
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Progreso</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
@@ -952,41 +962,41 @@ const FabricacionPage = ({ userRole }) => {
                               </span>
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
-                              <div className="flex space-x-2">
+                              <div className="flex justify-center space-x-2">
                                 {orden.estado === 'Pendiente' && (
                                   <button
                                     onClick={() => iniciarProduccionAutomatica(orden._id)}
-                                    className="text-blue-600 hover:text-blue-900"
+                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                                     title="Iniciar Producción"
                                   >
-                                    ▶️
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                   </button>
                                 )}
                                 {orden.estado === 'En Progreso' && (
                                   <button
                                     onClick={() => abrirModalConfirmacion(orden)}
-                                    className="text-green-600 hover:text-green-900"
+                                    className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
                                     title="Confirmar Producción"
                                   >
-                                    ✅
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                   </button>
                                 )}
                                 {(orden.estado === 'Pendiente' || orden.estado === 'En Progreso') && (
                                     <button
                                         onClick={() => abrirModalEditar(orden)}
-                                        className="text-gray-600 hover:text-gray-900"
+                                        className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                                         title="Editar Orden"
                                     >
-                                        ✏️
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                                     </button>
                                 )}
                                 {(orden.estado === 'Completado') && (
                                     <button
                                         onClick={() => setViewingOrden(orden)}
-                                        className="text-blue-600 hover:text-blue-900 ml-2"
+                                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                                         title="Ver Detalles"
                                     >
-                                        👁️
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                                     </button>
                                 )}
                               </div>
@@ -1045,6 +1055,15 @@ const FabricacionPage = ({ userRole }) => {
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                       />
                     </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Imagen</label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => setNuevoMaterial({ ...nuevoMaterial, imagen: e.target.files[0] })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      />
+                    </div>
                   </div>
                   <div className="flex space-x-4 mt-6">
                     <button
@@ -1074,6 +1093,18 @@ const FabricacionPage = ({ userRole }) => {
                           {material.cantidad > 0 ? 'Disponible' : 'Agotado'}
                         </span>
                       </div>
+                      
+                      {/* Imagen del Material */}
+                      {material.imagen && (
+                        <div className="mb-4 w-full h-32 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
+                           <img 
+                              src={`http://localhost:5000${material.imagen}`} 
+                              alt={material.nombre} 
+                              className="w-full h-full object-contain"
+                           />
+                        </div>
+                      )}
+
                       <p className="text-sm text-gray-500 mb-4">{material.categoria}</p>
                       <div className="space-y-2">
                         <div className="flex justify-between text-sm">

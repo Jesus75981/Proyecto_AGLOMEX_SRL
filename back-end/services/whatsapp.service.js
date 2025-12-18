@@ -19,7 +19,17 @@ class WhatsAppService {
         this.client = new Client({
             authStrategy: new LocalAuth(),
             puppeteer: {
-                args: ['--no-sandbox', '--disable-setuid-sandbox']
+                headless: true,
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--disable-gpu'
+                ],
+                timeout: 60000
             }
         });
 
@@ -27,9 +37,10 @@ class WhatsAppService {
             this.qrCode = qr;
             this.status = 'QR_READY';
             console.log('📱 WhatsApp QR Code generated!');
-            // Optional: Print to terminal as backup
-            // qrcode.generate(qr, { small: true });
         });
+
+        // ... rest of events ...
+
 
         this.client.on('ready', () => {
             this.status = 'READY';
@@ -53,7 +64,11 @@ class WhatsAppService {
             this.client = null; // Reset client to allow re-init
         });
 
-        this.client.initialize();
+        console.log('🚀 Launching Puppeteer...');
+        this.client.initialize().catch(err => {
+            console.error('❌ FATAL ERROR initializing WhatsApp client:', err);
+            this.status = 'DISCONNECTED';
+        });
     }
 
     getQr() {

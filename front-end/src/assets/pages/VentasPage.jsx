@@ -1129,31 +1129,53 @@ const VentasPage = ({ userRole }) => {
                           <span className="font-bold text-blue-600">
                             Bs. {nuevaVenta.metodosPago.reduce((s, p) => s + p.monto, 0).toFixed(2)}
                           </span>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">Saldo/Cambio: </span>
-                          <span className={`font-bold ${(nuevaVenta.metodosPago.reduce((s, p) => s + p.monto, 0) - calcularTotal()) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            Bs. {(nuevaVenta.metodosPago.reduce((s, p) => s + p.monto, 0) - calcularTotal()).toFixed(2)}
-                          </span>
-                        </div>
                       </div>
-                    </div>
+                      <div>
+                          {(() => {
+                            const totalPagado = nuevaVenta.metodosPago.reduce((s, p) => s + p.monto, 0);
+                            const totalVenta = calcularTotal();
+                            const diferencia = totalPagado - totalVenta;
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Observaciones</label>
-                      <textarea
-                        value={nuevaVenta.observaciones}
-                        onChange={(e) => setNuevaVenta({ ...nuevaVenta, observaciones: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                        rows="2"
-                        placeholder="Observaciones adicionales (opcional)"
-                      />
-                    </div>
-                  </div>
+                            if (diferencia > 0) {
+                              return (
+                                <>
+                                  <span className="text-gray-600">Cambio: </span>
+                                  <span className="font-bold text-green-600">
+                                    Bs. {diferencia.toFixed(2)}
+                                  </span>
+                                </>
+                              );
+                            } else if (diferencia < 0) {
+                              return (
+                                <>
+                                  <span className="text-gray-600">Saldo Pendiente: </span>
+                                  <span className="font-bold text-red-600">
+                                    Bs. {Math.abs(diferencia).toFixed(2)}
+                                  </span>
+                                </>
+                              );
+                            } else {
+                              return null;
+                            }
+                          })()}
+                      </div >
+                    </div >
 
-                  {errors.productos && <p className="text-red-500 text-sm mb-4">{errors.productos}</p>}
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-2">Observaciones</label>
+    <textarea
+      value={nuevaVenta.observaciones}
+      onChange={(e) => setNuevaVenta({ ...nuevaVenta, observaciones: e.target.value })}
+      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+      rows="2"
+      placeholder="Observaciones adicionales (opcional)"
+    />
+  </div>
+                  </div >
 
-                  <div className="flex space-x-4">
+  { errors.productos && <p className="text-red-500 text-sm mb-4">{errors.productos}</p> }
+
+  < div className = "flex space-x-4" >
                     <button
                       onClick={agregarVenta}
                       disabled={nuevaVenta.productos.length === 0}
@@ -1192,478 +1214,481 @@ const VentasPage = ({ userRole }) => {
                     >
                       Cancelar
                     </button>
-                  </div>
-                </div>
+                  </div >
+                </div >
               )
             }
 
-            {/* Lista de Ventas */}
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h2 className="text-2xl font-semibold text-gray-800 mb-6">Historial de Ventas</h2>
+{/* Lista de Ventas */ }
+<div className="bg-white rounded-xl shadow-md p-6">
+  <h2 className="text-2xl font-semibold text-gray-800 mb-6">Historial de Ventas</h2>
 
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-gray-50">
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Productos</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Saldo Pendiente</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {ventasFiltradas.map((venta, index) => (
-                      <tr key={venta._id || index} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                          #{venta.numVenta || venta._id}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {venta.cliente?.nombre || 'Sin cliente'}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-500">
-                          {venta.productos?.map(p => `${p.producto?.nombre} (${p.cantidad})`).join(', ') || 'Sin producto'}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-green-600">
-                          Bs. {(venta.productos?.reduce((sum, p) => sum + (p.precioTotal || 0), 0) || 0).toFixed(2)}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-red-600">
-                          {venta.saldoPendiente > 0 ? `Bs. ${venta.saldoPendiente.toFixed(2)}` : '-'}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                          {venta.fecha ? new Date(venta.fecha).toLocaleDateString('es-ES') : '-'}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${venta.estado === 'Completada' || venta.estado === 'Pagada'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-yellow-100 text-yellow-800'
-                            }`}>
-                            {venta.estado}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
-                          <div className="flex space-x-2">
-                            {/* Botón Detalles */}
-                            <button
-                              onClick={() => verDetallesVenta(venta)}
-                              className="text-blue-600 hover:text-blue-900 text-xs"
-                            >
-                              Ver Detalles
-                            </button>
-                            {venta.estado === 'Pendiente' && (
-                              <button
-                                onClick={() => cambiarEstadoVenta(venta._id, 'Completada')}
-                                className="text-green-600 hover:text-green-900 text-xs"
-                              >
-                                Completar
-                              </button>
-                            )}
-                            {userRole === 'admin' && (
-                              <button
-                                onClick={() => eliminarVenta(venta._id)}
-                                className="text-red-600 hover:text-red-900 text-xs"
-                              >
-                                Eliminar
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-
-                {ventasFiltradas.length === 0 && (
-                  <div className="text-center py-8 text-gray-500">
-                    {searchTerm ? 'No se encontraron ventas que coincidan con la búsqueda' : 'No hay ventas registradas'}
-                  </div>
+  <div className="overflow-x-auto">
+    <table className="w-full">
+      <thead>
+        <tr className="bg-gray-50">
+          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
+          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Productos</th>
+          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Saldo Pendiente</th>
+          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+        </tr>
+      </thead>
+      <tbody className="bg-white divide-y divide-gray-200">
+        {ventasFiltradas.map((venta, index) => (
+          <tr key={venta._id || index} className="hover:bg-gray-50">
+            <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+              #{venta.numVenta || venta._id}
+            </td>
+            <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+              {venta.cliente?.nombre || 'Sin cliente'}
+            </td>
+            <td className="px-4 py-3 text-sm text-gray-500">
+              {venta.productos?.map(p => `${p.producto?.nombre} (${p.cantidad})`).join(', ') || 'Sin producto'}
+            </td>
+            <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-green-600">
+              Bs. {(venta.productos?.reduce((sum, p) => sum + (p.precioTotal || 0), 0) || 0).toFixed(2)}
+            </td>
+            <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-red-600">
+              {venta.saldoPendiente > 0 ? `Bs. ${venta.saldoPendiente.toFixed(2)}` : '-'}
+            </td>
+            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+              {venta.fecha ? new Date(venta.fecha).toLocaleDateString('es-ES') : '-'}
+            </td>
+            <td className="px-4 py-3 whitespace-nowrap">
+              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${venta.estado === 'Completada' || venta.estado === 'Pagada'
+                ? 'bg-green-100 text-green-800'
+                : 'bg-yellow-100 text-yellow-800'
+                }`}>
+                {venta.estado}
+              </span>
+            </td>
+            <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
+              <div className="flex justify-center space-x-2">
+                {/* Botón Detalles */}
+                <button
+                  onClick={() => verDetallesVenta(venta)}
+                  className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                  title="Ver Detalles"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                </button>
+                {venta.estado === 'Pendiente' && (
+                  <button
+                    onClick={() => cambiarEstadoVenta(venta._id, 'Completada')}
+                    className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                    title="Completar Venta"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  </button>
+                )}
+                {userRole === 'admin' && (
+                  <button
+                    onClick={() => eliminarVenta(venta._id)}
+                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Eliminar"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                  </button>
                 )}
               </div>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+
+    {ventasFiltradas.length === 0 && (
+      <div className="text-center py-8 text-gray-500">
+        {searchTerm ? 'No se encontraron ventas que coincidan con la búsqueda' : 'No hay ventas registradas'}
+      </div>
+    )}
+  </div>
+</div>
+
+{/* --- MODAL DE DETALLES DE VENTA --- */ }
+{
+  showDetailModal && selectedVenta && (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50 rounded-t-xl">
+          <div>
+            <h3 className="text-2xl font-bold text-gray-800">Detalles de Venta #{selectedVenta.numVenta}</h3>
+            <p className="text-sm text-gray-500">Fecha: {new Date(selectedVenta.fecha).toLocaleDateString('es-ES')} - {new Date(selectedVenta.fecha).toLocaleTimeString('es-ES')}</p>
+          </div>
+          <button
+            onClick={() => setShowDetailModal(false)}
+            className="text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-full p-2 transition-colors"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="p-6 space-y-6">
+
+          {/* Info Cliente y Estado */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-blue-50 p-4 rounded-lg border border-blue-100">
+            <div>
+              <h4 className="font-semibold text-blue-800 mb-2">Información del Cliente</h4>
+              {selectedVenta.cliente ? (
+                <ul className="text-sm text-gray-700 space-y-1">
+                  <li><span className="font-medium">Nombre:</span> {selectedVenta.cliente.nombre}</li>
+                  {selectedVenta.cliente.empresa && <li><span className="font-medium">Empresa:</span> {selectedVenta.cliente.empresa}</li>}
+                  {selectedVenta.cliente.nit && <li><span className="font-medium">NIT/CI:</span> {selectedVenta.cliente.nit || selectedVenta.cliente.ci}</li>}
+                  <li><span className="font-medium">Teléfono:</span> {selectedVenta.cliente.telefono}</li>
+                </ul>
+              ) : (
+                <p className="text-sm text-gray-500 italic">Cliente Casual / No registrado</p>
+              )}
             </div>
+            <div className="text-right">
+              <h4 className="font-semibold text-gray-800 mb-2">Estado de Venta</h4>
+              <span className={`inline-block px-3 py-1 text-sm font-semibold rounded-full ${selectedVenta.estado === 'Completada' || selectedVenta.estado === 'Pagada'
+                ? 'bg-green-100 text-green-800'
+                : 'bg-yellow-100 text-yellow-800'
+                }`}>
+                {selectedVenta.estado}
+              </span>
+              <div className="mt-2 text-sm text-gray-600">
+                <p>Tipo: <span className="font-bold">{selectedVenta.tipoComprobante || 'Recibo'}</span></p>
+                <p>Nº: <span className="font-mono font-medium">{selectedVenta.numFactura}</span></p>
+                <p>Entrega: {selectedVenta.metodoEntrega}</p>
+              </div>
+            </div>
+          </div>
 
-            {/* --- MODAL DE DETALLES DE VENTA --- */}
-            {
-              showDetailModal && selectedVenta && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                  <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-                    <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50 rounded-t-xl">
-                      <div>
-                        <h3 className="text-2xl font-bold text-gray-800">Detalles de Venta #{selectedVenta.numVenta}</h3>
-                        <p className="text-sm text-gray-500">Fecha: {new Date(selectedVenta.fecha).toLocaleDateString('es-ES')} - {new Date(selectedVenta.fecha).toLocaleTimeString('es-ES')}</p>
-                      </div>
-                      <button
-                        onClick={() => setShowDetailModal(false)}
-                        className="text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-full p-2 transition-colors"
-                      >
-                        ✕
-                      </button>
-                    </div>
-
-                    <div className="p-6 space-y-6">
-
-                      {/* Info Cliente y Estado */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-blue-50 p-4 rounded-lg border border-blue-100">
-                        <div>
-                          <h4 className="font-semibold text-blue-800 mb-2">Información del Cliente</h4>
-                          {selectedVenta.cliente ? (
-                            <ul className="text-sm text-gray-700 space-y-1">
-                              <li><span className="font-medium">Nombre:</span> {selectedVenta.cliente.nombre}</li>
-                              {selectedVenta.cliente.empresa && <li><span className="font-medium">Empresa:</span> {selectedVenta.cliente.empresa}</li>}
-                              {selectedVenta.cliente.nit && <li><span className="font-medium">NIT/CI:</span> {selectedVenta.cliente.nit || selectedVenta.cliente.ci}</li>}
-                              <li><span className="font-medium">Teléfono:</span> {selectedVenta.cliente.telefono}</li>
-                            </ul>
-                          ) : (
-                            <p className="text-sm text-gray-500 italic">Cliente Casual / No registrado</p>
+          {/* Tabla de Productos */}
+          <div>
+            <h4 className="font-bold text-gray-800 mb-3 text-lg border-b pb-2">Productos Vendidos</h4>
+            <div className="overflow-x-auto border rounded-lg">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-100 text-gray-700">
+                  <tr>
+                    <th className="px-4 py-2 text-left">Código</th>
+                    <th className="px-4 py-2 text-left">Producto</th>
+                    <th className="px-4 py-2 text-center">Color</th>
+                    <th className="px-4 py-2 text-center">Cant.</th>
+                    <th className="px-4 py-2 text-right">Precio Unit.</th>
+                    <th className="px-4 py-2 text-right">Subtotal</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {selectedVenta.productos.map((item, idx) => (
+                    <tr key={idx} className="hover:bg-gray-50">
+                      <td className="px-4 py-2 font-mono text-gray-500">{item.producto?.codigo || item.producto?.idProductoTienda || 'N/A'}</td>
+                      <td className="px-4 py-2 font-medium text-gray-900">
+                        <div className="flex items-center gap-2">
+                          {item.producto?.imagen && (
+                            <img src={`http://localhost:5000${item.producto.imagen}`} alt="" className="w-8 h-8 rounded object-cover border" />
+                          )}
+                          <span>{item.producto?.nombre || item.productoNombre || 'Producto Eliminado'}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2 text-center text-gray-600">{item.producto?.color || '-'}</td>
+                      <td className="px-4 py-2 text-center font-semibold">{item.cantidad}</td>
+                      <td className="px-4 py-2 text-right">
+                        <div className="flex flex-col">
+                          <span className="text-gray-900">Bs. {(item.producto?.precioVenta || item.producto?.precio || 0).toFixed(2)}</span>
+                          {item.producto?.precioVenta !== item.precioUnitario && (
+                            <span className="text-xs text-gray-500 line-through">Oficial</span>
                           )}
                         </div>
-                        <div className="text-right">
-                          <h4 className="font-semibold text-gray-800 mb-2">Estado de Venta</h4>
-                          <span className={`inline-block px-3 py-1 text-sm font-semibold rounded-full ${selectedVenta.estado === 'Completada' || selectedVenta.estado === 'Pagada'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-yellow-100 text-yellow-800'
-                            }`}>
-                            {selectedVenta.estado}
-                          </span>
-                          <div className="mt-2 text-sm text-gray-600">
-                            <p>Tipo: <span className="font-bold">{selectedVenta.tipoComprobante || 'Recibo'}</span></p>
-                            <p>Nº: <span className="font-mono font-medium">{selectedVenta.numFactura}</span></p>
-                            <p>Entrega: {selectedVenta.metodoEntrega}</p>
-                          </div>
+                      </td>
+                      <td className="px-4 py-2 text-right font-medium text-green-600">
+                        <div className="flex flex-col">
+                          <span>Bs. {(item.cantidad * item.precioUnitario).toFixed(2)}</span>
+                          {item.producto?.precioVenta !== item.precioUnitario && (
+                            <span className="text-xs text-blue-600">
+                              (A: Bs. {item.precioUnitario.toFixed(2)})
+                            </span>
+                          )}
                         </div>
-                      </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-gray-50 font-semibold">
+                  <tr>
+                    <td colSpan="5" className="px-4 py-2 text-right text-gray-700">Subtotal:</td>
+                    <td className="px-4 py-2 text-right text-gray-900">Bs. {(selectedVenta.productos.reduce((sum, p) => sum + (p.cantidad * p.precioUnitario), 0)).toFixed(2)}</td>
+                  </tr>
+                  {selectedVenta.descuento > 0 && (
+                    <tr className="text-red-600">
+                      <td colSpan="5" className="px-4 py-1 text-right">Descuento Global:</td>
+                      <td className="px-4 py-1 text-right">- Bs. {selectedVenta.descuento.toFixed(2)}</td>
+                    </tr>
+                  )}
+                  <tr className="bg-green-50">
+                    <td colSpan="5" className="px-4 py-3 text-right text-gray-900 font-bold text-lg">Total Final:</td>
+                    <td className="px-4 py-3 text-right text-lg text-green-700 font-bold">
+                      Bs. {Math.max(0, (selectedVenta.productos.reduce((sum, p) => sum + (p.cantidad * p.precioUnitario), 0) - (selectedVenta.descuento || 0))).toFixed(2)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
 
-                      {/* Tabla de Productos */}
-                      <div>
-                        <h4 className="font-bold text-gray-800 mb-3 text-lg border-b pb-2">Productos Vendidos</h4>
-                        <div className="overflow-x-auto border rounded-lg">
-                          <table className="w-full text-sm">
-                            <thead className="bg-gray-100 text-gray-700">
-                              <tr>
-                                <th className="px-4 py-2 text-left">Código</th>
-                                <th className="px-4 py-2 text-left">Producto</th>
-                                <th className="px-4 py-2 text-center">Color</th>
-                                <th className="px-4 py-2 text-center">Cant.</th>
-                                <th className="px-4 py-2 text-right">Precio Unit.</th>
-                                <th className="px-4 py-2 text-right">Subtotal</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                              {selectedVenta.productos.map((item, idx) => (
-                                <tr key={idx} className="hover:bg-gray-50">
-                                  <td className="px-4 py-2 font-mono text-gray-500">{item.producto?.codigo || item.producto?.idProductoTienda || 'N/A'}</td>
-                                  <td className="px-4 py-2 font-medium text-gray-900">
-                                    <div className="flex items-center gap-2">
-                                      {item.producto?.imagen && (
-                                        <img src={`http://localhost:5000${item.producto.imagen}`} alt="" className="w-8 h-8 rounded object-cover border" />
-                                      )}
-                                      <span>{item.producto?.nombre || item.productoNombre || 'Producto Eliminado'}</span>
-                                    </div>
-                                  </td>
-                                  <td className="px-4 py-2 text-center text-gray-600">{item.producto?.color || '-'}</td>
-                                  <td className="px-4 py-2 text-center font-semibold">{item.cantidad}</td>
-                                  <td className="px-4 py-2 text-right">
-                                    <div className="flex flex-col">
-                                      <span className="text-gray-900">Bs. {(item.producto?.precioVenta || item.producto?.precio || 0).toFixed(2)}</span>
-                                      {item.producto?.precioVenta !== item.precioUnitario && (
-                                        <span className="text-xs text-gray-500 line-through">Oficial</span>
-                                      )}
-                                    </div>
-                                  </td>
-                                  <td className="px-4 py-2 text-right font-medium text-green-600">
-                                    <div className="flex flex-col">
-                                      <span>Bs. {(item.cantidad * item.precioUnitario).toFixed(2)}</span>
-                                      {item.producto?.precioVenta !== item.precioUnitario && (
-                                        <span className="text-xs text-blue-600">
-                                          (A: Bs. {item.precioUnitario.toFixed(2)})
-                                        </span>
-                                      )}
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                            <tfoot className="bg-gray-50 font-semibold">
-                              <tr>
-                                <td colSpan="5" className="px-4 py-2 text-right text-gray-700">Subtotal:</td>
-                                <td className="px-4 py-2 text-right text-gray-900">Bs. {(selectedVenta.productos.reduce((sum, p) => sum + (p.cantidad * p.precioUnitario), 0)).toFixed(2)}</td>
-                              </tr>
-                              {selectedVenta.descuento > 0 && (
-                                <tr className="text-red-600">
-                                  <td colSpan="5" className="px-4 py-1 text-right">Descuento Global:</td>
-                                  <td className="px-4 py-1 text-right">- Bs. {selectedVenta.descuento.toFixed(2)}</td>
-                                </tr>
-                              )}
-                              <tr className="bg-green-50">
-                                <td colSpan="5" className="px-4 py-3 text-right text-gray-900 font-bold text-lg">Total Final:</td>
-                                <td className="px-4 py-3 text-right text-lg text-green-700 font-bold">
-                                  Bs. {Math.max(0, (selectedVenta.productos.reduce((sum, p) => sum + (p.cantidad * p.precioUnitario), 0) - (selectedVenta.descuento || 0))).toFixed(2)}
-                                </td>
-                              </tr>
-                            </tfoot>
-                          </table>
-                        </div>
-                      </div>
-
-                      {/* Pagos y Observaciones */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div>
-                          <h4 className="font-bold text-gray-800 mb-2 border-b pb-1">Observaciones</h4>
-                          <p className="text-gray-600 text-sm bg-gray-50 p-3 rounded-lg border min-h-[80px]">
-                            {selectedVenta.observaciones || "Sin observaciones adicionales."}
-                          </p>
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-gray-800 mb-2 border-b pb-1">Desglose de Pagos</h4>
-                          <div className="space-y-2">
-                            {selectedVenta.metodosPago && selectedVenta.metodosPago.length > 0 ? (
-                              selectedVenta.metodosPago.map((pago, idx) => (
-                                <div key={idx} className="flex justify-between text-sm">
-                                  <span>{pago.tipo}:</span>
-                                  <span className="font-medium">Bs. {pago.monto.toFixed(2)}</span>
-                                </div>
-                              ))
-                            ) : (
-                              <p className="text-sm text-gray-500">No hay pagos registrados (Posiblemente crédito total)</p>
-                            )}
-                            <div className="border-t pt-2 flex justify-between font-bold text-gray-900 mt-2">
-                              <span>Total Pagado:</span>
-                              <span>Bs. {(selectedVenta.metodosPago?.reduce((acc, curr) => acc + curr.monto, 0) || 0).toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between text-red-600 font-bold">
-                              <span>Saldo Pendiente:</span>
-                              <span>Bs. {(selectedVenta.saldoPendiente || 0).toFixed(2)}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
+          {/* Pagos y Observaciones */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div>
+              <h4 className="font-bold text-gray-800 mb-2 border-b pb-1">Observaciones</h4>
+              <p className="text-gray-600 text-sm bg-gray-50 p-3 rounded-lg border min-h-[80px]">
+                {selectedVenta.observaciones || "Sin observaciones adicionales."}
+              </p>
+            </div>
+            <div>
+              <h4 className="font-bold text-gray-800 mb-2 border-b pb-1">Desglose de Pagos</h4>
+              <div className="space-y-2">
+                {selectedVenta.metodosPago && selectedVenta.metodosPago.length > 0 ? (
+                  selectedVenta.metodosPago.map((pago, idx) => (
+                    <div key={idx} className="flex justify-between text-sm">
+                      <span>{pago.tipo}:</span>
+                      <span className="font-medium">Bs. {pago.monto.toFixed(2)}</span>
                     </div>
-
-                    <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end rounded-b-xl">
-                      <button
-                        onClick={() => setShowDetailModal(false)}
-                        className="px-6 py-2 bg-gray-600 text-white font-medium rounded-lg hover:bg-gray-700 shadow transition-colors"
-                      >
-                        Cerrar
-                      </button>
-                      {/* Opcional: Agregar botón Imprimir aquí */}
-                    </div>
-                  </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-gray-500">No hay pagos registrados (Posiblemente crédito total)</p>
+                )}
+                <div className="border-t pt-2 flex justify-between font-bold text-gray-900 mt-2">
+                  <span>Total Pagado:</span>
+                  <span>Bs. {(selectedVenta.metodosPago?.reduce((acc, curr) => acc + curr.monto, 0) || 0).toFixed(2)}</span>
                 </div>
-              )
-            }
+                <div className="flex justify-between text-red-600 font-bold">
+                  <span>Saldo Pendiente:</span>
+                  <span>Bs. {(selectedVenta.saldoPendiente || 0).toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end rounded-b-xl">
+          <button
+            onClick={() => setShowDetailModal(false)}
+            className="px-6 py-2 bg-gray-600 text-white font-medium rounded-lg hover:bg-gray-700 shadow transition-colors"
+          >
+            Cerrar
+          </button>
+          {/* Opcional: Agregar botón Imprimir aquí */}
+        </div>
+      </div>
+    </div>
+  )
+}
 
           </>
         )}
 
-        {/* --- VISTA DE GESTIÓN DE CLIENTES --- */}
-        {
-          activeTab === 'clientes' && (
-            <div className="bg-white rounded-xl shadow-lg border border-gray-100">
-              <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                <h2 className="text-xl font-bold text-gray-800">Cartera de Clientes</h2>
-                <button
-                  onClick={() => {
-                    setClienteEditing(null); // Modo crear
-                    setNuevoCliente({
-                      nombre: '', empresa: '', direccion: '', telefono: '', email: '', nit: '', ci: '', ubicacion: ''
-                    });
-                    setShowCreateClientForm(true);
-                  }}
-                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm flex items-center gap-2"
-                >
-                  <span>+</span> Nuevo Cliente
-                </button>
-              </div>
+{/* --- VISTA DE GESTIÓN DE CLIENTES --- */ }
+{
+  activeTab === 'clientes' && (
+    <div className="bg-white rounded-xl shadow-lg border border-gray-100">
+      <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+        <h2 className="text-xl font-bold text-gray-800">Cartera de Clientes</h2>
+        <button
+          onClick={() => {
+            setClienteEditing(null); // Modo crear
+            setNuevoCliente({
+              nombre: '', empresa: '', direccion: '', telefono: '', email: '', nit: '', ci: '', ubicacion: ''
+            });
+            setShowCreateClientForm(true);
+          }}
+          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm flex items-center gap-2"
+        >
+          <span>+</span> Nuevo Cliente
+        </button>
+      </div>
 
-              {/* Formulario Modal para Crear/Editar Cliente */}
-              {showCreateClientForm && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                  <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                    <div className="flex justify-between items-center p-6 border-b border-gray-100">
-                      <h3 className="text-xl font-bold text-gray-800">
-                        {clienteEditing ? 'Editar Cliente' : 'Registrar Nuevo Cliente'}
-                      </h3>
-                      <button
-                        onClick={() => setShowCreateClientForm(false)}
-                        className="text-gray-400 hover:text-gray-600"
-                      >
-                        ✕
-                      </button>
-                    </div>
+      {/* Formulario Modal para Crear/Editar Cliente */}
+      {showCreateClientForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center p-6 border-b border-gray-100">
+              <h3 className="text-xl font-bold text-gray-800">
+                {clienteEditing ? 'Editar Cliente' : 'Registrar Nuevo Cliente'}
+              </h3>
+              <button
+                onClick={() => setShowCreateClientForm(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
 
-                    <div className="p-6 space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Nombre Completo *</label>
-                          <input
-                            type="text"
-                            value={nuevoCliente.nombre}
-                            onChange={(e) => setNuevoCliente({ ...nuevoCliente, nombre: e.target.value })}
-                            className={`w-full p-2 border ${clienteErrors.nombre ? 'border-red-500' : 'border-gray-300'} rounded-lg`}
-                          />
-                          {clienteErrors.nombre && <p className="text-red-500 text-xs mt-1">{clienteErrors.nombre}</p>}
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Empresa</label>
-                          <input
-                            type="text"
-                            value={nuevoCliente.empresa}
-                            onChange={(e) => setNuevoCliente({ ...nuevoCliente, empresa: e.target.value })}
-                            className="w-full p-2 border border-gray-300 rounded-lg"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono *</label>
-                          <input
-                            type="text"
-                            value={nuevoCliente.telefono}
-                            onChange={(e) => setNuevoCliente({ ...nuevoCliente, telefono: e.target.value })}
-                            className={`w-full p-2 border ${clienteErrors.telefono ? 'border-red-500' : 'border-gray-300'} rounded-lg`}
-                          />
-                          {clienteErrors.telefono && <p className="text-red-500 text-xs mt-1">{clienteErrors.telefono}</p>}
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Dirección *</label>
-                          <input
-                            type="text"
-                            value={nuevoCliente.direccion}
-                            onChange={(e) => setNuevoCliente({ ...nuevoCliente, direccion: e.target.value })}
-                            className={`w-full p-2 border ${clienteErrors.direccion ? 'border-red-500' : 'border-gray-300'} rounded-lg`}
-                          />
-                          {clienteErrors.direccion && <p className="text-red-500 text-xs mt-1">{clienteErrors.direccion}</p>}
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                          <input
-                            type="email"
-                            value={nuevoCliente.email}
-                            onChange={(e) => setNuevoCliente({ ...nuevoCliente, email: e.target.value })}
-                            className={`w-full p-2 border ${clienteErrors.email ? 'border-red-500' : 'border-gray-300'} rounded-lg`}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">NIT</label>
-                          <input
-                            type="text"
-                            value={nuevoCliente.nit}
-                            onChange={(e) => setNuevoCliente({ ...nuevoCliente, nit: e.target.value })}
-                            className="w-full p-2 border border-gray-300 rounded-lg"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">CI</label>
-                          <input
-                            type="text"
-                            value={nuevoCliente.ci}
-                            onChange={(e) => setNuevoCliente({ ...nuevoCliente, ci: e.target.value })}
-                            className="w-full p-2 border border-gray-300 rounded-lg"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Ubicación</label>
-                          <input
-                            type="text"
-                            value={nuevoCliente.ubicacion}
-                            onChange={(e) => setNuevoCliente({ ...nuevoCliente, ubicacion: e.target.value })}
-                            className="w-full p-2 border border-gray-300 rounded-lg"
-                            placeholder="Coordenadas o Ref."
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-2 rounded-b-xl">
-                      <button
-                        onClick={() => setShowCreateClientForm(false)}
-                        className="px-4 py-2 text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
-                      >
-                        Cancelar
-                      </button>
-                      <button
-                        onClick={handleSaveCliente}
-                        className="px-6 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 shadow-md transition-colors"
-                      >
-                        {clienteEditing ? 'Actualizar Cliente' : 'Guardar Cliente'}
-                      </button>
-                    </div>
-                  </div>
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre Completo *</label>
+                  <input
+                    type="text"
+                    value={nuevoCliente.nombre}
+                    onChange={(e) => setNuevoCliente({ ...nuevoCliente, nombre: e.target.value })}
+                    className={`w-full p-2 border ${clienteErrors.nombre ? 'border-red-500' : 'border-gray-300'} rounded-lg`}
+                  />
+                  {clienteErrors.nombre && <p className="text-red-500 text-xs mt-1">{clienteErrors.nombre}</p>}
                 </div>
-              )}
-
-              {/* Tabla de Clientes */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left text-gray-500">
-                  <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b">
-                    <tr>
-                      <th className="px-6 py-3">Cliente / Empresa</th>
-                      <th className="px-6 py-3">Contacto</th>
-                      <th className="px-6 py-3">Ubicación</th>
-                      <th className="px-6 py-3">NIT / CI</th>
-                      <th className="px-6 py-3 text-center">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {clientes.map(cliente => (
-                      <tr key={cliente._id} className="bg-white hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="font-bold text-gray-900">{cliente.nombre}</div>
-                          {cliente.empresa && <div className="text-indigo-600 text-xs">{cliente.empresa}</div>}
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <span>📞</span> {cliente.telefono}
-                          </div>
-                          {cliente.email && (
-                            <div className="flex items-center gap-2 text-xs">
-                              <span>✉️</span> {cliente.email}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 max-w-xs truncate">
-                          {cliente.direccion}
-                          {cliente.ubicacion && <div className="text-xs text-blue-500">📍 {cliente.ubicacion}</div>}
-                        </td>
-                        <td className="px-6 py-4">
-                          {cliente.nit ? `NIT: ${cliente.nit}` : ''}
-                          {cliente.ci ? `CI: ${cliente.ci}` : ''}
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <div className="flex justify-center gap-2">
-                            <button
-                              onClick={() => handleEditCliente(cliente)}
-                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                              title="Editar"
-                            >
-                              ✏️
-                            </button>
-                            <button
-                              onClick={() => handleDeleteCliente(cliente._id)}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                              title="Eliminar"
-                            >
-                              🗑️
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                    {clientes.length === 0 && (
-                      <tr>
-                        <td colSpan="5" className="px-6 py-8 text-center text-gray-400">
-                          No hay clientes registrados
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Empresa</label>
+                  <input
+                    type="text"
+                    value={nuevoCliente.empresa}
+                    onChange={(e) => setNuevoCliente({ ...nuevoCliente, empresa: e.target.value })}
+                    className="w-full p-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono *</label>
+                  <input
+                    type="text"
+                    value={nuevoCliente.telefono}
+                    onChange={(e) => setNuevoCliente({ ...nuevoCliente, telefono: e.target.value })}
+                    className={`w-full p-2 border ${clienteErrors.telefono ? 'border-red-500' : 'border-gray-300'} rounded-lg`}
+                  />
+                  {clienteErrors.telefono && <p className="text-red-500 text-xs mt-1">{clienteErrors.telefono}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Dirección *</label>
+                  <input
+                    type="text"
+                    value={nuevoCliente.direccion}
+                    onChange={(e) => setNuevoCliente({ ...nuevoCliente, direccion: e.target.value })}
+                    className={`w-full p-2 border ${clienteErrors.direccion ? 'border-red-500' : 'border-gray-300'} rounded-lg`}
+                  />
+                  {clienteErrors.direccion && <p className="text-red-500 text-xs mt-1">{clienteErrors.direccion}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={nuevoCliente.email}
+                    onChange={(e) => setNuevoCliente({ ...nuevoCliente, email: e.target.value })}
+                    className={`w-full p-2 border ${clienteErrors.email ? 'border-red-500' : 'border-gray-300'} rounded-lg`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">NIT</label>
+                  <input
+                    type="text"
+                    value={nuevoCliente.nit}
+                    onChange={(e) => setNuevoCliente({ ...nuevoCliente, nit: e.target.value })}
+                    className="w-full p-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">CI</label>
+                  <input
+                    type="text"
+                    value={nuevoCliente.ci}
+                    onChange={(e) => setNuevoCliente({ ...nuevoCliente, ci: e.target.value })}
+                    className="w-full p-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Ubicación</label>
+                  <input
+                    type="text"
+                    value={nuevoCliente.ubicacion}
+                    onChange={(e) => setNuevoCliente({ ...nuevoCliente, ubicacion: e.target.value })}
+                    className="w-full p-2 border border-gray-300 rounded-lg"
+                    placeholder="Coordenadas o Ref."
+                  />
+                </div>
               </div>
             </div>
-          )
-        }
+
+            <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-2 rounded-b-xl">
+              <button
+                onClick={() => setShowCreateClientForm(false)}
+                className="px-4 py-2 text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveCliente}
+                className="px-6 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 shadow-md transition-colors"
+              >
+                {clienteEditing ? 'Actualizar Cliente' : 'Guardar Cliente'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tabla de Clientes */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm text-left text-gray-500">
+          <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b">
+            <tr>
+              <th className="px-6 py-3">Cliente / Empresa</th>
+              <th className="px-6 py-3">Contacto</th>
+              <th className="px-6 py-3">Ubicación</th>
+              <th className="px-6 py-3">NIT / CI</th>
+              <th className="px-6 py-3 text-center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {clientes.map(cliente => (
+              <tr key={cliente._id} className="bg-white hover:bg-gray-50 transition-colors">
+                <td className="px-6 py-4">
+                  <div className="font-bold text-gray-900">{cliente.nombre}</div>
+                  {cliente.empresa && <div className="text-indigo-600 text-xs">{cliente.empresa}</div>}
+                </td>
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-2">
+                    <span>📞</span> {cliente.telefono}
+                  </div>
+                  {cliente.email && (
+                    <div className="flex items-center gap-2 text-xs">
+                      <span>✉️</span> {cliente.email}
+                    </div>
+                  )}
+                </td>
+                <td className="px-6 py-4 max-w-xs truncate">
+                  {cliente.direccion}
+                  {cliente.ubicacion && <div className="text-xs text-blue-500">📍 {cliente.ubicacion}</div>}
+                </td>
+                <td className="px-6 py-4">
+                  {cliente.nit ? `NIT: ${cliente.nit}` : ''}
+                  {cliente.ci ? `CI: ${cliente.ci}` : ''}
+                </td>
+                <td className="px-6 py-4 text-center">
+                  <div className="flex justify-center gap-2">
+                    <button
+                      onClick={() => handleEditCliente(cliente)}
+                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="Editar"
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      onClick={() => handleDeleteCliente(cliente._id)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Eliminar"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {clientes.length === 0 && (
+              <tr>
+                <td colSpan="5" className="px-6 py-8 text-center text-gray-400">
+                  No hay clientes registrados
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
 
       </main >
     </div >
