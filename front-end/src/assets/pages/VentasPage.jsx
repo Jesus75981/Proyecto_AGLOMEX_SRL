@@ -872,7 +872,7 @@ const VentasPage = ({ userRole }) => {
                               .map((cliente) => (
                                 <div
                                   key={cliente._id}
-                                  onClick={() => {
+                                  onMouseDown={() => {
                                     setNuevaVenta({ ...nuevaVenta, cliente: cliente.nombre });
                                     setShowClienteDropdown(false);
                                   }}

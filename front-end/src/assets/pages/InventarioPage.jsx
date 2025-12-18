@@ -550,7 +550,7 @@ const InventarioPage = ({ userRole }) => {
                           {categorias.filter(cat => cat.toLowerCase().includes(nuevoProducto.categoria.toLowerCase())).map(cat => (
                             <div
                               key={cat}
-                              onClick={() => {
+                              onMouseDown={() => {
                                 setNuevoProducto({ ...nuevoProducto, categoria: cat });
                                 setShowCategoriaDropdown(false);
                               }}
@@ -580,7 +580,7 @@ const InventarioPage = ({ userRole }) => {
                           {proveedores.filter(prov => prov.toLowerCase().includes(nuevoProducto.proveedor.toLowerCase())).map(prov => (
                             <div
                               key={prov}
-                              onClick={() => {
+                              onMouseDown={() => {
                                 setNuevoProducto({ ...nuevoProducto, proveedor: prov });
                                 setShowProveedorDropdown(false);
                               }}

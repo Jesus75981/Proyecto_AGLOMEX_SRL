@@ -754,14 +754,7 @@ const FabricacionPage = ({ userRole }) => {
               </button>
             )}
 
-            {activeTab === 'materiales' && (
-              <button
-                onClick={() => setShowForm(!showForm)}
-                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition duration-200 font-semibold"
-              >
-                {showForm ? 'Cancelar' : '+ Nuevo Material'}
-              </button>
-            )}
+
 
             {activeTab === 'maquinas' && (
               <button
@@ -813,7 +806,7 @@ const FabricacionPage = ({ userRole }) => {
                            {categorias.filter(cat => cat.toLowerCase().includes(nuevaOrden.categoria.toLowerCase())).map((cat, idx) => (
                             <div
                               key={idx}
-                              onClick={() => {
+                              onMouseDown={() => {
                                 setNuevaOrden({ ...nuevaOrden, categoria: cat });
                                 setShowCategoriaDropdown(false);
                               }}

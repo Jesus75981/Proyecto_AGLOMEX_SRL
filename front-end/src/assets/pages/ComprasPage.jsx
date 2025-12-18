@@ -845,7 +845,7 @@ const ComprasPage = ({ userRole }) => {
                           .map(p => (
                             <div
                               key={p._id}
-                              onClick={() => seleccionarProveedor(p)}
+                              onMouseDown={() => seleccionarProveedor(p)}
                               className="px-4 py-3 hover:bg-purple-50 cursor-pointer border-b border-gray-100 last:border-0 transition-colors duration-150"
                             >
                               <div className="flex justify-between items-center">
@@ -1036,7 +1036,6 @@ const ComprasPage = ({ userRole }) => {
                               setNuevoProducto(prev => ({ ...prev, categoria: val, nuevaCategoria: val }));
                               setMostrarResultadosCategoria(true);
                             }}
-                            onFocus={() => setMostrarResultadosCategoria(true)}
                             onBlur={() => setTimeout(() => setMostrarResultadosCategoria(false), 200)}
                             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 pr-10"
                           />
@@ -1062,7 +1061,7 @@ const ComprasPage = ({ userRole }) => {
                               .map(cat => (
                                 <div
                                   key={cat}
-                                  onClick={() => setNuevoProducto(prev => ({ ...prev, categoria: cat, nuevaCategoria: cat }))}
+                                  onMouseDown={() => setNuevoProducto(prev => ({ ...prev, categoria: cat, nuevaCategoria: cat }))}
                                   className="px-4 py-2 hover:bg-teal-50 cursor-pointer border-b border-gray-100 last:border-0 text-gray-700"
                                 >
                                   {cat}
