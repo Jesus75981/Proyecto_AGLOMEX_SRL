@@ -132,6 +132,11 @@ const AdminCatalogPage = ({ userRole }) => {
         }
       });
 
+      // Asegurar que tipo se envíe (por defecto Producto Terminado si no existe)
+      if (!productoData.tipo) {
+        productoData.tipo = 'Producto Terminado';
+      }
+
       const response = await fetch(API_URL, {
         method: 'POST',
         headers: {

@@ -485,11 +485,20 @@ export const obtenerEstadisticas = async (req, res) => {
             matchStage.fecha = { $gte: new Date(`${currentYear}-01-01`), $lte: new Date(`${currentYear}-12-31`) };
         }
 
+        let groupId;
+        if (period === 'day') {
+            groupId = { hour: { $hour: "$fecha" } };
+        } else if (period === 'month') {
+            groupId = { day: { $dayOfMonth: "$fecha" } };
+        } else {
+            groupId = { month: { $month: "$fecha" } };
+        }
+
         const comprasAgrupadas = await Compra.aggregate([
             { $match: matchStage },
             {
                 $group: {
-                    _id: { month: { $month: "$fecha" } },
+                    _id: groupId,
                     totalGasto: { $sum: "$totalCompra" },
                     totalPendiente: { $sum: "$saldoPendiente" }
                 }
@@ -500,15 +509,69 @@ export const obtenerEstadisticas = async (req, res) => {
         const comprasGrafica = comprasAgrupadas.map(item => ({
             period: item._id,
             totalGasto: item.totalGasto,
-            totalPendiente: item.totalPendiente
+            totalPendiente: item.totalPendiente,
+            // Calculate pagado in backend for consistency, though frontend does it too now
+            totalPagado: item.totalGasto - item.totalPendiente
         }));
+
+        // Agregación para Estadísticas Generales
+        const statsGenerales = await Compra.aggregate([
+            { $match: matchStage },
+            {
+                $group: {
+                    _id: null,
+                    totalGasto: { $sum: "$totalCompra" },
+                    totalPendiente: { $sum: "$saldoPendiente" },
+                    count: { $sum: 1 }
+                }
+            }
+        ]);
+
+        const generales = statsGenerales[0] || { totalGasto: 0, totalPendiente: 0, count: 0 };
+
+        // Agregación por Tipo
+        const comprasPorTipo = await Compra.aggregate([
+            { $match: matchStage },
+            {
+                $group: {
+                    _id: "$tipoCompra",
+                    value: { $sum: 1 },
+                    total: { $sum: "$totalCompra" }
+                }
+            },
+            { $project: { name: "$_id", value: 1, total: 1, _id: 0 } }
+        ]);
+
+        // Agregación por Estado
+        const comprasPorEstado = await Compra.aggregate([
+            { $match: matchStage },
+            {
+                $group: {
+                    _id: "$estado",
+                    value: { $sum: 1 }
+                }
+            },
+            { $project: { name: "$_id", value: 1, _id: 0 } }
+        ]);
+
+        // Compras Recientes
+        const comprasRecientes = await Compra.find(matchStage)
+            .sort({ fecha: -1 })
+            .limit(5)
+            .populate('proveedor', 'nombre')
+            .select('fecha numCompra proveedor totalCompra estado tipoCompra');
 
         res.json({
             comprasMensuales: comprasGrafica,
-            estadisticasGenerales: { totalGasto: 0 }, // Placeholder
-            comprasRecientes: [],
-            comprasPorTipo: [],
-            comprasPorEstado: []
+            estadisticasGenerales: {
+                totalGasto: generales.totalGasto,
+                totalCompras: generales.count,
+                promedioCompra: generales.count > 0 ? generales.totalGasto / generales.count : 0,
+                totalPendiente: generales.totalPendiente
+            },
+            comprasRecientes,
+            comprasPorTipo,
+            comprasPorEstado
         });
 
     } catch (error) {

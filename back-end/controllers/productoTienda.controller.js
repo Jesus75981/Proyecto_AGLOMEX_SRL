@@ -62,7 +62,8 @@ export const crearProducto = async (req, res) => {
     }
 
     if (!tipo || tipo.trim().length === 0) {
-      // Si no se envía, se asigna por defecto en el modelo.
+      // Si no se envía, se asigna por defecto explícitamente para evitar error de validación
+      req.body.tipo = 'Producto Terminado';
     }
 
     if (!color || color.trim().length === 0) {

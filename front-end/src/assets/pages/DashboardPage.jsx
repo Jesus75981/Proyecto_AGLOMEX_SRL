@@ -177,14 +177,18 @@ const DashboardPage = ({ userRole }) => {
           apiFetch('/maquinas', { headers })
         ]);
 
-        // Calculate machine stats manually
-        const mStats = [
-          { name: 'Operativa', value: maquinasRes.filter(m => m.estado === 'Operativa').length },
-          { name: 'En mantenimiento', value: maquinasRes.filter(m => m.estado === 'En mantenimiento').length },
-          { name: 'Fuera de servicio', value: maquinasRes.filter(m => m.estado === 'Fuera de servicio').length }
-        ].filter(item => item.value > 0);
+        // Calculate machine stats dynamically
+        const mStatsMap = maquinasRes.reduce((acc, m) => {
+          acc[m.estado] = (acc[m.estado] || 0) + 1;
+          return acc;
+        }, {});
 
-        setProduccionData({ ...res, maquinaStats: mStats });
+        const mStats = Object.keys(mStatsMap).map(status => ({
+          name: status,
+          value: mStatsMap[status]
+        }));
+
+        setProduccionData({ ...(res.data || res), maquinaStats: mStats });
       }
 
       // 3. Finanzas
@@ -209,13 +213,13 @@ const DashboardPage = ({ userRole }) => {
       // 5. Logistica
       if (activeTab === 'logistica') {
         const res = await apiFetch(`/logistica/estadisticas?${queryString}`, { headers });
-        setLogisticaData(res);
+        setLogisticaData(res.data || res);
       }
 
       // 6. Compras
       if (activeTab === 'compras') {
         const res = await apiFetch(`/compras/estadisticas?${queryString}`, { headers });
-        setComprasData(res);
+        setComprasData(res.data || res);
       }
 
     } catch (err) {
@@ -291,13 +295,27 @@ const DashboardPage = ({ userRole }) => {
   };
 
   const periodeLabel = (item) => {
-    if (periodo === 'year') {
+    if (!item || !item.period) return '';
+
+    // Period: Year (Monthly view) -> Backend returns { month: 1..12 }
+    if (periodo === 'year' || (item.period && item.period.month)) {
       const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-      return monthNames[item.period.month - 1];
+      const monthIndex = typeof item.period === 'object' ? item.period.month : item.period;
+      if (!monthIndex) return '';
+      return monthNames[monthIndex - 1] || '';
     }
-    if (periodo === 'month') return item.period.day;
-    if (periodo === 'day') return `${item.period.hour}:00`;
-    return item.period;
+
+    // Period: Month (Daily view) -> Backend returns { day: 1..31 }
+    if (periodo === 'month' || (item.period && item.period.day)) {
+      return item.period.day ? `${item.period.day}` : '';
+    }
+
+    // Period: Day (Hourly view) -> Backend returns { hour: 0..23 }
+    if (periodo === 'day' || (item.period && item.period.hour !== undefined)) {
+      return `${item.period.hour}:00`;
+    }
+
+    return JSON.stringify(item.period);
   };
 
   // Prepare Chart Data
@@ -312,26 +330,18 @@ const DashboardPage = ({ userRole }) => {
     unidades: item.totalProducciones
   }));
 
-  const formatCashflowLabel = (item) => {
-    // item.period is { month: 1 } or { day: 5 }
-    if (item.period && item.period.month) {
-      const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-      return monthNames[item.period.month - 1];
-    }
-    if (item.period && item.period.day) return item.period.day;
-    return '';
-  };
+  const formatCashflowLabel = (item) => periodeLabel(item);
 
   const cashflowChartData = (finanzasData.cashflow || []).map(item => ({
-    label: formatCashflowLabel(item),
+    label: periodeLabel(item),
     ingresos: item.ingresos,
     egresos: item.egresos,
-    neto: item.ingresos - item.egresos // Calculated field for net flow chart
+    neto: item.ingresos - item.egresos
   }));
 
   const comprasChartData = (comprasData.comprasMensuales || []).map(item => ({
     mes: periodeLabel(item),
-    pagado: item.totalPagado,
+    pagado: (item.totalGasto || 0) - (item.totalPendiente || 0),
     pendiente: item.totalPendiente
   }));
 
@@ -566,9 +576,19 @@ const DashboardPage = ({ userRole }) => {
                             data={produccionData.maquinaStats}
                             cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value"
                           >
-                            {produccionData.maquinaStats.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.name === 'Operativa' ? '#10B981' : entry.name === 'En mantenimiento' ? '#F59E0B' : '#EF4444'} />
-                            ))}
+                            {produccionData.maquinaStats.map((entry, index) => {
+                              const getColor = (status) => {
+                                switch (status) {
+                                  case 'Operativa': return '#10B981'; // Green
+                                  case 'En mantenimiento': return '#F59E0B'; // Orange
+                                  case 'Fuera de servicio': return '#EF4444'; // Red
+                                  case 'En revisión': return '#8B5CF6'; // Purple
+                                  case 'Necesita reparación': return '#EC4899'; // Pink
+                                  default: return COLORS[index % COLORS.length];
+                                }
+                              };
+                              return <Cell key={`cell-${index}`} fill={getColor(entry.name)} />;
+                            })}
                           </Pie>
                           <Tooltip />
                           <Legend />
@@ -746,12 +766,12 @@ const DashboardPage = ({ userRole }) => {
                         <BarChart data={ventasData.productosMasVendidos || []} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                           <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5E7EB" />
                           <XAxis type="number" stroke="#9CA3AF" />
-                          <YAxis dataKey="_id" type="category" width={120} stroke="#4B5563" tick={{ fontSize: 11 }} />
+                          <YAxis dataKey="nombre" type="category" width={120} stroke="#4B5563" tick={{ fontSize: 11 }} />
                           <Tooltip content={({ active, payload }) => {
                             if (active && payload && payload.length) {
                               return (
                                 <div className="bg-white p-2 border border-blue-100 shadow-lg rounded-lg">
-                                  <p className="font-bold text-gray-700">{payload[0].payload._id}</p>
+                                  <p className="font-bold text-gray-700">{payload[0].payload.nombre}</p>
                                   <p className="text-sm text-blue-600">Vendidos: {payload[0].value}</p>
                                 </div>
                               );
@@ -908,7 +928,7 @@ const DashboardPage = ({ userRole }) => {
                       <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={300} debounce={300}>
                         <PieChart>
                           <Pie
-                            data={comprasData.comprasPorTipo.map(i => ({ name: i._id, value: i.count }))}
+                            data={comprasData.comprasPorTipo}
                             cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value"
                           >
                             {comprasData.comprasPorTipo.map((entry, index) => (
@@ -923,54 +943,7 @@ const DashboardPage = ({ userRole }) => {
                   </div>
                 </div>
 
-                {/* Tabla de Compras Recientes */}
-                <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 min-w-0">
-                  <h3 className="text-lg font-semibold mb-4">Compras Recientes</h3>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">N° Compra</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proveedor</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {comprasData.comprasRecientes.length > 0 ? (
-                          comprasData.comprasRecientes.map((compra, idx) => (
-                            <tr key={idx}>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {new Date(compra.fecha).toLocaleDateString()}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                {compra.numCompra}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {compra.proveedor?.nombre || 'N/A'}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {compra.tipoCompra}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
-                                Bs. {(compra.total || 0).toLocaleString()}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${compra.estado === 'Pagada' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                                  {compra.estado}
-                                </span>
-                              </td>
-                            </tr>
-                          ))
-                        ) : (
-                          <tr><td colSpan="6" className="px-6 py-4 text-center text-sm text-gray-500">No hay compras recientes.</td></tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+
               </div>
             )}
           </>
