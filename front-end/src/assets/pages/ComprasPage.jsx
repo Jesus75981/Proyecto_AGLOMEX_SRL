@@ -569,7 +569,7 @@ const ComprasPage = ({ userRole }) => {
       productoId: producto._id,
       productoNombre: producto.nombre,
       cantidad: 1,
-      costoUnitario: 0 // Default to 0 to allow easy editing
+      costoUnitario: '' // Empty string to prevent autocomplete
     });
     setBusquedaProducto(producto.nombre);
     setMostrarResultadosProducto(false);
@@ -727,9 +727,10 @@ const ComprasPage = ({ userRole }) => {
           <div className="flex items-center gap-4">
              <button
                 onClick={volverAlHome}
-                className="flex items-center space-x-2 bg-gray-100 text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors"
+                className="flex items-center space-x-2 bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors"
              >
                 <span>←</span>
+                <span>Menú</span>
              </button>
              <h1 className="text-2xl font-bold text-gray-900">Módulo de Compras (CRUD)</h1>
           </div>
@@ -966,9 +967,16 @@ const ComprasPage = ({ userRole }) => {
                       {mostrarResultadosProducto && (
                         <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                           {productosFiltrados.length > 0 ? productosFiltrados.map(p => (
-                            <div key={p._id} onClick={() => seleccionarProducto(p)} className="px-4 py-2 hover:bg-blue-50 cursor-pointer">
-                              <div className="font-medium text-gray-800">{p.nombre} ({p.codigo})</div>
-                              <div className="text-sm text-gray-600">Color: {p.color} - Cat: {p.categoria}</div>
+                            <div key={p._id} onMouseDown={() => seleccionarProducto(p)} className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0">
+                              <div className="font-semibold text-gray-800">{p.nombre}</div>
+                              <div className="text-sm text-gray-600 mt-1">
+                                <span className="font-medium">Código:</span> {p.codigo || 'N/A'}
+                                {p.color && <> <span className="mx-2">•</span> <span className="font-medium">Color:</span> {p.color}</>}
+                              </div>
+                              <div className="text-sm text-gray-600">
+                                {p.marca && <><span className="font-medium">Marca:</span> {p.marca} <span className="mx-2">•</span></>}
+                                <span className="font-medium">Categoría:</span> {p.categoria}
+                              </div>
                             </div>
                           )) : <div className="px-4 py-3 text-gray-500 text-center">No se encontraron productos</div>}
                         </div>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import aglomexLogo from '../images/aglomex8.jpg'; // Asegúrate de que la ruta sea correcta
+import aglomexLogo from '../images/aglomex6.jpg'; // Asegúrate de que la ruta sea correcta
 
 const LoginPage = ({ onLogin }) => {
   const [username, setUsername] = useState('');
@@ -80,8 +80,8 @@ const LoginPage = ({ onLogin }) => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen w-full bg-gradient-to-br from-gray-900 to-gray-700 font-sans">
-      <div className="p-8 bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm border-2 border-gray-700">
+    <div className="flex items-center justify-center min-h-screen w-full bg-gradient-to-br from-gray-50 to-gray-100 font-sans">
+      <div className="p-8 bg-white rounded-2xl shadow-2xl w-full max-w-sm border border-gray-200">
         <div className="flex justify-center mb-6">
           {/* Muestra el logo de Aglomex */}
           <img
@@ -94,21 +94,21 @@ const LoginPage = ({ onLogin }) => {
           />
         </div>
 
-        <h2 className="text-3xl font-extrabold text-white text-center mb-2">
+        <h2 className="text-3xl font-extrabold text-gray-800 text-center mb-2">
           Iniciar Sesión
         </h2>
 
-        <p className="text-gray-400 text-sm text-center mb-8">
-          Accede a tu panel de gestión de Muebles 2025
+        <p className="text-gray-600 text-sm text-center mb-8">
+          Accede a tu panel de gestión de Muebles
         </p>
 
         <form onSubmit={handleLogin}>
           <div className="mb-4">
-            <label className="block text-gray-300 text-sm font-semibold mb-2" htmlFor="username">
+            <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="username">
               Nombre de Usuario
             </label>
             <input
-              className="shadow-sm appearance-none border border-gray-700 bg-gray-900 rounded-lg w-full py-3 px-4 text-white leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-200"
+              className="shadow-sm appearance-none border border-gray-300 bg-white rounded-lg w-full py-3 px-4 text-gray-800 leading-tight focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors duration-200"
               id="username"
               type="text"
               placeholder="Ingresa tu usuario"
@@ -119,11 +119,11 @@ const LoginPage = ({ onLogin }) => {
           </div>
 
           <div className="mb-6">
-            <label className="block text-gray-300 text-sm font-semibold mb-2" htmlFor="password">
+            <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="password">
               Contraseña
             </label>
             <input
-              className="shadow-sm appearance-none border border-gray-700 bg-gray-900 rounded-lg w-full py-3 px-4 text-white leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-200"
+              className="shadow-sm appearance-none border border-gray-300 bg-white rounded-lg w-full py-3 px-4 text-gray-800 leading-tight focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors duration-200"
               id="password"
               type="password"
               placeholder="Ingresa tu contraseña"
@@ -134,14 +134,14 @@ const LoginPage = ({ onLogin }) => {
           </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-900 border border-red-700 rounded-lg">
-              <p className="text-red-300 text-sm text-center">{error}</p>
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-600 text-sm text-center">{error}</p>
             </div>
           )}
 
           <div className="flex items-center justify-center mb-4">
             <button
-              className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-opacity-50 transition-colors duration-200 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-opacity-50 transition-colors duration-200 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
               type="submit"
               disabled={isLoading}
             >
@@ -154,10 +154,10 @@ const LoginPage = ({ onLogin }) => {
         <div className="flex items-center justify-center mb-4">
           <button
             onClick={goToCatalog}
-            className="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50 transition-colors duration-200 shadow-md"
+            className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-50 transition-colors duration-200 shadow-sm"
             type="button"
           >
-            Ver Catálogo Público
+            Ver la página inicial
           </button>
         </div>
 
@@ -166,10 +166,10 @@ const LoginPage = ({ onLogin }) => {
 
         {/* Información de conexión */}
         <div className="mt-4 text-center">
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-400">
             Servidor: localhost:5000
           </p>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-400">
             {isLoading ? 'Conectando al servidor...' : 'Servidor listo'}
           </p>
         </div>

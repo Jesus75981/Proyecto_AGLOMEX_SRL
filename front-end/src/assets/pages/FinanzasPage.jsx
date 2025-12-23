@@ -546,9 +546,9 @@ const FinanzasPage = ({ userRole }) => {
             <div className="flex gap-4">
               <button
                 onClick={() => navigate('/home')}
-                className="bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 transition-colors"
+                className="bg-orange-500 text-white px-6 py-3 rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2"
               >
-                Volver al Menú
+                <span>←</span> <span>Menú</span>
               </button>
               <button
                 onClick={() => setShowForm(!showForm)}

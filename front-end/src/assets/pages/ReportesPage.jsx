@@ -256,8 +256,8 @@ const ReportesPage = ({ userRole }) => {
             <nav className="bg-white shadow-sm border-b border-gray-200">
                 <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
                     <div className="flex items-center space-x-4">
-                        <button onClick={() => navigate('/home')} className="text-gray-600 hover:text-gray-900 border px-3 py-1 rounded-lg">
-                            ← Volver
+                        <button onClick={() => navigate('/home')} className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2">
+                            <span>←</span> <span>Menú</span>
                         </button>
                         <h1 className="text-2xl font-bold text-gray-800">Reportes Avanzados</h1>
                     </div>

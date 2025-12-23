@@ -111,7 +111,7 @@ const VentasPage = ({ userRole }) => {
     fecha: new Date().toISOString().split('T')[0],
     metodosPago: [], // Array de pagos múltiples
     metodoEntrega: 'Recojo en Tienda', // ✅ Default delivery method
-    numFactura: generarNumFactura(),
+    numFactura: '', // Manual y opcional
     observaciones: '',
     observaciones: '',
     descuento: 0, // Global discount
@@ -360,6 +360,12 @@ const VentasPage = ({ userRole }) => {
       return;
     }
 
+    // Validar que se haya seleccionado una cuenta bancaria para transferencias
+    if (pagoTemporal.metodo === 'Transferencia' && !pagoTemporal.cuentaId) {
+      alert('Debe seleccionar una cuenta bancaria para transferencias');
+      return;
+    }
+
     const nuevoPago = {
       tipo: pagoTemporal.metodo,
       monto: monto,
@@ -567,6 +573,18 @@ const VentasPage = ({ userRole }) => {
         setVentas([...ventas, nuevaVentaGuardada]);
       }
 
+      // Resetear formulario
+      setNuevaVenta({
+        cliente: '',
+        productos: [],
+        fecha: new Date().toISOString().split('T')[0],
+        metodosPago: [],
+        metodoEntrega: 'Recojo en Tienda',
+        numFactura: '', // Vacío para la próxima venta
+        observaciones: '',
+        descuento: 0,
+        tipoComprobante: 'Recibo'
+      });
       setErrors({});
       setShowForm(false);
 
@@ -626,11 +644,11 @@ const VentasPage = ({ userRole }) => {
           <div className="flex items-center gap-4">
             <button
               onClick={volverAlHome}
-              className="flex items-center space-x-2 bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 hover:text-green-600 transition-colors shadow-sm font-medium"
+              className="flex items-center space-x-2 bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors shadow-sm font-medium"
               title="Volver al Inicio"
             >
               <span className="text-xl">←</span>
-              <span>Volver al Home</span>
+              <span>Menú</span>
             </button>
             <h1 className="text-2xl font-bold text-gray-900">Módulo de Ventas y Clientes</h1>
           </div>
@@ -685,7 +703,20 @@ const VentasPage = ({ userRole }) => {
 
                 {!showForm && (
                   <button
-                    onClick={() => setShowForm(true)}
+                    onClick={() => {
+                      setNuevaVenta({
+                        cliente: '',
+                        productos: [],
+                        fecha: new Date().toISOString().split('T')[0],
+                        metodosPago: [],
+                        metodoEntrega: 'Recojo en Tienda',
+                        numFactura: '', // Vacío al abrir formulario
+                        observaciones: '',
+                        descuento: 0,
+                        tipoComprobante: 'Recibo'
+                      });
+                      setShowForm(true);
+                    }}
                     className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-bold shadow-md transition-all flex items-center gap-2 transform hover:scale-105"
                   >
                     <span>＋</span> Registrar Venta
@@ -908,6 +939,19 @@ const VentasPage = ({ userRole }) => {
                       {errors.fecha && <p className="text-red-500 text-sm mt-1">{errors.fecha}</p>}
                     </div>
 
+                    {/* Número de Factura */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Número de Factura (Opcional)</label>
+                      <input
+                        type="text"
+                        value={nuevaVenta.numFactura}
+                        onChange={(e) => setNuevaVenta({ ...nuevaVenta, numFactura: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                        placeholder="Ingrese número de factura..."
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Deja en blanco si no aplica</p>
+                    </div>
+
                     {/* Método de Entrega */}
                     <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-2">Método de Entrega</label>
@@ -949,20 +993,24 @@ const VentasPage = ({ userRole }) => {
                               {productosFiltrados.map((producto, index) => (
                                 <div
                                   key={index}
-                                  onClick={() => {
+                                  onMouseDown={() => {
                                     setProductoSearchTerm(producto.nombre);
                                     setProductoTemporal({
                                       ...productoTemporal,
                                       productoId: producto._id,
                                       productoNombre: producto.nombre,
-                                      precioUnitario: producto.precioVenta || producto.precioCompra || producto.precio || 0
+                                      precioUnitario: '' // Empty string to prevent autocomplete
                                     });
                                     setShowProductoDropdown(false);
                                   }}
-                                  className="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                                  className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0"
                                 >
-                                  <div className="font-medium">{producto.nombre}</div>
-                                  <div className="text-sm text-gray-500">Bs. {producto.precioVenta || producto.precio}</div>
+                                  <div className="font-semibold text-gray-800">{producto.nombre}</div>
+                                  <div className="text-sm text-gray-600 mt-1">
+                                    <span className="font-medium">Código:</span> {producto.codigo || producto.idProductoTienda || 'N/A'}
+                                    {producto.color && <> <span className="mx-2">•</span> <span className="font-medium">Color:</span> {producto.color}</>}
+                                    {producto.marca && <> <span className="mx-2">•</span> <span className="font-medium">Marca:</span> {producto.marca}</>}
+                                  </div>
                                 </div>
                               ))}
                             </div>
@@ -1088,9 +1136,28 @@ const VentasPage = ({ userRole }) => {
                             <option value="Efectivo">Efectivo</option>
                             <option value="Transferencia">Transferencia</option>
                             <option value="Cheque">Cheque</option>
-                            <option value="Tarjeta">Tarjeta</option>
                           </select>
                         </div>
+
+                        {/* Selector de Cuenta Bancaria (solo para Transferencia) */}
+                        {pagoTemporal.metodo === 'Transferencia' && (
+                          <div className="flex-1 min-w-[200px]">
+                            <label className="text-xs text-gray-500">Cuenta Bancaria</label>
+                            <select
+                              value={pagoTemporal.cuentaId}
+                              onChange={(e) => setPagoTemporal({ ...pagoTemporal, cuentaId: e.target.value })}
+                              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-green-500"
+                            >
+                              <option value="">Seleccionar cuenta...</option>
+                              {activeBankAccounts.map(cuenta => (
+                                <option key={cuenta._id} value={cuenta._id}>
+                                  {cuenta.nombreBanco} - {cuenta.numeroCuenta} (Bs. {cuenta.saldo.toFixed(2)})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
                         <div className="w-32">
                           <label className="text-xs text-gray-500">Monto (Bs)</label>
                           <input
@@ -1114,15 +1181,29 @@ const VentasPage = ({ userRole }) => {
                       {/* Lista de Pagos Agregados */}
                       {nuevaVenta.metodosPago.length > 0 && (
                         <div className="space-y-2 mb-2">
-                          {nuevaVenta.metodosPago.map((pago, idx) => (
-                            <div key={idx} className="flex justify-between items-center bg-white p-2 rounded border border-gray-200 shadow-sm text-sm">
-                              <span className="font-medium text-gray-700">{pago.tipo}</span>
-                              <div className="flex items-center gap-3">
-                                <span className="font-bold text-gray-900">Bs. {pago.monto.toFixed(2)}</span>
-                                <button onClick={() => quitarPago(idx)} className="text-red-500 hover:text-red-700 font-bold">✕</button>
+                          {nuevaVenta.metodosPago.map((pago, idx) => {
+                            // Buscar información de la cuenta bancaria si es transferencia
+                            const cuentaBancaria = pago.cuentaId 
+                              ? activeBankAccounts.find(c => c._id === pago.cuentaId)
+                              : null;
+
+                            return (
+                              <div key={idx} className="flex justify-between items-center bg-white p-2 rounded border border-gray-200 shadow-sm text-sm">
+                                <div className="flex flex-col">
+                                  <span className="font-medium text-gray-700">{pago.tipo}</span>
+                                  {cuentaBancaria && (
+                                    <span className="text-xs text-gray-500">
+                                      {cuentaBancaria.nombreBanco} - {cuentaBancaria.numeroCuenta}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <span className="font-bold text-gray-900">Bs. {pago.monto.toFixed(2)}</span>
+                                  <button onClick={() => quitarPago(idx)} className="text-red-500 hover:text-red-700 font-bold">✕</button>
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
 

@@ -440,7 +440,7 @@ const InventarioPage = ({ userRole }) => {
                 className="flex items-center space-x-2 bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition duration-200"
               >
                 <span>←</span>
-                <span>Volver al Home</span>
+                <span>Menú</span>
               </button>
               <h1 className="text-2xl font-bold text-gray-800">Sistema Aglomex</h1>
             </div>
