@@ -81,7 +81,7 @@ const ReporteComprasDiario = ({ userRole }) => {
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex justify-between items-center">
             <button onClick={volverAlHome} className="flex items-center space-x-2 bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition">
-              <span>←</span> <span>Volver al Home</span>
+              <span>←</span> <span>Menú</span>
             </button>
             <h1 className="text-2xl font-bold text-gray-800">Módulo de Reportes</h1>
           </div>

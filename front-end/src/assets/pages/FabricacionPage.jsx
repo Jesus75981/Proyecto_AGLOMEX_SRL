@@ -604,7 +604,7 @@ const FabricacionPage = ({ userRole }) => {
                 className="flex items-center space-x-2 bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition duration-200"
               >
                 <span>←</span>
-                <span>Volver al Home</span>
+                <span>Menú</span>
               </button>
               <h1 className="text-2xl font-bold text-gray-800">Sistema Aglomex</h1>
             </div>
@@ -754,14 +754,7 @@ const FabricacionPage = ({ userRole }) => {
               </button>
             )}
 
-            {activeTab === 'materiales' && (
-              <button
-                onClick={() => setShowForm(!showForm)}
-                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition duration-200 font-semibold"
-              >
-                {showForm ? 'Cancelar' : '+ Nuevo Material'}
-              </button>
-            )}
+
 
             {activeTab === 'maquinas' && (
               <button
@@ -813,7 +806,7 @@ const FabricacionPage = ({ userRole }) => {
                            {categorias.filter(cat => cat.toLowerCase().includes(nuevaOrden.categoria.toLowerCase())).map((cat, idx) => (
                             <div
                               key={idx}
-                              onClick={() => {
+                              onMouseDown={() => {
                                 setNuevaOrden({ ...nuevaOrden, categoria: cat });
                                 setShowCategoriaDropdown(false);
                               }}

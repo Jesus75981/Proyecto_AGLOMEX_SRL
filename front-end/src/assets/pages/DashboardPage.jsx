@@ -358,9 +358,9 @@ const DashboardPage = ({ userRole }) => {
           <div className="flex items-center gap-4">
             <button
               onClick={() => navigate('/home')}
-              className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-2"
+              className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-2"
             >
-              <span>←</span> Volver
+              <span>←</span> <span>Menú</span>
             </button>
             <h1 className="text-3xl font-bold text-gray-800">Dashboard Ejecutivo</h1>
           </div>

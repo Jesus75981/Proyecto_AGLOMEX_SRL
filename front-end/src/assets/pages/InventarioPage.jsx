@@ -440,7 +440,7 @@ const InventarioPage = ({ userRole }) => {
                 className="flex items-center space-x-2 bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition duration-200"
               >
                 <span>←</span>
-                <span>Volver al Home</span>
+                <span>Menú</span>
               </button>
               <h1 className="text-2xl font-bold text-gray-800">Sistema Aglomex</h1>
             </div>
@@ -550,7 +550,7 @@ const InventarioPage = ({ userRole }) => {
                           {categorias.filter(cat => cat.toLowerCase().includes(nuevoProducto.categoria.toLowerCase())).map(cat => (
                             <div
                               key={cat}
-                              onClick={() => {
+                              onMouseDown={() => {
                                 setNuevoProducto({ ...nuevoProducto, categoria: cat });
                                 setShowCategoriaDropdown(false);
                               }}
@@ -580,7 +580,7 @@ const InventarioPage = ({ userRole }) => {
                           {proveedores.filter(prov => prov.toLowerCase().includes(nuevoProducto.proveedor.toLowerCase())).map(prov => (
                             <div
                               key={prov}
-                              onClick={() => {
+                              onMouseDown={() => {
                                 setNuevoProducto({ ...nuevoProducto, proveedor: prov });
                                 setShowProveedorDropdown(false);
                               }}
