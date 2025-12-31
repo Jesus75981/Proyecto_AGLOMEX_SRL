@@ -56,13 +56,14 @@ export const crearProducto = async (req, res) => {
   try {
     // 1. Validación adicional en el controlador
     const { nombre, color, categoria, codigo, tipo } = req.body;
+    console.log('[DEBUG] crearProducto body:', req.body); // Log incoming body
 
     if (!nombre || nombre.trim().length === 0) {
       return res.status(400).json({ error: 'El campo "nombre" es obligatorio y no puede estar vacío.' });
     }
 
-    if (!tipo || tipo.trim().length === 0) {
-      // Si no se envía, se asigna por defecto explícitamente para evitar error de validación
+    if (!tipo || tipo.trim().length === 0 || tipo === 'undefined') {
+      // Si no se envía (o es "undefined"), se asigna por defecto explícitamente
       req.body.tipo = 'Producto Terminado';
     }
 

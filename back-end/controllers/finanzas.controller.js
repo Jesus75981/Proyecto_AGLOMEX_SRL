@@ -522,6 +522,106 @@ export const getFinancialStatistics = async (req, res) => {
   }
 };
 
+// Función para obtener rentabilidad por producto
+// Función para obtener rentabilidad por producto (INCLUYENDO NO VENDIDOS)
+export const getRentabilidadProductos = async (req, res) => {
+  try {
+    const { startDate, endDate, search } = req.query;
+
+    const pipeline = [
+      { $match: { activo: true } },
+
+      ...(search ? [{
+        $match: {
+          $or: [
+            { nombre: { $regex: search, $options: "i" } },
+            { codigo: { $regex: search, $options: "i" } }
+          ]
+        }
+      }] : []),
+
+      {
+        $lookup: {
+          from: "ventas",
+          let: { pid: "$_id" },
+          pipeline: [
+            { $unwind: "$productos" },
+            {
+              $match: {
+                $expr: { $eq: ["$productos.producto", "$$pid"] },
+                estado: { $ne: "Anulado" }
+              }
+            },
+            ...(startDate && endDate ? [{
+              $match: {
+                fecha: {
+                  $gte: new Date(startDate),
+                  $lte: new Date(endDate)
+                }
+              }
+            }] : [])
+          ],
+          as: "ventasRealizadas"
+        }
+      },
+
+      {
+        $project: {
+          nombre: 1,
+          codigo: 1,
+          imagen: 1,
+          cantidadVendida: { $sum: "$ventasRealizadas.productos.cantidad" },
+          ingresoTotal: { $sum: "$ventasRealizadas.productos.precioTotal" },
+          costoTotal: {
+            $sum: {
+              $map: {
+                input: "$ventasRealizadas",
+                as: "v",
+                in: {
+                  $multiply: [
+                    "$$v.productos.cantidad",
+                    { $ifNull: ["$$v.productos.costoUnitario", "$precioCompra"] }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+
+      {
+        $project: {
+          nombre: 1,
+          codigo: 1,
+          imagen: 1,
+          cantidadVendida: 1,
+          ingresoTotal: 1,
+          costoTotal: 1,
+          utilidad: { $subtract: ["$ingresoTotal", "$costoTotal"] },
+          margen: {
+            $cond: [
+              { $gt: ["$ingresoTotal", 0] },
+              { $multiply: [{ $divide: [{ $subtract: ["$ingresoTotal", "$costoTotal"] }, "$ingresoTotal"] }, 100] },
+              0
+            ]
+          }
+        }
+      },
+
+      { $sort: { utilidad: -1, nombre: 1 } }
+    ];
+
+    const ProductoTiendaModel = mongoose.model("ProductoTienda");
+    const resultados = await ProductoTiendaModel.aggregate(pipeline);
+
+    res.json(resultados);
+
+  } catch (error) {
+    console.error("Error al obtener rentabilidad por producto:", error);
+    res.status(500).json({ message: "Error al obtener reporte de rentabilidad" });
+  }
+};
+
 // --- GESTIÓN DE DEUDAS (CUENTAS POR PAGAR) ---
 
 // Obtener deudas pendientes

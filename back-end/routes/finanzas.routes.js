@@ -17,7 +17,8 @@ import {
     getAccounts,
     updateAccount,
     addDeposit,
-    getAccountTransactions
+    getAccountTransactions,
+    getRentabilidadProductos // <-- Importar función
 } from '../controllers/finanzas.controller.js';
 
 import { verifyToken, isAdmin } from '../middleware/auth.middleware.js';
@@ -64,6 +65,7 @@ router.get('/exchange-rate', getExchangeRate);
 router.get('/metrics', getFinancialMetrics);
 router.get('/cashflow', getCashFlow);
 router.get('/estadisticas', getFinancialStatistics);
+router.get('/rentabilidad-productos', getRentabilidadProductos); // <-- Nueva ruta
 
 // Rutas para deudas (Cuentas por Pagar)
 router.get('/deudas', getDeudas);

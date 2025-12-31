@@ -1,28 +1,58 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+// --- Helper para API (Igual que DashboardPage) ---
+const API_URL = 'http://localhost:5000/api';
 
-// Función helper para hacer llamadas a la API
-// Función helper para hacer llamadas a la API
+const getAuthToken = () => localStorage.getItem('token');
+
 const apiFetch = async (endpoint, options = {}) => {
-  const token = localStorage.getItem('token');
-  const config = {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
-    },
-    ...options,
-  };
+  const token = getAuthToken();
+  const headers = { 'Content-Type': 'application/json', ...options.headers };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  // Allow absolute paths (starting with /api) or default to /api/finanzas
-  const url = endpoint.startsWith('/api') ? endpoint : `/api/finanzas${endpoint}`;
+  // Handle absolute vs relative paths logic from previous implementation but safer
+  const isGlobalApi = endpoint.startsWith('/api');
+  const path = isGlobalApi ? endpoint.replace('/api', '') : `/finanzas${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
 
-  const response = await axios({
-    url,
-    ...config,
-  });
+  // NOTE: previous logic was: endpoint.startsWith('/api') ? endpoint : `/api/finanzas${endpoint}`
+  // But DashboardPage uses base API_URL = .../api
+  // So:
+  // If endpoint is "/api/deudas", we want http://localhost:5000/api/deudas
+  // If endpoint is "/resumen" (finanzas specific), we want http://localhost:5000/api/finanzas/resumen
 
-  return response.data;
+  let fullUrl;
+  if (endpoint.startsWith('/api')) {
+    // e.g. /api/maquinas -> http://localhost:5000/api/maquinas
+    fullUrl = `http://localhost:5000${endpoint}`;
+  } else if (endpoint === '/') {
+    // root of finanzas -> http://localhost:5000/api/finanzas/
+    fullUrl = `${API_URL}/finanzas/`;
+  } else {
+    // e.g. /resumen -> http://localhost:5000/api/finanzas/resumen
+    fullUrl = `${API_URL}/finanzas${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
+  }
+
+  // Override for specific non-finanzas paths if passed as relative but intended for other modules?
+  // The original code: const url = endpoint.startsWith('/api') ? endpoint : `/api/finanzas${endpoint}`;
+  // So "/api/..." went to root, everything else to /api/finanzas/...
+
+  // Simplification to match original logic exactly but using fetch:
+  const urlToFetch = endpoint.startsWith('/api')
+    ? `http://localhost:5000${endpoint}`
+    : `http://localhost:5000/api/finanzas${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
+
+  const response = await fetch(urlToFetch, { ...options, headers });
+
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+      throw new Error('Sesión expirada o permisos insuficientes.');
+    }
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || errorData.error || 'Error en la petición a la API');
+  }
+  return response.json();
 };
 
 // Componente principal de la página de finanzas
@@ -169,14 +199,14 @@ const FinanzasPage = ({ userRole }) => {
         // Modo Edición
         await apiFetch(`/cuentas/${editingAccountId}`, {
           method: 'PUT',
-          data: accountFormData
+          body: JSON.stringify(accountFormData)
         });
         alert('Cuenta actualizada exitosamente');
       } else {
         // Modo Creación
         await apiFetch('/cuentas', {
           method: 'POST',
-          data: accountFormData
+          body: JSON.stringify(accountFormData)
         });
         alert('Cuenta creada exitosamente');
       }
@@ -216,7 +246,7 @@ const FinanzasPage = ({ userRole }) => {
       try {
         await apiFetch(`/cuentas/${account._id}`, {
           method: 'PUT',
-          data: { isActive: newStatus }
+          body: JSON.stringify({ isActive: newStatus })
         });
         loadBankAccounts();
       } catch (err) {
@@ -238,10 +268,10 @@ const FinanzasPage = ({ userRole }) => {
     try {
       await apiFetch(`/cuentas/${accountToClose._id}`, {
         method: 'PUT',
-        data: {
+        body: JSON.stringify({
           isActive: false,
           transferToAccountId: targetAccountId
-        }
+        })
       });
       setShowTransferModal(false);
       setAccountToClose(null);
@@ -259,10 +289,10 @@ const FinanzasPage = ({ userRole }) => {
     try {
       await apiFetch('/cuentas/deposito', {
         method: 'POST',
-        data: {
+        body: JSON.stringify({
           cuentaId: selectedAccount._id,
           ...depositFormData
-        }
+        })
       });
       setShowDepositForm(false);
       setDepositFormData({ monto: '', descripcion: '', comprobanteUrl: '' });
@@ -311,13 +341,13 @@ const FinanzasPage = ({ userRole }) => {
 
       await apiFetch(endpoint, {
         method: 'POST',
-        data: {
+        body: JSON.stringify({
           monto: parseFloat(pagoDeudaData.monto),
           tipoPago: pagoDeudaData.tipoPago,
           referencia: pagoDeudaData.referencia,
           cuenta: pagoDeudaData.cuenta
           // deudaId is in URL, spread rest
-        }
+        })
       });
 
       alert('Pago registrado exitosamente');
@@ -369,13 +399,13 @@ const FinanzasPage = ({ userRole }) => {
       if (editingId) {
         await apiFetch(`/${editingId}`, {
           method: 'PUT',
-          data: formData
+          body: JSON.stringify(formData)
         });
         setEditingId(null);
       } else {
         await apiFetch('/', {
           method: 'POST',
-          data: formData
+          body: JSON.stringify(formData)
         });
       }
       setFormData({
@@ -434,10 +464,10 @@ const FinanzasPage = ({ userRole }) => {
     try {
       await apiFetch('/api/maquinas', {
         method: 'POST',
-        data: {
+        body: JSON.stringify({
           ...maquinaFormData,
           costo: parseFloat(maquinaFormData.costo)
-        }
+        })
       });
       setShowMaquinaForm(false);
       setMaquinaFormData({ nombre: '', tipo: '', estado: 'Operativa', costo: '' });
@@ -483,10 +513,10 @@ const FinanzasPage = ({ userRole }) => {
     try {
       await apiFetch(`/api/maquinas/${expandedMaquina}/mantenimiento`, {
         method: 'POST',
-        data: {
+        body: JSON.stringify({
           ...mantenimientoFormData,
           costo: parseFloat(mantenimientoFormData.costo)
-        }
+        })
       });
       setShowMantenimientoForm(false);
       setMantenimientoFormData({ fecha: new Date().toISOString().split('T')[0], costo: '', descripcion: '' });

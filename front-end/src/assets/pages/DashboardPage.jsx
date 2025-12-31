@@ -39,12 +39,12 @@ const apiFetch = async (endpoint, options = {}) => {
 
   const response = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
   if (!response.ok) {
-    if (response.status === 401) {
+    if (response.status === 401 || response.status === 403) {
       localStorage.removeItem('token');
       window.location.href = '/login';
-      throw new Error('Sesión expirada. Redirigiendo al login...');
+      throw new Error('Sesión expirada o permisos insuficientes. Redirigiendo al login...');
     }
-    const errorData = await response.json();
+    const errorData = await response.json().catch(() => ({}));
     throw new Error(errorData.message || errorData.error || 'Error en la petición a la API');
   }
   return response.json();
@@ -128,7 +128,9 @@ const DashboardPage = ({ userRole }) => {
   // Datos
   const [ventasData, setVentasData] = useState({ ventasMensuales: [], ventasAnuales: [], productosMasVendidos: [] });
   const [produccionData, setProduccionData] = useState({ estadisticasGenerales: {}, produccionMensual: [], produccionPorEstado: [], eficienciaProduccion: [], maquinaStats: [] });
-  const [finanzasData, setFinanzasData] = useState({ metrics: {}, cashflow: [], resumenTotal: {} });
+  const [finanzasData, setFinanzasData] = useState({ resumenTotal: {}, cashflow: [] });
+  const [rentabilidadData, setRentabilidadData] = useState([]); // <-- Nuevo estado para rentabilidad
+  const [rentabilidadSearch, setRentabilidadSearch] = useState(''); // <-- Nuevo estado para búsqueda
   const [inventarioData, setInventarioData] = useState({ metricas: {}, alertas: [] });
   const [logisticaData, setLogisticaData] = useState({ estadisticas: {}, pedidosRecientes: [] });
   const [comprasData, setComprasData] = useState({
@@ -138,9 +140,23 @@ const DashboardPage = ({ userRole }) => {
     comprasPorTipo: [],
     comprasPorEstado: []
   });
+  const [comprasPorProductoData, setComprasPorProductoData] = useState([]); // <-- Nuevo estado para compras por producto
+  const [comprasSearch, setComprasSearch] = useState(''); // <-- Search input state
+  const [debouncedComprasSearch, setDebouncedComprasSearch] = useState(''); // <-- Debounced value for API
 
   // Colores
   const COLORS = ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4'];
+
+  // Debounce Effect
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedComprasSearch(comprasSearch);
+    }, 500); // 500ms delay
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [comprasSearch]);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -149,13 +165,14 @@ const DashboardPage = ({ userRole }) => {
 
   useEffect(() => {
     cargarDatos();
-  }, [activeTab, periodo, selectedYear, selectedMonth, selectedDate]);
+  }, [activeTab, periodo, selectedYear, selectedMonth, selectedDate, rentabilidadSearch, debouncedComprasSearch]); // <-- Depend on DEBOUNCED value
 
   const cargarDatos = async () => {
     setLoading(true);
     setError(null);
     try {
       const token = localStorage.getItem('token');
+      if (!token) return; // Prevent 403 calls if not logged in
       const headers = { Authorization: `Bearer ${token}` };
 
       // Construct global query params
@@ -191,11 +208,13 @@ const DashboardPage = ({ userRole }) => {
         setProduccionData({ ...(res.data || res), maquinaStats: mStats });
       }
 
-      // 3. Finanzas
       if (activeTab === 'finanzas') {
         const stats = await apiFetch(`/finanzas/estadisticas?${queryString}`, { headers });
         const resumen = await apiFetch('/finanzas/resumen', { headers });
+        const rentabilidad = await apiFetch(`/finanzas/rentabilidad-productos?${queryString}&search=${rentabilidadSearch}`, { headers }); // <-- Fetch rentabilidad
+
         setFinanzasData({ ...stats, resumenTotal: resumen.data || {} });
+        setRentabilidadData(rentabilidad); // <-- Set data
       }
 
       // 4. Inventario
@@ -219,7 +238,9 @@ const DashboardPage = ({ userRole }) => {
       // 6. Compras
       if (activeTab === 'compras') {
         const res = await apiFetch(`/compras/estadisticas?${queryString}`, { headers });
+        const productosRes = await apiFetch(`/compras/productos?${queryString}&search=${debouncedComprasSearch}`, { headers }); // Use debounced value
         setComprasData(res.data || res);
+        setComprasPorProductoData(productosRes);
       }
 
     } catch (err) {
@@ -341,6 +362,7 @@ const DashboardPage = ({ userRole }) => {
 
   const comprasChartData = (comprasData.comprasMensuales || []).map(item => ({
     mes: periodeLabel(item),
+    gasto: item.totalGasto, // Maps to AreaChart dataKey="gasto"
     pagado: (item.totalGasto || 0) - (item.totalPendiente || 0),
     pendiente: item.totalPendiente
   }));
@@ -606,15 +628,15 @@ const DashboardPage = ({ userRole }) => {
               <div className="space-y-6 animate-fade-in">
                 {/* Top Row: KPI Cards (Barras Arriba) */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  <KPICard title="Total Ingresos" value={`Bs. ${finanzasData.resumenTotal.ingresos?.toLocaleString() || 0}`} icon="📈" color="green" />
-                  <KPICard title="Total Egresos" value={`Bs. ${finanzasData.resumenTotal.egresos?.toLocaleString() || 0}`} icon="📉" color="red" />
-                  <KPICard title="Utilidad Neta" value={`Bs. ${(finanzasData.resumenTotal.ingresos - finanzasData.resumenTotal.egresos).toLocaleString() || 0}`} icon="💰" color="blue" />
-                  <div className={`p-6 rounded-xl border shadow-sm transition-transform hover:scale-105 ${(finanzasData.resumenTotal.balance || 0) >= 0 ? 'bg-indigo-50 border-indigo-100' : 'bg-orange-50 border-orange-100'}`}>
+                  <KPICard title="Total Ingresos" value={`Bs. ${finanzasData.resumenTotal?.ingresos?.toLocaleString() || 0}`} icon="📈" color="green" />
+                  <KPICard title="Total Egresos" value={`Bs. ${finanzasData.resumenTotal?.egresos?.toLocaleString() || 0}`} icon="📉" color="red" />
+                  <KPICard title="Utilidad Neta" value={`Bs. ${((finanzasData.resumenTotal?.ingresos || 0) - (finanzasData.resumenTotal?.egresos || 0)).toLocaleString() || 0}`} icon="💰" color="blue" />
+                  <div className={`p-6 rounded-xl border shadow-sm transition-transform hover:scale-105 ${(finanzasData.resumenTotal?.balance || 0) >= 0 ? 'bg-indigo-50 border-indigo-100' : 'bg-orange-50 border-orange-100'}`}>
                     <div className="flex justify-between items-start">
                       <div>
                         <p className="text-sm font-medium mb-1 opacity-80">Balance General</p>
-                        <h3 className={`text-2xl font-bold ${(finanzasData.resumenTotal.balance || 0) >= 0 ? 'text-indigo-700' : 'text-orange-700'}`}>
-                          Bs. {finanzasData.resumenTotal.balance?.toLocaleString() || 0}
+                        <h3 className={`text-2xl font-bold ${(finanzasData.resumenTotal?.balance || 0) >= 0 ? 'text-indigo-700' : 'text-orange-700'}`}>
+                          Bs. {finanzasData.resumenTotal?.balance?.toLocaleString() || 0}
                         </h3>
                       </div>
                       <span className="text-3xl p-2 bg-white bg-opacity-30 rounded-lg">⚖️</span>
@@ -709,7 +731,97 @@ const DashboardPage = ({ userRole }) => {
                   </div>
                 </div>
 
+                {/* --- SECCIÓN NUEVA: ANÁLISIS DE RENTABILIDAD POR PRODUCTO --- */}
+                <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 mt-6 overflow-hidden">
+                  <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                    <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                      <span className="p-2 bg-indigo-100 rounded-lg text-indigo-600">📊</span>
+                      Rentabilidad por Producto
+                    </h3>
+                    <div className="relative w-full md:w-64">
+                      <input
+                        type="text"
+                        placeholder="Buscar por código o nombre..."
+                        className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        value={rentabilidadSearch}
+                        onChange={(e) => setRentabilidadSearch(e.target.value)}
+                      />
+                      <span className="absolute left-3 top-2.5 text-gray-400">🔍</span>
+                    </div>
+                  </div>
+
+                  <div className="h-96 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        layout="vertical"
+                        data={rentabilidadData.slice(0, 10)} // Top 10 productos
+                        margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5E7EB" />
+                        <XAxis type="number" stroke="#9CA3AF" tickFormatter={(value) => `Bs. ${value}`} />
+                        <YAxis
+                          type="category"
+                          dataKey="nombre"
+                          stroke="#4B5563"
+                          width={150}
+                          tick={{ fontSize: 12 }}
+                        />
+                        <Tooltip
+                          content={({ active, payload, label }) => {
+                            if (active && payload && payload.length) {
+                              const data = payload[0].payload;
+                              return (
+                                <div className="bg-white p-4 border border-gray-200 shadow-lg rounded-lg">
+                                  <p className="font-bold text-gray-800 mb-2">{label}</p>
+                                  <div className="space-y-1 text-sm">
+                                    <p className="flex justify-between gap-4">
+                                      <span className="text-gray-500">Utilidad Neta:</span>
+                                      <span className={`font-bold ${data.utilidad >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        Bs. {data.utilidad.toLocaleString()}
+                                      </span>
+                                    </p>
+                                    <p className="flex justify-between gap-4">
+                                      <span className="text-gray-500">Vendidos:</span>
+                                      <span className="font-medium">{data.cantidadVendida} u.</span>
+                                    </p>
+                                    <p className="flex justify-between gap-4">
+                                      <span className="text-gray-500">Ingreso Total:</span>
+                                      <span className="font-medium text-blue-600">Bs. {data.ingresoTotal.toLocaleString()}</span>
+                                    </p>
+                                    <p className="flex justify-between gap-4">
+                                      <span className="text-gray-500">Costo Total:</span>
+                                      <span className="font-medium text-gray-600">Bs. {data.costoTotal.toLocaleString()}</span>
+                                    </p>
+                                    <p className="flex justify-between gap-4">
+                                      <span className="text-gray-500">Margen %:</span>
+                                      <span className={`font-bold ${data.margen >= 20 ? 'text-green-600' : data.margen > 0 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                        {data.margen.toFixed(1)}%
+                                      </span>
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Bar
+                          dataKey="utilidad"
+                          fill="#10B981"
+                          radius={[0, 4, 4, 0]}
+                          barSize={20}
+                          name="Utilidad Neta"
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                    {rentabilidadData.length > 10 && (
+                      <p className="text-center text-xs text-gray-400 mt-2">Mostrando los 10 productos más rentables</p>
+                    )}
+                  </div>
+                </div>
+
               </div>
+
             )}
 
             {/* --- INVENTARIO --- */}
@@ -929,17 +1041,93 @@ const DashboardPage = ({ userRole }) => {
                         <PieChart>
                           <Pie
                             data={comprasData.comprasPorTipo}
-                            cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value"
+                            cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="total"
+                            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                           >
                             {comprasData.comprasPorTipo.map((entry, index) => (
                               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                             ))}
                           </Pie>
-                          <Tooltip />
+                          <Tooltip content={<CustomTooltip prefix="Bs. " />} />
                           <Legend />
                         </PieChart>
                       </ResponsiveContainer>
                     </div>
+                  </div>
+                </div>
+
+                {/* --- SECCIÓN NUEVA: ANÁLISIS DE COMPRAS POR PRODUCTO --- */}
+                <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 mt-6 overflow-hidden">
+                  <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                    <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                      <span className="p-2 bg-pink-100 rounded-lg text-pink-600">🛍️</span>
+                      Compras por Producto
+                    </h3>
+                    <div className="relative w-full md:w-64">
+                      <input
+                        type="text"
+                        placeholder="Buscar por código o nombre..."
+                        className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
+                        value={comprasSearch}
+                        onChange={(e) => setComprasSearch(e.target.value)}
+                      />
+                      <span className="absolute left-3 top-2.5 text-gray-400">🔍</span>
+                    </div>
+                  </div>
+
+                  <div className="h-96 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        layout="vertical"
+                        data={comprasPorProductoData.slice(0, 10)} // Top 10 productos
+                        margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5E7EB" />
+                        <XAxis type="number" stroke="#9CA3AF" tickFormatter={(value) => `Bs. ${value}`} />
+                        <YAxis
+                          type="category"
+                          dataKey="nombre"
+                          stroke="#4B5563"
+                          width={150}
+                          tick={{ fontSize: 12 }}
+                        />
+                        <Tooltip
+                          content={({ active, payload, label }) => {
+                            if (active && payload && payload.length) {
+                              const data = payload[0].payload;
+                              return (
+                                <div className="bg-white p-4 border border-gray-200 shadow-lg rounded-lg">
+                                  <p className="font-bold text-gray-800 mb-2">{label}</p>
+                                  <div className="space-y-1 text-sm">
+                                    <p className="flex justify-between gap-4">
+                                      <span className="text-gray-500">Gasto Total:</span>
+                                      <span className="font-bold text-pink-600">Bs. {data.costoTotal.toLocaleString()}</span>
+                                    </p>
+                                    <p className="flex justify-between gap-4">
+                                      <span className="text-gray-500">Cantidad:</span>
+                                      <span className="font-medium">{data.cantidadComprada} u.</span>
+                                    </p>
+                                    <p className="flex justify-between gap-4">
+                                      <span className="text-gray-500">Costo Promedio:</span>
+                                      <span className="font-medium">Bs. {data.precioPromedio.toFixed(2)}</span>
+                                    </p>
+                                    <p className="flex justify-between gap-4">
+                                      <span className="text-gray-500">Última Compra:</span>
+                                      <span className="font-medium text-gray-400">{new Date(data.ultimaCompra).toLocaleDateString()}</span>
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Bar dataKey="costoTotal" fill="#EC4899" radius={[0, 4, 4, 0]} barSize={20} name="Gasto Total" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                    {comprasPorProductoData.length > 10 && (
+                      <p className="text-center text-xs text-gray-400 mt-2">Mostrando los 10 productos con mayor gasto</p>
+                    )}
                   </div>
                 </div>
 
@@ -949,7 +1137,7 @@ const DashboardPage = ({ userRole }) => {
           </>
         )}
       </div>
-    </div >
+    </div>
   );
 };
 export default DashboardPage;

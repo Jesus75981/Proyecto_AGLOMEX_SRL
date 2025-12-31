@@ -24,6 +24,9 @@ const ventaSchema = new mongoose.Schema({
       },
       cantidad: Number,
       precioUnitario: Number,
+      costoUnitario: Number, // <-- NUEVO: Snapshot del costo al momento de venta
+      nombreProducto: String, // Snapshot
+      codigo: String, // Snapshot
       precioTotal: Number
     }
   ],
@@ -69,7 +72,7 @@ const ventaSchema = new mongoose.Schema({
     enum: ["Factura", "Recibo"],
     default: "Recibo" // Default to Recibo if not specified (informal)
   },
-  numFactura: { type: String, required: true },
+  numFactura: { type: String, required: false }, // Opcional según requerimiento
   observaciones: String
 }, { timestamps: true });
 

@@ -15,15 +15,26 @@ export const registrarVenta = async (req, res) => {
 
     const ventaData = { ...req.body, numVenta: nuevoNumVenta };
 
-    // 1. VALIDACIÓN DE STOCK
+    // 1. VALIDACIÓN DE STOCK Y SNAPSHOT DE COSTOS
     const productosVendidos = ventaData.productos;
     const productosInsuficientes = [];
-    for (const item of productosVendidos) {
+
+    // Iterar para validar stock Y capturar costo unitario actual
+    for (let i = 0; i < productosVendidos.length; i++) {
+      const item = productosVendidos[i];
       const producto = await ProductoTienda.findById(item.producto);
+
       if (!producto) return res.status(404).json({ msg: `Producto con ID ${item.producto} no encontrado.` });
+
       if (producto.cantidad < item.cantidad) {
         productosInsuficientes.push({ nombre: producto.nombre, stockActual: producto.cantidad, solicitado: item.cantidad });
       }
+
+      // SNAPSHOT DEL COSTO PROMEDIO (WAC) AL MOMENTO DE LA VENTA
+      // Si no tiene costoPromedio (legacy), usar precioCompra
+      item.costoUnitario = producto.costoPromedio || producto.precioCompra || 0;
+      item.nombreProducto = producto.nombre; // Snapshot
+      item.codigo = producto.codigo; // Snapshot
     }
     if (productosInsuficientes.length > 0) {
       return res.status(400).json({ msg: "Stock insuficiente", productosInsuficientes });

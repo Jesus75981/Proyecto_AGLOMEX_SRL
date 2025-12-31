@@ -26,6 +26,10 @@ const compraSchema = new mongoose.Schema({
         required: true,
         unique: true
     },
+    numeroFactura: {
+        type: String,
+        required: true // Obligatorio según requerimiento
+    },
     fecha: {
         type: Date,
         default: Date.now
@@ -53,6 +57,8 @@ const compraSchema = new mongoose.Schema({
                 required: true,
                 enum: ['MateriaPrima', 'ProductoTienda']
             },
+            nombreProducto: String, // Snapshot del nombre
+            codigo: String, // Snapshot del código
             cantidad: { type: Number, required: true },
             precioUnitario: { type: Number, required: true },
             codigoProveedor: String

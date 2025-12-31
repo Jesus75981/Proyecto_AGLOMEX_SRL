@@ -160,6 +160,9 @@ export const registrarCompra = async (req, res) => {
         if (!datosCompra.proveedor) {
             return res.status(400).json({ message: "El proveedor es obligatorio." });
         }
+        if (!datosCompra.numeroFactura) {
+            return res.status(400).json({ message: "El número de factura es obligatorio para todas las compras." });
+        }
         const Proveedor = (await import("../models/proveedores.model.js")).default;
         const proveedorExistente = await Proveedor.findById(datosCompra.proveedor);
         if (!proveedorExistente) {
@@ -232,7 +235,9 @@ export const registrarCompra = async (req, res) => {
             return {
                 ...item,
                 producto: productoObjectId,
-                onModel: datosCompra.tipoCompra === "Materia Prima" ? "MateriaPrima" : "ProductoTienda"
+                onModel: datosCompra.tipoCompra === "Materia Prima" ? "MateriaPrima" : "ProductoTienda",
+                nombreProducto: item.nombreProducto, // Snapshot
+                codigo: item.codigo // Snapshot
             };
         });
         datosCompra.productos = await Promise.all(preProcessPromises);
@@ -241,16 +246,39 @@ export const registrarCompra = async (req, res) => {
         const compraGuardada = await nuevaCompra.save();
 
         // Actualizar inventario
-        const updatePromises = datosCompra.productos.map(item => {
+        // Actualizar inventario con Cálculo de Costo Promedio Ponderado (WAC)
+        const updatePromises = datosCompra.productos.map(async (item) => {
             const Modelo = datosCompra.tipoCompra === "Materia Prima" ? MateriaPrima : ProductoTienda;
-            return Modelo.findByIdAndUpdate(
-                item.producto,
-                {
-                    $inc: { cantidad: item.cantidad },
-                    $set: { precioCompra: item.precioUnitario } // Automatic update of purchase price
-                },
-                { new: true }
-            ).orFail(new Error(`${datosCompra.tipoCompra} con ID ${item.producto} no encontrado.`));
+
+            // Buscar producto actual
+            const producto = await Modelo.findById(item.producto);
+            if (!producto) throw new Error(`${datosCompra.tipoCompra} con ID ${item.producto} no encontrado.`);
+
+            // 1. Calcular Nuevo WAC
+            const stockActual = producto.cantidad || 0;
+            // Si no existe costoPromedio, usamos precioCompra como fallback inicial
+            const costoPromedioActual = producto.costoPromedio || producto.precioCompra || 0;
+
+            const nuevoStock = item.cantidad;
+            const costoUnitarioNuevo = item.precioUnitario;
+
+            // Fórmula: ((StockActual * CostoActual) + (NuevoStock * NuevoCosto)) / (StockActual + NuevoStock)
+            const totalValorActual = stockActual * costoPromedioActual;
+            const totalValorNuevo = nuevoStock * costoUnitarioNuevo;
+            const nuevoTotalStock = stockActual + nuevoStock;
+
+            const nuevoCostoPromedio = nuevoTotalStock > 0
+                ? (totalValorActual + totalValorNuevo) / nuevoTotalStock
+                : costoUnitarioNuevo;
+
+            // 2. Actualizar Producto
+            producto.cantidad = nuevoTotalStock;
+            producto.costoPromedio = nuevoCostoPromedio;
+            producto.precioCompra = costoUnitarioNuevo; // Mantenemos referencia del último precio de compra también
+
+            console.log(`[WAC] ${producto.nombre}: Stock ${stockActual}->${nuevoTotalStock}, CostoProm ${costoPromedioActual.toFixed(2)}->${nuevoCostoPromedio.toFixed(2)}`);
+
+            return producto.save();
         });
         await Promise.all(updatePromises);
 
@@ -577,6 +605,105 @@ export const obtenerEstadisticas = async (req, res) => {
     } catch (error) {
         console.error("Error al obtener estadísticas de compras:", error);
         res.status(500).json({ message: "Error al obtener estadísticas de compras" });
+    }
+};
+
+
+/**
+ * Obtener desglose de compras por producto (para el Dashboard)
+ */
+export const getComprasPorProducto = async (req, res) => {
+    try {
+        const { year, period, month, date, search } = req.query;
+        let matchStage = {
+            estado: { $ne: "Anulado" }
+        };
+
+        // Date Filtering Logic (reuse strict logic if needed or standard date ranges)
+        if (year) {
+            const currentYear = parseInt(year);
+            const startDate = new Date(year, 0, 1);
+            const endDate = new Date(year, 11, 31, 23, 59, 59);
+            matchStage.fecha = { $gte: startDate, $lte: endDate };
+
+            if (period === 'month' && month) {
+                const m = parseInt(month) - 1;
+                matchStage.fecha = {
+                    $gte: new Date(year, m, 1),
+                    $lte: new Date(year, m + 1, 0, 23, 59, 59)
+                };
+            } else if ((period === 'week' || period === 'day') && date) {
+                const dayStart = new Date(date);
+                const dayEnd = new Date(date);
+                dayEnd.setHours(23, 59, 59, 999);
+                matchStage.fecha = { $gte: dayStart, $lte: dayEnd };
+            }
+        }
+
+        const pipeline = [
+            { $match: matchStage },
+            { $unwind: "$productos" },
+            // Lookup for missing product names/codes (Legacy Data Support)
+            {
+                $lookup: {
+                    from: "productotiendas",
+                    localField: "productos.producto",
+                    foreignField: "_id",
+                    as: "detalleProductoTienda"
+                }
+            },
+            {
+                $lookup: {
+                    from: "materiaprimas", // Check your collection name convention
+                    localField: "productos.producto",
+                    foreignField: "_id",
+                    as: "detalleMateriaPrima"
+                }
+            },
+            {
+                $group: {
+                    _id: "$productos.producto", // Group by Product ID
+                    // Coalesce: Snapshot > ProductoTienda > MateriaPrima > Unknown
+                    nombre: {
+                        $first: {
+                            $ifNull: [
+                                "$productos.nombreProducto",
+                                { $ifNull: [{ $arrayElemAt: ["$detalleProductoTienda.nombre", 0] }, { $arrayElemAt: ["$detalleMateriaPrima.nombre", 0] }, "Producto Desconocido"] }
+                            ]
+                        }
+                    },
+                    codigo: {
+                        $first: {
+                            $ifNull: [
+                                "$productos.codigo",
+                                { $ifNull: [{ $arrayElemAt: ["$detalleProductoTienda.codigo", 0] }, "S/C"] } // MateriaPrima might not have code
+                            ]
+                        }
+                    },
+                    cantidadComprada: { $sum: "$productos.cantidad" },
+                    costoTotal: { $sum: { $multiply: ["$productos.cantidad", "$productos.precioUnitario"] } },
+                    precioPromedio: { $avg: "$productos.precioUnitario" },
+                    ultimaCompra: { $max: "$fecha" }
+                }
+            },
+            // Filter by Search if present
+            ...(search ? [{
+                $match: {
+                    $or: [
+                        { nombre: { $regex: search, $options: "i" } },
+                        { codigo: { $regex: search, $options: "i" } }
+                    ]
+                }
+            }] : []),
+            { $sort: { costoTotal: -1 } } // Sort by highest spend
+        ];
+
+        const resultados = await Compra.aggregate(pipeline);
+        res.json(resultados);
+
+    } catch (error) {
+        console.error("Error al obtener compras por producto:", error);
+        res.status(500).json({ message: "Error al obtener reporte de compras por producto" });
     }
 };
 
