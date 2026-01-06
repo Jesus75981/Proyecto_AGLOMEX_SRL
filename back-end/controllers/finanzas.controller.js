@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import Finanzas from '../models/finanzas.model.js';
 import Logistica from '../models/logistica.model.js';
 import Venta from '../models/venta.model.js';
@@ -211,6 +212,18 @@ export const getFinancialMetrics = async (req, res) => {
       utilidadNeta: 0
     };
 
+    // --- Agregado: Calcular Disponibilidad de Capital (Caja + Bancos) ---
+    const accounts = await BankAccount.find({ isActive: true });
+    const totalBanco = accounts.filter(a => a.tipo === 'banco').reduce((sum, a) => sum + a.saldo, 0);
+    const totalEfectivo = accounts.filter(a => a.tipo === 'efectivo').reduce((sum, a) => sum + a.saldo, 0);
+
+    result.capitalStats = {
+      totalBanco,
+      totalEfectivo,
+      totalCapital: totalBanco + totalEfectivo
+    };
+    // -------------------------------------------------------------------
+
     res.json(result);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -312,7 +325,7 @@ export const getFinancialStatistics = async (req, res) => {
     let sort = {};
 
     if (period === 'month') {
-      const selectedMonth = parseInt(month) || 0; // 0-indexed (0 = Jan)
+      const selectedMonth = (parseInt(month) || 1) - 1; // Frontend sends 1-12, JS Date needs 0-11
       startDate = new Date(selectedYear, selectedMonth, 1);
       endDate = new Date(selectedYear, selectedMonth + 1, 0, 23, 59, 59);
 
@@ -424,9 +437,6 @@ export const getFinancialStatistics = async (req, res) => {
 
       // Guardar dato específico para desglose
       metrics.ingresosPorEnvio = logisticaData.totalCostoEnvio;
-
-      // Recalcular utilidad neta
-      metrics.utilidadNeta = metrics.totalIngresos - metrics.totalEgresos;
     }
     // -------------------------------
     // --- INTEGRACIÓN: VENTAS FACTURADAS VS RECIEBOS ---
@@ -434,47 +444,84 @@ export const getFinancialStatistics = async (req, res) => {
       {
         $match: {
           fecha: { $gte: startDate, $lte: endDate },
-          estado: { $ne: 'Anulado' } // Ensure voided sales are excluded
+          estado: { $ne: 'Anulado' }
+        }
+      },
+      // Descomponemos productos para calcular costo individualmente
+      { $unwind: "$productos" },
+      {
+        $project: {
+          _id: 1, // Mantener ID de venta
+          tipoComprobante: 1,
+          cantidad: "$productos.cantidad",
+          precioTotal: "$productos.precioTotal", // O calcular precioUnitario * cantidad
+          precioUnitario: "$productos.precioUnitario",
+          // Lógica de costo con fallback
+          costoUnitarioReal: {
+            $ifNull: ["$productos.costoUnitario", 0]
+          }
         }
       },
       {
+        $addFields: {
+          costoTotalProducto: { $multiply: ["$cantidad", "$costoUnitarioReal"] },
+          ventaTotalProducto: { $multiply: ["$cantidad", "$precioUnitario"] } // Recalcular para asegurar consistencia
+        }
+      },
+      // Re-agrupar por Venta
+      {
         $group: {
-          _id: "$tipoComprobante", // Group by 'Factura' or 'Recibo'
-          total: {
-            $sum: {
-              $ifNull: ["$totalVenta", // Try to use totalVenta first if available in schema (it's not, use products sum)
-                { $reduce: { input: "$productos", initialValue: 0, in: { $add: ["$$value", "$$this.precioTotal"] } } }
-              ]
-            }
-          },
-          count: { $sum: 1 }
+          _id: "$_id",
+          tipoComprobante: { $first: "$tipoComprobante" },
+          totalVenta: { $sum: "$ventaTotalProducto" },
+          costoVenta: { $sum: "$costoTotalProducto" }
+        }
+      },
+      // Agrupar por Tipo de Comprobante (como estaba originalmente)
+      {
+        $group: {
+          _id: "$tipoComprobante",
+          total: { $sum: "$totalVenta" },
+          count: { $sum: 1 },
+          costoTotal: { $sum: "$costoVenta" }
         }
       }
     ]);
 
-    metrics.resumenFiscal = {
-      facturado: 0,
-      recibo: 0,
-      impuestoEstimado: 0
-    };
+    // Assign breakdown results
+    metrics.ventasBreakdown = ventasBreakdown[0] || { total: 0, count: 0, costoTotal: 0 };
 
-    ventasBreakdown.forEach(item => {
-      if (item._id === 'Factura') {
-        metrics.resumenFiscal.facturado = item.total;
-      } else {
-        metrics.resumenFiscal.recibo += item.total; // Default to Recibo for others
+    // --- INTEGRACIÓN: UTILIDAD BRUTA REAL (VENTAS - COSTOS) ---
+    // User requested "Utilidad por Venta" to be purely Sales - COGS, excluding other expenses.
+    const grossProfitAggregation = await Venta.aggregate([
+      {
+        $match: {
+          fecha: { $gte: startDate, $lte: endDate },
+          estado: { $ne: 'Anulado' }
+        }
+      },
+      { $unwind: '$productos' },
+      {
+        $group: {
+          _id: null,
+          totalVentas: { $sum: { $multiply: ['$productos.cantidad', '$productos.precioUnitario'] } },
+          totalCosto: {
+            $sum: { $multiply: ['$productos.cantidad', { $ifNull: ['$productos.costoUnitario', 0] }] }
+          }
+        }
+      },
+      {
+        $project: {
+          utilidadBrutaVentas: { $subtract: ['$totalVentas', '$totalCosto'] }
+        }
       }
-    });
+    ]);
 
-    // Estimate Tax (e.g. 13% IVA + 3% IT = ~16% or just 13% based on user preference? User said "no tenemos credito fiscal", implying informal environment).
-    // Let's just provide the totals for decision making. User can interpret tax.
-    // But if they want "Impuesto Estimado" I'll set it as 13% of Facturado for reference.
-    metrics.resumenFiscal.impuestoEstimado = metrics.resumenFiscal.facturado * 0.13;
-    // -------------------------------
+    metrics.utilidadBrutaVentas = grossProfitAggregation[0] ? grossProfitAggregation[0].utilidadBrutaVentas : 0;
+    // -------------------------------------------------------------
 
-    // Cashflow (distribución por periodo)
-    // NOTA: Para simplificar, actualmente no estamos fusionando los costos de logística en el gráfico de Cashflow
-    // Si se requiere exactitud total en el gráfico, se debería hacer una agregación similar y combinar arrays.
+    // --- INTEGRACIÓN: FLUJO DE CAJA (Gráfico) ---
+    // Agrupar por unidad de tiempo seleccionada (día, mes)
     const cashflow = await Finanzas.aggregate([
       {
         $match: {
@@ -506,9 +553,48 @@ export const getFinancialStatistics = async (req, res) => {
       { $sort: sort }
     ]);
 
+    // Detalle Granular de Ventas para Tabla de Rentabilidad
+    const salesDetail = await Venta.aggregate([
+      {
+        $match: {
+          fecha: { $gte: startDate, $lte: endDate },
+          estado: { $ne: 'Anulado' }
+        }
+      },
+      { $unwind: "$productos" },
+      {
+        $project: {
+          fecha: 1,
+          numVenta: 1,
+          producto: "$productos.nombreProducto",
+          codigo: "$productos.codigo",
+          cantidad: "$productos.cantidad",
+          precioVenta: "$productos.precioUnitario",
+          costoCompra: { $ifNull: ["$productos.costoUnitario", 0] }
+        }
+      },
+      {
+        $addFields: {
+          utilidadUnitario: { $subtract: ["$precioVenta", "$costoCompra"] },
+          utilidadTotal: { $multiply: ["$cantidad", { $subtract: ["$precioVenta", "$costoCompra"] }] }
+        }
+      },
+      { $sort: { fecha: -1 } },
+      { $limit: 100 }
+    ]);
+
+    // DEBUG: Inspect Venta #1
+    const v1 = salesDetail.find(s => s.numVenta === 1);
+    if (v1) {
+      console.log("--- DEBUG VENTA #1 ---");
+      console.log(JSON.stringify(v1, null, 2));
+      console.log("----------------------");
+    }
+
     res.json({
       metrics,
       cashflow,
+      salesDetail, // New field
       periodInfo: {
         startDate,
         endDate,
@@ -526,7 +612,28 @@ export const getFinancialStatistics = async (req, res) => {
 // Función para obtener rentabilidad por producto (INCLUYENDO NO VENDIDOS)
 export const getRentabilidadProductos = async (req, res) => {
   try {
-    const { startDate, endDate, search } = req.query;
+    const { year, period, month, date, search } = req.query;
+
+    let start = null;
+    let end = null;
+
+    if (year) {
+      const y = parseInt(year);
+      if (period === 'month' && month) {
+        const m = parseInt(month) - 1; // JS months 0-11
+        start = new Date(Date.UTC(y, m, 1, 0, 0, 0));
+        end = new Date(Date.UTC(y, m + 1, 0, 23, 59, 59));
+      } else if (period === 'day' && date) {
+        // Asumiendo que date viene 'YYYY-MM-DD' y queremos cubrir el día UTC completo
+        // O mejor: interpretar la fecha local del usuario y cubrir ese rango
+        const d = new Date(date);
+        start = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0));
+        end = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59));
+      } else {
+        start = new Date(Date.UTC(y, 0, 1, 0, 0, 0));
+        end = new Date(Date.UTC(y, 11, 31, 23, 59, 59));
+      }
+    }
 
     const pipeline = [
       { $match: { activo: true } },
@@ -552,11 +659,11 @@ export const getRentabilidadProductos = async (req, res) => {
                 estado: { $ne: "Anulado" }
               }
             },
-            ...(startDate && endDate ? [{
+            ...(start && end ? [{
               $match: {
                 fecha: {
-                  $gte: new Date(startDate),
-                  $lte: new Date(endDate)
+                  $gte: start,
+                  $lte: end
                 }
               }
             }] : [])
@@ -580,7 +687,7 @@ export const getRentabilidadProductos = async (req, res) => {
                 in: {
                   $multiply: [
                     "$$v.productos.cantidad",
-                    { $ifNull: ["$$v.productos.costoUnitario", "$precioCompra"] }
+                    { $ifNull: ["$$v.productos.costoUnitario", 0] }
                   ]
                 }
               }
@@ -711,7 +818,7 @@ export const registrarPagoDeuda = async (req, res) => {
 // Crear nueva cuenta bancaria
 export const createAccount = async (req, res) => {
   try {
-    const { nombreBanco, numeroCuenta, saldoInicial } = req.body;
+    const { nombreBanco, numeroCuenta, saldoInicial, tipo = 'banco' } = req.body; // Default tipo to banco
 
     if (!nombreBanco || !numeroCuenta) {
       return res.status(400).json({ message: "Nombre del banco y número de cuenta son obligatorios." });
@@ -725,7 +832,8 @@ export const createAccount = async (req, res) => {
     const newAccount = new BankAccount({
       nombreBanco,
       numeroCuenta,
-      saldo: saldoInicial || 0
+      saldo: saldoInicial || 0,
+      tipo // Add tipo
     });
 
     await newAccount.save();

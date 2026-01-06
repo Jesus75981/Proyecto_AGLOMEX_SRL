@@ -28,7 +28,7 @@ const compraSchema = new mongoose.Schema({
     },
     numeroFactura: {
         type: String,
-        required: true // Obligatorio según requerimiento
+        required: false // Ahora opcional
     },
     fecha: {
         type: Date,

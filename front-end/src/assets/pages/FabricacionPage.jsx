@@ -17,9 +17,9 @@ const FabricacionPage = ({ userRole }) => {
 
   // Handle initial tab from navigation state
   useEffect(() => {
-     if (location.state?.initialTab) {
-        setActiveTab(location.state.initialTab);
-     }
+    if (location.state?.initialTab) {
+      setActiveTab(location.state.initialTab);
+    }
   }, [location.state]);
 
   // ✅ Volver al HOME (menú principal)
@@ -93,10 +93,10 @@ const FabricacionPage = ({ userRole }) => {
 
   // Estado para datos de finalización de producción
   const [datosCompletados, setDatosCompletados] = useState({
-      descripcion: '',
-      categoria: '',
-      precioVenta: 0,
-      imagen: ''
+    descripcion: '',
+    categoria: '',
+    precioVenta: 0,
+    imagen: ''
   });
 
   // Estado para nueva máquina
@@ -201,46 +201,46 @@ const FabricacionPage = ({ userRole }) => {
       const precio = mat ? (mat.precioCompra || 0) : 0;
       return acc + (precio * item.cantidad);
     }, 0);
-    
+
     setNuevaOrden(prev => ({ ...prev, precioCompra: costoTotal }));
   }, [nuevaOrden.materiales, materiales]);
 
   const agregarMaterialAOrden = () => {
     if (!materialSeleccionado || cantidadMaterialSeleccionada <= 0) return;
-    
+
     // Verificar stock
     const material = materiales.find(m => m._id === materialSeleccionado);
     if (!material) return;
     if (material.cantidad < cantidadMaterialSeleccionada) {
-        alert(`Stock insuficiente. Solo hay ${material.cantidad} disponibles.`);
-        return;
+      alert(`Stock insuficiente. Solo hay ${material.cantidad} disponibles.`);
+      return;
     }
 
-      // Check if already exists
-      const exists = nuevaOrden.materiales.find(m => m.material === materialSeleccionado);
-      
-      let updatedMaterials;
-      if (exists) {
-          updatedMaterials = nuevaOrden.materiales.map(m => 
-              m.material === materialSeleccionado 
-                  ? { ...m, cantidad: m.cantidad + cantidadMaterialSeleccionada }
-                  : m
-          );
-      } else {
-          updatedMaterials = [...nuevaOrden.materiales, { material: materialSeleccionado, cantidad: cantidadMaterialSeleccionada }];
-      }
+    // Check if already exists
+    const exists = nuevaOrden.materiales.find(m => m.material === materialSeleccionado);
 
-      setNuevaOrden({ ...nuevaOrden, materiales: updatedMaterials });
-      setMaterialSeleccionado('');
-      setCantidadMaterialSeleccionada(1);
-      setSearchTermMaterial(''); // Reset search
+    let updatedMaterials;
+    if (exists) {
+      updatedMaterials = nuevaOrden.materiales.map(m =>
+        m.material === materialSeleccionado
+          ? { ...m, cantidad: m.cantidad + cantidadMaterialSeleccionada }
+          : m
+      );
+    } else {
+      updatedMaterials = [...nuevaOrden.materiales, { material: materialSeleccionado, cantidad: cantidadMaterialSeleccionada }];
+    }
+
+    setNuevaOrden({ ...nuevaOrden, materiales: updatedMaterials });
+    setMaterialSeleccionado('');
+    setCantidadMaterialSeleccionada(1);
+    setSearchTermMaterial(''); // Reset search
   };
 
   const eliminarMaterialDeOrden = (idMaterial) => {
-      setNuevaOrden({
-          ...nuevaOrden,
-          materiales: nuevaOrden.materiales.filter(m => m.material !== idMaterial)
-      });
+    setNuevaOrden({
+      ...nuevaOrden,
+      materiales: nuevaOrden.materiales.filter(m => m.material !== idMaterial)
+    });
   };
 
   // Filtrar datos según búsqueda
@@ -263,10 +263,10 @@ const FabricacionPage = ({ userRole }) => {
   // Funciones para órdenes de fabricación
   const guardarOrden = async () => {
     try {
-      const url = editingOrden 
-          ? `http://localhost:5000/api/produccion/${editingOrden._id}`
-          : 'http://localhost:5000/api/produccion';
-      
+      const url = editingOrden
+        ? `http://localhost:5000/api/produccion/${editingOrden._id}`
+        : 'http://localhost:5000/api/produccion';
+
       const method = editingOrden ? 'PUT' : 'POST';
 
       const response = await fetch(url, {
@@ -310,27 +310,27 @@ const FabricacionPage = ({ userRole }) => {
   };
 
   const abrirModalEditar = (orden) => {
-      setEditingOrden(orden);
-      
-      // Mapear materiales para que coincidan con la estructura del formulario { material: id, cantidad: n }
-      // Asegurarse de tomar el _id del objeto material populado
-      const materialesFormato = orden.materiales.map(m => ({
-          material: m.material._id || m.material, // Handle populated vs unpopulated
-          cantidad: m.cantidad
-      }));
+    setEditingOrden(orden);
 
-      setNuevaOrden({
-          nombre: orden.nombre,
-          categoria: orden.categoria || '',
-          marca: orden.marca || '',
-          cantidad: orden.cantidad,
-          precioCompra: orden.precioCompra,
-          precioVenta: orden.precioVenta,
-          tiempoEstimado: orden.tiempoEstimado || 1,
-          materiales: materialesFormato,
-          imagen: orden.imagen || ''
-      });
-      setShowForm(true);
+    // Mapear materiales para que coincidan con la estructura del formulario { material: id, cantidad: n }
+    // Asegurarse de tomar el _id del objeto material populado
+    const materialesFormato = orden.materiales.map(m => ({
+      material: m.material._id || m.material, // Handle populated vs unpopulated
+      cantidad: m.cantidad
+    }));
+
+    setNuevaOrden({
+      nombre: orden.nombre,
+      categoria: orden.categoria || '',
+      marca: orden.marca || '',
+      cantidad: orden.cantidad,
+      precioCompra: orden.precioCompra,
+      precioVenta: orden.precioVenta,
+      tiempoEstimado: orden.tiempoEstimado || 1,
+      materiales: materialesFormato,
+      imagen: orden.imagen || ''
+    });
+    setShowForm(true);
   };
 
   const iniciarProduccionAutomatica = async (id) => {
@@ -358,14 +358,14 @@ const FabricacionPage = ({ userRole }) => {
   };
 
   const abrirModalConfirmacion = (orden) => {
-      setSelectedOrdenId(orden._id);
-      setDatosCompletados({
-          descripcion: `Producto fabricado: ${orden.nombre}`,
-          categoria: 'Muebles', // Default or fetch existing
-          precioVenta: orden.precioVenta || 0,
-          imagen: orden.imagen || ''
-      });
-      setShowCompletionModal(true);
+    setSelectedOrdenId(orden._id);
+    setDatosCompletados({
+      descripcion: `Producto fabricado: ${orden.nombre}`,
+      categoria: 'Muebles', // Default or fetch existing
+      precioVenta: orden.precioVenta || 0,
+      imagen: orden.imagen || ''
+    });
+    setShowCompletionModal(true);
   };
 
   const confirmarProduccion = async () => {
@@ -399,8 +399,8 @@ const FabricacionPage = ({ userRole }) => {
   const guardarMaterial = async () => {
     try {
       if (!nuevoMaterial.nombre || !nuevoMaterial.categoria) {
-          alert("Por favor complete los campos obligatorios (Nombre, Categoría)");
-          return;
+        alert("Por favor complete los campos obligatorios (Nombre, Categoría)");
+        return;
       }
 
       const formData = new FormData();
@@ -415,29 +415,29 @@ const FabricacionPage = ({ userRole }) => {
       formData.append('marca', nuevoMaterial.marca);
       formData.append('cajas', nuevoMaterial.cajas);
       // Determine if proveedor is object (populated) or string/id
-      const provForSend = (typeof nuevoMaterial.proveedor === 'object' && nuevoMaterial.proveedor !== null) 
-                          ? (nuevoMaterial.proveedor._id || '') 
-                          : (nuevoMaterial.proveedor || '');
+      const provForSend = (typeof nuevoMaterial.proveedor === 'object' && nuevoMaterial.proveedor !== null)
+        ? (nuevoMaterial.proveedor._id || '')
+        : (nuevoMaterial.proveedor || '');
       formData.append('proveedor', provForSend);
-      
+
       // Append nested dimensions
       if (nuevoMaterial.dimensiones) {
-          formData.append('dimensiones.alto', nuevoMaterial.dimensiones.alto || 0);
-          formData.append('dimensiones.ancho', nuevoMaterial.dimensiones.ancho || 0);
-          formData.append('dimensiones.profundidad', nuevoMaterial.dimensiones.profundidad || 0);
+        formData.append('dimensiones.alto', nuevoMaterial.dimensiones.alto || 0);
+        formData.append('dimensiones.ancho', nuevoMaterial.dimensiones.ancho || 0);
+        formData.append('dimensiones.profundidad', nuevoMaterial.dimensiones.profundidad || 0);
       }
-      
+
       if (nuevoMaterial.imagen instanceof File) {
         formData.append('imagen', nuevoMaterial.imagen);
       } else if (editingMaterial && !nuevoMaterial.imagen) {
-          // Keep existing image logic handled by backend if not provided? 
-          // Usually backend keeps it if not updated.
+        // Keep existing image logic handled by backend if not provided? 
+        // Usually backend keeps it if not updated.
       }
 
-      const url = editingMaterial 
+      const url = editingMaterial
         ? `http://localhost:5000/api/materiaPrima/${editingMaterial._id}`
         : 'http://localhost:5000/api/materiaPrima';
-      
+
       const method = editingMaterial ? 'PUT' : 'POST';
 
       const response = await fetch(url, {
@@ -481,26 +481,26 @@ const FabricacionPage = ({ userRole }) => {
   };
 
   const abrirModalEditarMaterial = (material) => {
-      setEditingMaterial(material);
-      setNuevoMaterial({
-          nombre: material.nombre,
-          categoria: material.categoria,
-          cantidad: material.cantidad,
-          cantidadMinima: material.cantidadMinima || 10,
-          precioCompra: material.precioCompra,
-          precioVenta: material.precioVenta || 0,
-          unidad: material.unidad || '',
-          ubicacion: material.ubicacion || '',
-          color: material.color || '',
-          descripcion: material.descripcion || '',
-          marca: material.marca || '',
-          cajas: material.cajas || '',
-          dimensiones: material.dimensiones || { alto: '', ancho: '', profundidad: '' },
-          // Flatten proveedor if it is an object
-          proveedor: material.proveedor?.nombre || material.proveedor || '', 
-          imagen: material.imagen 
-      });
-      setShowForm(true);
+    setEditingMaterial(material);
+    setNuevoMaterial({
+      nombre: material.nombre,
+      categoria: material.categoria,
+      cantidad: material.cantidad,
+      cantidadMinima: material.cantidadMinima || 10,
+      precioCompra: material.precioCompra,
+      precioVenta: material.precioVenta || 0,
+      unidad: material.unidad || '',
+      ubicacion: material.ubicacion || '',
+      color: material.color || '',
+      descripcion: material.descripcion || '',
+      marca: material.marca || '',
+      cajas: material.cajas || '',
+      dimensiones: material.dimensiones || { alto: '', ancho: '', profundidad: '' },
+      // Flatten proveedor if it is an object
+      proveedor: material.proveedor?.nombre || material.proveedor || '',
+      imagen: material.imagen
+    });
+    setShowForm(true);
   };
 
   // Funciones para máquinas
@@ -558,37 +558,37 @@ const FabricacionPage = ({ userRole }) => {
 
   // Funciones de WhatsApp
   const checkWhatsAppStatus = async () => {
-      setLoadingQr(true);
-      try {
-          const response = await fetch('http://localhost:5000/api/whatsapp/status');
-          const data = await response.json();
-          setWhatsappStatus(data.status);
-          setQrCode(data.qr);
-      } catch (error) {
-          console.error("Error fetching WhatsApp status:", error);
-      }
-      setLoadingQr(false);
+    setLoadingQr(true);
+    try {
+      const response = await fetch('http://localhost:5000/api/whatsapp/status');
+      const data = await response.json();
+      setWhatsappStatus(data.status);
+      setQrCode(data.qr);
+    } catch (error) {
+      console.error("Error fetching WhatsApp status:", error);
+    }
+    setLoadingQr(false);
   };
 
   useEffect(() => {
-      let interval;
-      if (showWhatsAppModal) {
-          checkWhatsAppStatus();
-          interval = setInterval(checkWhatsAppStatus, 3000); // Poll every 3 seconds while modal is open
-      }
-      return () => clearInterval(interval);
+    let interval;
+    if (showWhatsAppModal) {
+      checkWhatsAppStatus();
+      interval = setInterval(checkWhatsAppStatus, 3000); // Poll every 3 seconds while modal is open
+    }
+    return () => clearInterval(interval);
   }, [showWhatsAppModal]);
 
   const restartWhatsApp = async () => {
-      if (!window.confirm("¿Reiniciar la conexión de WhatsApp? Esto generará un nuevo QR.")) return;
-      try {
-          await fetch('http://localhost:5000/api/whatsapp/restart', { method: 'POST' });
-          alert("Reiniciando servicio... Espere unos segundos.");
-          setQrCode('');
-          setWhatsappStatus('INITIALIZING');
-      } catch (error) {
-          console.error("Error restarting WhatsApp:", error);
-      }
+    if (!window.confirm("¿Reiniciar la conexión de WhatsApp? Esto generará un nuevo QR.")) return;
+    try {
+      await fetch('http://localhost:5000/api/whatsapp/restart', { method: 'POST' });
+      alert("Reiniciando servicio... Espere unos segundos.");
+      setQrCode('');
+      setWhatsappStatus('INITIALIZING');
+    } catch (error) {
+      console.error("Error restarting WhatsApp:", error);
+    }
   };
 
 
@@ -625,73 +625,72 @@ const FabricacionPage = ({ userRole }) => {
 
           <div className="mb-8 flex justify-between items-center">
             <div>
-                <h1 className="text-4xl font-bold text-orange-600 mb-2">Módulo de Fabricación</h1>
-                <p className="text-gray-600 text-lg">Gestión de producción, materiales y equipos</p>
+              <h1 className="text-4xl font-bold text-orange-600 mb-2">Módulo de Fabricación</h1>
+              <p className="text-gray-600 text-lg">Gestión de producción, materiales y equipos</p>
             </div>
-            <button 
-                onClick={() => setShowWhatsAppModal(true)}
-                className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition shadow-lg"
+            <button
+              onClick={() => setShowWhatsAppModal(true)}
+              className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition shadow-lg"
             >
-                <span className="text-xl">🔔</span>
-                <span>Configurar Notificaciones</span>
+              <span className="text-xl">🔔</span>
+              <span>Configurar Notificaciones</span>
             </button>
           </div>
 
           {/* WhatsApp Modal */}
           {showWhatsAppModal && (
-              <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-                  <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full relative">
-                      <button 
-                          onClick={() => setShowWhatsAppModal(false)}
-                          className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"
-                      >
-                          ✕
-                      </button>
-                      
-                      <h2 className="text-2xl font-bold text-center mb-6 text-gray-800">
-                          WhatsApp Notificaciones
-                      </h2>
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+              <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full relative">
+                <button
+                  onClick={() => setShowWhatsAppModal(false)}
+                  className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"
+                >
+                  ✕
+                </button>
 
-                      <div className="flex justify-center mb-6">
-                          <div className={`px-4 py-2 rounded-full font-bold text-sm ${
-                              whatsappStatus === 'READY' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                          }`}>
-                              Estado: {whatsappStatus === 'READY' ? 'CONECTADO 🟢' : 'DESCONECTADO 🔴'}
-                          </div>
-                      </div>
+                <h2 className="text-2xl font-bold text-center mb-6 text-gray-800">
+                  WhatsApp Notificaciones
+                </h2>
 
-                      <div className="flex flex-col items-center justify-center min-h-[250px] bg-gray-50 rounded-lg p-4 mb-6 border-2 border-dashed border-gray-300">
-                          {loadingQr ? (
-                              <p className="text-gray-500 animate-pulse">Cargando código QR...</p>
-                          ) : whatsappStatus === 'READY' ? (
-                              <div className="text-center">
-                                  <div className="text-6xl mb-4">✅</div>
-                                  <p className="text-gray-700 font-medium">¡El sistema está vinculado!</p>
-                                  <p className="text-sm text-gray-500 mt-2">Recibirás alertas de inicio y retraso.</p>
-                              </div>
-                          ) : qrCode ? (
-                              <div className="bg-white p-2 rounded shadow-sm">
-                                  <QRCode value={qrCode} size={200} />
-                                  <p className="text-xs text-center text-gray-500 mt-2">Escanea con tu celular</p>
-                              </div>
-                          ) : (
-                              <div className="text-center">
-                                  <p className="text-gray-500 mb-2">Esperando código QR...</p>
-                                  {whatsappStatus === 'INITIALIZING' && <p className="text-xs text-orange-500">Iniciando cliente...</p>}
-                              </div>
-                          )}
-                      </div>
-
-                      <div className="flex justify-center">
-                          <button 
-                              onClick={restartWhatsApp}
-                              className="text-sm text-blue-600 hover:underline hover:text-blue-800"
-                          >
-                              ↻ Reiniciar conexión / Generar nuevo QR
-                          </button>
-                      </div>
+                <div className="flex justify-center mb-6">
+                  <div className={`px-4 py-2 rounded-full font-bold text-sm ${whatsappStatus === 'READY' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }`}>
+                    Estado: {whatsappStatus === 'READY' ? 'CONECTADO 🟢' : 'DESCONECTADO 🔴'}
                   </div>
+                </div>
+
+                <div className="flex flex-col items-center justify-center min-h-[250px] bg-gray-50 rounded-lg p-4 mb-6 border-2 border-dashed border-gray-300">
+                  {loadingQr ? (
+                    <p className="text-gray-500 animate-pulse">Cargando código QR...</p>
+                  ) : whatsappStatus === 'READY' ? (
+                    <div className="text-center">
+                      <div className="text-6xl mb-4">✅</div>
+                      <p className="text-gray-700 font-medium">¡El sistema está vinculado!</p>
+                      <p className="text-sm text-gray-500 mt-2">Recibirás alertas de inicio y retraso.</p>
+                    </div>
+                  ) : qrCode ? (
+                    <div className="bg-white p-2 rounded shadow-sm">
+                      <QRCode value={qrCode} size={200} />
+                      <p className="text-xs text-center text-gray-500 mt-2">Escanea con tu celular</p>
+                    </div>
+                  ) : (
+                    <div className="text-center">
+                      <p className="text-gray-500 mb-2">Esperando código QR...</p>
+                      {whatsappStatus === 'INITIALIZING' && <p className="text-xs text-orange-500">Iniciando cliente...</p>}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-center">
+                  <button
+                    onClick={restartWhatsApp}
+                    className="text-sm text-blue-600 hover:underline hover:text-blue-800"
+                  >
+                    ↻ Reiniciar conexión / Generar nuevo QR
+                  </button>
+                </div>
               </div>
+            </div>
           )}
 
           {/* Pestañas */}
@@ -734,19 +733,19 @@ const FabricacionPage = ({ userRole }) => {
             {activeTab === 'ordenes' && (
               <button
                 onClick={() => {
-                    setShowForm(!showForm);
-                    if (showForm) { // Si estaba abierto y se cierra, limpiar edición
-                        setEditingOrden(null);
-                        setNuevaOrden({
-                            nombre: '',
-                            cantidad: 1,
-                            precioCompra: 0,
-                            precioVenta: 0,
-                            tiempoEstimado: 1,
-                            materiales: [],
-                            imagen: ''
-                        });
-                    }
+                  setShowForm(!showForm);
+                  if (showForm) { // Si estaba abierto y se cierra, limpiar edición
+                    setEditingOrden(null);
+                    setNuevaOrden({
+                      nombre: '',
+                      cantidad: 1,
+                      precioCompra: 0,
+                      precioVenta: 0,
+                      tiempoEstimado: 1,
+                      materiales: [],
+                      imagen: ''
+                    });
+                  }
                 }}
                 className="bg-orange-600 text-white px-6 py-2 rounded-lg hover:bg-orange-700 transition duration-200 font-semibold"
               >
@@ -773,7 +772,7 @@ const FabricacionPage = ({ userRole }) => {
               {showForm && (
                 <div className="bg-white rounded-xl shadow-md p-6">
                   <h2 className="text-2xl font-semibold text-gray-800 mb-6">
-                      {editingOrden ? 'Editar Orden de Fabricación' : 'Nueva Orden de Fabricación'}
+                    {editingOrden ? 'Editar Orden de Fabricación' : 'Nueva Orden de Fabricación'}
                   </h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
@@ -803,7 +802,7 @@ const FabricacionPage = ({ userRole }) => {
                       />
                       {showCategoriaDropdown && (
                         <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto mt-1">
-                           {categorias.filter(cat => cat.toLowerCase().includes(nuevaOrden.categoria.toLowerCase())).map((cat, idx) => (
+                          {categorias.filter(cat => cat.toLowerCase().includes(nuevaOrden.categoria.toLowerCase())).map((cat, idx) => (
                             <div
                               key={idx}
                               onMouseDown={() => {
@@ -816,7 +815,7 @@ const FabricacionPage = ({ userRole }) => {
                             </div>
                           ))}
                           {categorias.filter(cat => cat.toLowerCase().includes(nuevaOrden.categoria.toLowerCase())).length === 0 && (
-                              <div className="px-4 py-2 text-sm text-gray-500 italic">Presiona Enter para crear nueva</div>
+                            <div className="px-4 py-2 text-sm text-gray-500 italic">Presiona Enter para crear nueva</div>
                           )}
                         </div>
                       )}
@@ -872,214 +871,214 @@ const FabricacionPage = ({ userRole }) => {
                   {/* Selección de Materiales (Carrito) */}
                   <div className="mt-6 border-t pt-4">
                     <h3 className="font-semibold text-gray-800 mb-3">Materiales Requeridos</h3>
-                    
+
                     {/* Selector */}
                     {/* Selector Buscable */}
                     {/* Selector Buscable (Auto-Add) */}
                     <div className="mb-4 bg-gray-50 p-4 rounded-lg relative">
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Agregar Material (Buscar por Nombre, Color o Código)</label>
-                        <div className="relative">
-                            <input
-                                type="text"
-                                value={searchTermMaterial}
-                                onChange={(e) => {
-                                    setSearchTermMaterial(e.target.value);
-                                    setIsDropdownOpen(true);
-                                }}
-                                onFocus={() => setIsDropdownOpen(true)}
-                                placeholder="Escribe para buscar y click para añadir..."
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 pl-10"
-                            />
-                            <div className="absolute left-3 top-2.5 text-gray-400">🔍</div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Agregar Material (Buscar por Nombre, Color o Código)</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={searchTermMaterial}
+                          onChange={(e) => {
+                            setSearchTermMaterial(e.target.value);
+                            setIsDropdownOpen(true);
+                          }}
+                          onFocus={() => setIsDropdownOpen(true)}
+                          placeholder="Escribe para buscar y click para añadir..."
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 pl-10"
+                        />
+                        <div className="absolute left-3 top-2.5 text-gray-400">🔍</div>
+                      </div>
+
+                      {/* Dropdown de Resultados (Quick Add Multi-Select) */}
+                      {isDropdownOpen && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto left-0">
+                          {/* Header for bulk actions or close */}
+                          <div className="sticky top-0 bg-gray-100 p-2 flex justify-between items-center border-b z-20">
+                            <span className="text-xs font-semibold text-gray-500 uppercase">Seleccionar Materiales</span>
+                            <button
+                              onClick={() => setIsDropdownOpen(false)}
+                              className="text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-1 rounded"
+                            >
+                              Listo / Cerrar
+                            </button>
+                          </div>
+                          <ul className="divide-y divide-gray-100">
+                            {materiales.filter(mat => {
+                              const term = searchTermMaterial.toLowerCase();
+                              const nombre = mat.nombre?.toLowerCase() || '';
+                              const color = mat.color?.toLowerCase() || '';
+                              const codigo = mat.codigo?.toLowerCase() || '';
+                              const prov = mat.proveedor?.nombreEmpresa?.toLowerCase() || '';
+
+                              return nombre.includes(term) || color.includes(term) || codigo.includes(term) || prov.includes(term);
+                            }).map(mat => {
+                              const isAdded = nuevaOrden.materiales.some(m => m.material === mat._id);
+                              return (
+                                <li
+                                  key={mat._id}
+                                  onClick={() => {
+                                    // Quick Add Logic - Multi Select
+                                    if (mat.cantidad <= 0) {
+                                      alert("No hay stock disponible de este material.");
+                                      return;
+                                    }
+
+                                    // Toggle or Append? User said "elegir varios". Usually implies toggling or adding.
+                                    // If already added, maybe just flash it or ignore? 
+                                    // Let's implement toggle behavior (Add/Remove) or just Increment?
+                                    // User said "elegir uno o mas", likely "Check" behavior.
+
+                                    setNuevaOrden(prev => {
+                                      const exists = prev.materiales.find(m => m.material === mat._id);
+                                      let updatedMaterials;
+                                      if (exists) {
+                                        // Remove if clicked again? Or increment? 
+                                        // "Elegir" suggests selection state. If I click again, I likely want to unselect OR I'm done.
+                                        // Let's go with "Toggle" for purely selection, but since we have quantity, maybe just Add is safer?
+                                        // Use case: I want screws, wood, paint. Click, Click, Click.
+                                        // If I click screws again, do I want 2 screws or 0? 
+                                        // Given the "Quantity" input in table, let's assuming clicking ADDS.
+                                        // But duplicate rows are bad.
+                                        // Let's Toggle. Red highlight if removing? 
+                                        // Simpler: If added, remove. If not, add 1.
+                                        updatedMaterials = prev.materiales.filter(m => m.material !== mat._id);
+                                      } else {
+                                        updatedMaterials = [...prev.materiales, { material: mat._id, cantidad: 1 }];
+                                      }
+                                      return { ...prev, materiales: updatedMaterials };
+                                    });
+
+                                    // Keep dropdown open!
+                                    // setSearchTermMaterial(''); // Don't clear search if they are picking multiple from same query?
+                                    // Actually, if I typed "tornillo", I want to pick "tornillo 1" and "tornillo 2". So keep search.
+                                  }}
+                                  className={`px-4 py-3 cursor-pointer text-sm flex justify-between items-center transition-colors ${isAdded ? 'bg-orange-50 border-l-4 border-orange-500' : 'hover:bg-gray-50'}`}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    {/* Checkbox visual indicator */}
+                                    <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isAdded ? 'bg-orange-500 border-orange-500 text-white' : 'border-gray-300 bg-white'}`}>
+                                      {isAdded && <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>}
+                                    </div>
+                                    <div>
+                                      <div className="font-medium text-gray-800">
+                                        {mat.nombre} {mat.color && <span className="text-gray-500 text-xs font-normal">({mat.color})</span>}
+                                      </div>
+                                      <div className="text-xs text-gray-400 font-mono">
+                                        {mat.codigo || 'S/C'} • {mat.proveedor?.nombreEmpresa || 'Prov.'}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <div className={`text-xs font-bold ${mat.cantidad > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                                      {mat.cantidad > 0 ? `${mat.cantidad} u.` : 'Agotado'}
+                                    </div>
+                                    <div className="text-xs text-gray-500 font-mono">{mat.precioCompra} Bs</div>
+                                  </div>
+                                </li>
+                              );
+                            })}
+                            {materiales.filter(mat => { /* Repeated filter */
+                              const term = searchTermMaterial.toLowerCase();
+                              const nombre = mat.nombre?.toLowerCase() || '';
+                              const color = mat.color?.toLowerCase() || '';
+                              const codigo = mat.codigo?.toLowerCase() || '';
+                              return nombre.includes(term) || color.includes(term) || codigo.includes(term);
+                            }).length === 0 && (
+                                <li className="px-4 py-8 text-center text-gray-500 text-sm italic">
+                                  No se encontraron materiales que coincidan con "{searchTermMaterial}"
+                                </li>
+                              )}
+                          </ul>
                         </div>
-
-                        {/* Dropdown de Resultados (Quick Add Multi-Select) */}
-                        {isDropdownOpen && (
-                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto left-0">
-                                {/* Header for bulk actions or close */}
-                                <div className="sticky top-0 bg-gray-100 p-2 flex justify-between items-center border-b z-20">
-                                    <span className="text-xs font-semibold text-gray-500 uppercase">Seleccionar Materiales</span>
-                                    <button 
-                                        onClick={() => setIsDropdownOpen(false)}
-                                        className="text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-1 rounded"
-                                    >
-                                        Listo / Cerrar
-                                    </button>
-                                </div>
-                                <ul className="divide-y divide-gray-100">
-                                {materiales.filter(mat => {
-                                    const term = searchTermMaterial.toLowerCase();
-                                    const nombre = mat.nombre?.toLowerCase() || '';
-                                    const color = mat.color?.toLowerCase() || '';
-                                    const codigo = mat.codigo?.toLowerCase() || '';
-                                    const prov = mat.proveedor?.nombreEmpresa?.toLowerCase() || ''; 
-                                    
-                                    return nombre.includes(term) || color.includes(term) || codigo.includes(term) || prov.includes(term);
-                                }).map(mat => {
-                                    const isAdded = nuevaOrden.materiales.some(m => m.material === mat._id);
-                                    return (
-                                    <li 
-                                        key={mat._id}
-                                        onClick={() => {
-                                            // Quick Add Logic - Multi Select
-                                            if (mat.cantidad <= 0) {
-                                                alert("No hay stock disponible de este material.");
-                                                return;
-                                            }
-
-                                            // Toggle or Append? User said "elegir varios". Usually implies toggling or adding.
-                                            // If already added, maybe just flash it or ignore? 
-                                            // Let's implement toggle behavior (Add/Remove) or just Increment?
-                                            // User said "elegir uno o mas", likely "Check" behavior.
-                                            
-                                            setNuevaOrden(prev => {
-                                                const exists = prev.materiales.find(m => m.material === mat._id);
-                                                let updatedMaterials;
-                                                if (exists) {
-                                                    // Remove if clicked again? Or increment? 
-                                                    // "Elegir" suggests selection state. If I click again, I likely want to unselect OR I'm done.
-                                                    // Let's go with "Toggle" for purely selection, but since we have quantity, maybe just Add is safer?
-                                                    // Use case: I want screws, wood, paint. Click, Click, Click.
-                                                    // If I click screws again, do I want 2 screws or 0? 
-                                                    // Given the "Quantity" input in table, let's assuming clicking ADDS.
-                                                    // But duplicate rows are bad.
-                                                    // Let's Toggle. Red highlight if removing? 
-                                                    // Simpler: If added, remove. If not, add 1.
-                                                    updatedMaterials = prev.materiales.filter(m => m.material !== mat._id);
-                                                } else {
-                                                    updatedMaterials = [...prev.materiales, { material: mat._id, cantidad: 1 }];
-                                                }
-                                                return { ...prev, materiales: updatedMaterials };
-                                            });
-
-                                            // Keep dropdown open!
-                                            // setSearchTermMaterial(''); // Don't clear search if they are picking multiple from same query?
-                                            // Actually, if I typed "tornillo", I want to pick "tornillo 1" and "tornillo 2". So keep search.
-                                        }}
-                                        className={`px-4 py-3 cursor-pointer text-sm flex justify-between items-center transition-colors ${isAdded ? 'bg-orange-50 border-l-4 border-orange-500' : 'hover:bg-gray-50'}`}
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            {/* Checkbox visual indicator */}
-                                            <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isAdded ? 'bg-orange-500 border-orange-500 text-white' : 'border-gray-300 bg-white'}`}>
-                                                {isAdded && <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>}
-                                            </div>
-                                            <div>
-                                                <div className="font-medium text-gray-800">
-                                                    {mat.nombre} {mat.color && <span className="text-gray-500 text-xs font-normal">({mat.color})</span>}
-                                                </div>
-                                                <div className="text-xs text-gray-400 font-mono">
-                                                    {mat.codigo || 'S/C'} • {mat.proveedor?.nombreEmpresa || 'Prov.'}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="text-right">
-                                            <div className={`text-xs font-bold ${mat.cantidad > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                                                {mat.cantidad > 0 ? `${mat.cantidad} u.` : 'Agotado'}
-                                            </div>
-                                            <div className="text-xs text-gray-500 font-mono">{mat.precioCompra} Bs</div>
-                                        </div>
-                                    </li>
-                                    );
-                                })}
-                                {materiales.filter(mat => { /* Repeated filter */
-                                     const term = searchTermMaterial.toLowerCase();
-                                    const nombre = mat.nombre?.toLowerCase() || '';
-                                    const color = mat.color?.toLowerCase() || '';
-                                     const codigo = mat.codigo?.toLowerCase() || '';
-                                    return nombre.includes(term) || color.includes(term) || codigo.includes(term);
-                                }).length === 0 && (
-                                    <li className="px-4 py-8 text-center text-gray-500 text-sm italic">
-                                        No se encontraron materiales que coincidan con "{searchTermMaterial}"
-                                    </li>
-                                )}
-                                </ul>
-                            </div>
-                        )}
+                      )}
                     </div>
 
                     {/* Tabla de Materiales Agregados */}
                     {nuevaOrden.materiales.length > 0 ? (
-                        <div className="overflow-hidden border border-gray-200 rounded-lg">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50">
-                                    <tr>
-                                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
-                                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Color</th>
-                                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cód/Prov</th>
-                                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Costo Unit.</th>
-                                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Cant.</th>
-                                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Subtotal</th>
-                                        <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Acción</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                    {nuevaOrden.materiales.map((item, index) => {
-                                        const mat = materiales.find(m => m._id === item.material);
-                                        const precio = mat ? (mat.precioCompra || 0) : 0;
-                                        return (
-                                            <tr key={index}>
-                                                <td className="px-4 py-2 text-sm text-gray-900">{mat ? mat.nombre : 'Desconocido'}</td>
-                                                <td className="px-4 py-2 text-sm text-gray-500">
-                                                    {mat && mat.color ? (
-                                                        <span className="flex items-center gap-1">
-                                                            <span className="w-3 h-3 rounded-full border border-gray-300" style={{ backgroundColor: mat.color }}></span>
-                                                            <span className="text-xs">{mat.color}</span>
-                                                        </span>
-                                                    ) : '-'}
-                                                </td>
-                                                <td className="px-4 py-2 text-sm text-gray-500">
-                                                    {mat ? (
-                                                        <div className="flex flex-col text-xs">
-                                                            <span className="font-semibold">{mat.codigo || 'S/C'}</span>
-                                                            <span className="text-gray-400">{mat.proveedor?.nombreEmpresa || '-'}</span>
-                                                        </div>
-                                                    ) : '-'}
-                                                </td>
-                                                <td className="px-4 py-2 text-sm text-gray-600 text-right">{precio} Bs</td>
-                                                <td className="px-4 py-2 text-sm text-gray-900 text-right">
-                                                    <input 
-                                                        type="number"
-                                                        min="1"
-                                                        value={item.cantidad}
-                                                        onChange={(e) => {
-                                                            const newQty = parseInt(e.target.value) || 0;
-                                                            // Optional: Check stock limit
-                                                            if (mat && newQty > mat.cantidad) {
-                                                                // Could alert or just visually warn
-                                                            }
-                                                            const updated = nuevaOrden.materiales.map(m => 
-                                                                m.material === item.material ? { ...m, cantidad: newQty } : m
-                                                            );
-                                                            setNuevaOrden({...nuevaOrden, materiales: updated});
-                                                        }}
-                                                        className="w-20 px-2 py-1 text-right border border-gray-300 rounded focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
-                                                    />
-                                                </td>
-                                                <td className="px-4 py-2 text-sm font-medium text-gray-900 text-right">{(precio * item.cantidad).toFixed(2)} Bs</td>
-                                                <td className="px-4 py-2 text-center">
-                                                    <button
-                                                        onClick={() => eliminarMaterialDeOrden(item.material)}
-                                                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                        title="Eliminar"
-                                                    >
-                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                                    </button>
-                                                </td>
-                                            </tr>
+                      <div className="overflow-hidden border border-gray-200 rounded-lg">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Color</th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cód/Prov</th>
+                              <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Costo Unit.</th>
+                              <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Cant.</th>
+                              <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Subtotal</th>
+                              <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Acción</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {nuevaOrden.materiales.map((item, index) => {
+                              const mat = materiales.find(m => m._id === item.material);
+                              const precio = mat ? (mat.precioCompra || 0) : 0;
+                              return (
+                                <tr key={index}>
+                                  <td className="px-4 py-2 text-sm text-gray-900">{mat ? mat.nombre : 'Desconocido'}</td>
+                                  <td className="px-4 py-2 text-sm text-gray-500">
+                                    {mat && mat.color ? (
+                                      <span className="flex items-center gap-1">
+                                        <span className="w-3 h-3 rounded-full border border-gray-300" style={{ backgroundColor: mat.color }}></span>
+                                        <span className="text-xs">{mat.color}</span>
+                                      </span>
+                                    ) : '-'}
+                                  </td>
+                                  <td className="px-4 py-2 text-sm text-gray-500">
+                                    {mat ? (
+                                      <div className="flex flex-col text-xs">
+                                        <span className="font-semibold">{mat.codigo || 'S/C'}</span>
+                                        <span className="text-gray-400">{mat.proveedor?.nombreEmpresa || '-'}</span>
+                                      </div>
+                                    ) : '-'}
+                                  </td>
+                                  <td className="px-4 py-2 text-sm text-gray-600 text-right">{precio} Bs</td>
+                                  <td className="px-4 py-2 text-sm text-gray-900 text-right">
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      value={item.cantidad}
+                                      onChange={(e) => {
+                                        const newQty = parseInt(e.target.value) || 0;
+                                        // Optional: Check stock limit
+                                        if (mat && newQty > mat.cantidad) {
+                                          // Could alert or just visually warn
+                                        }
+                                        const updated = nuevaOrden.materiales.map(m =>
+                                          m.material === item.material ? { ...m, cantidad: newQty } : m
                                         );
-                                    })}
-                                </tbody>
-                                <tfoot className="bg-gray-50">
-                                    <tr>
-                                        <td colSpan="5" className="px-4 py-2 text-right font-bold text-gray-700">Total Materiales:</td>
-                                        <td className="px-4 py-2 text-right font-bold text-orange-600">{nuevaOrden.precioCompra.toFixed(2)} Bs</td>
-                                        <td></td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
+                                        setNuevaOrden({ ...nuevaOrden, materiales: updated });
+                                      }}
+                                      className="w-20 px-2 py-1 text-right border border-gray-300 rounded focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
+                                    />
+                                  </td>
+                                  <td className="px-4 py-2 text-sm font-medium text-gray-900 text-right">{(precio * item.cantidad).toFixed(2)} Bs</td>
+                                  <td className="px-4 py-2 text-center">
+                                    <button
+                                      onClick={() => eliminarMaterialDeOrden(item.material)}
+                                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                      title="Eliminar"
+                                    >
+                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                          <tfoot className="bg-gray-50">
+                            <tr>
+                              <td colSpan="5" className="px-4 py-2 text-right font-bold text-gray-700">Total Materiales:</td>
+                              <td className="px-4 py-2 text-right font-bold text-orange-600">{nuevaOrden.precioCompra.toFixed(2)} Bs</td>
+                              <td></td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
                     ) : (
-                        <p className="text-gray-500 text-sm italic text-center py-4">No has agregado materiales aún.</p>
+                      <p className="text-gray-500 text-sm italic text-center py-4">No has agregado materiales aún.</p>
                     )}
                   </div>
 
@@ -1108,8 +1107,9 @@ const FabricacionPage = ({ userRole }) => {
                     <table className="w-full">
                       <thead>
                         <tr className="bg-gray-50">
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Orden #</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Progreso</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
@@ -1120,10 +1120,13 @@ const FabricacionPage = ({ userRole }) => {
                         {ordenesFiltradas.map((orden) => (
                           <tr key={orden._id} className="hover:bg-gray-50">
                             <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-orange-600">
-                              #{orden.numeroOrden ? orden.numeroOrden.toString().padStart(3, '0') : '---'}
+                              {orden.idProduccion || (orden.numeroOrden ? `#${orden.numeroOrden.toString().padStart(3, '0')}` : '---')}
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                               {orden.nombre}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                              {orden.categoria}
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                               {orden.cantidad}
@@ -1166,22 +1169,22 @@ const FabricacionPage = ({ userRole }) => {
                                   </button>
                                 )}
                                 {(orden.estado === 'Pendiente' || orden.estado === 'En Progreso') && (
-                                    <button
-                                        onClick={() => abrirModalEditar(orden)}
-                                        className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                                        title="Editar Orden"
-                                    >
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                    </button>
+                                  <button
+                                    onClick={() => abrirModalEditar(orden)}
+                                    className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                                    title="Editar Orden"
+                                  >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                  </button>
                                 )}
                                 {(orden.estado === 'Completado') && (
-                                    <button
-                                        onClick={() => setViewingOrden(orden)}
-                                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                        title="Ver Detalles"
-                                    >
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                                    </button>
+                                  <button
+                                    onClick={() => setViewingOrden(orden)}
+                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                    title="Ver Detalles"
+                                  >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                  </button>
                                 )}
                               </div>
                             </td>
@@ -1243,13 +1246,13 @@ const FabricacionPage = ({ userRole }) => {
                       />
                     </div>
                     <div>
-                       <label className="block text-sm font-medium text-gray-700 mb-2">Stock Mínimo</label>
-                       <input
-                         type="number"
-                         value={nuevoMaterial.cantidadMinima}
-                         onChange={(e) => setNuevoMaterial({ ...nuevoMaterial, cantidadMinima: parseInt(e.target.value) || 0 })}
-                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                       />
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Stock Mínimo</label>
+                      <input
+                        type="number"
+                        value={nuevoMaterial.cantidadMinima}
+                        onChange={(e) => setNuevoMaterial({ ...nuevoMaterial, cantidadMinima: parseInt(e.target.value) || 0 })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Precio Compra {editingMaterial && <span className="text-red-500 text-xs ml-2">(No editable)</span>}</label>
@@ -1312,52 +1315,52 @@ const FabricacionPage = ({ userRole }) => {
                         placeholder="Ej. 1 caja 2 sillas"
                       />
                     </div>
-                    
+
                     <div className="md:col-span-2 lg:col-span-3 grid grid-cols-3 gap-4 border border-gray-200 p-4 rounded-lg bg-gray-50">
-                        <span className="col-span-3 text-sm font-medium text-gray-700">Dimensiones (cm)</span>
-                        <div>
-                            <label className="block text-xs text-gray-500 mb-1">Alto</label>
-                            <input
-                                type="number"
-                                value={nuevoMaterial.dimensiones?.alto}
-                                onChange={(e) => setNuevoMaterial({ ...nuevoMaterial, dimensiones: { ...nuevoMaterial.dimensiones, alto: parseFloat(e.target.value) || 0 } })}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs text-gray-500 mb-1">Ancho</label>
-                            <input
-                                type="number"
-                                value={nuevoMaterial.dimensiones?.ancho}
-                                onChange={(e) => setNuevoMaterial({ ...nuevoMaterial, dimensiones: { ...nuevoMaterial.dimensiones, ancho: parseFloat(e.target.value) || 0 } })}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs text-gray-500 mb-1">Profundidad</label>
-                            <input
-                                type="number"
-                                value={nuevoMaterial.dimensiones?.profundidad}
-                                onChange={(e) => setNuevoMaterial({ ...nuevoMaterial, dimensiones: { ...nuevoMaterial.dimensiones, profundidad: parseFloat(e.target.value) || 0 } })}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                            />
-                        </div>
+                      <span className="col-span-3 text-sm font-medium text-gray-700">Dimensiones (cm)</span>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Alto</label>
+                        <input
+                          type="number"
+                          value={nuevoMaterial.dimensiones?.alto}
+                          onChange={(e) => setNuevoMaterial({ ...nuevoMaterial, dimensiones: { ...nuevoMaterial.dimensiones, alto: parseFloat(e.target.value) || 0 } })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Ancho</label>
+                        <input
+                          type="number"
+                          value={nuevoMaterial.dimensiones?.ancho}
+                          onChange={(e) => setNuevoMaterial({ ...nuevoMaterial, dimensiones: { ...nuevoMaterial.dimensiones, ancho: parseFloat(e.target.value) || 0 } })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Profundidad</label>
+                        <input
+                          type="number"
+                          value={nuevoMaterial.dimensiones?.profundidad}
+                          onChange={(e) => setNuevoMaterial({ ...nuevoMaterial, dimensiones: { ...nuevoMaterial.dimensiones, profundidad: parseFloat(e.target.value) || 0 } })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        />
+                      </div>
                     </div>
-                     <div className="lg:col-span-3">
+                    <div className="lg:col-span-3">
                       <label className="block text-sm font-medium text-gray-700 mb-2">Proveedor</label>
-                       {/* Dropdown or Input for Proveedor - Using Input for simple consistency first or dropdown if providers are loaded */}
-                       {/* Checking if providers are loaded in this component. Usually fetched. */}
-                       {/* Assuming 'proveedores' state exists or I should add it. Let's check state. */}
-                       {/* Using simple input for now as per minimal change pattern unless I see providers state */}
+                      {/* Dropdown or Input for Proveedor - Using Input for simple consistency first or dropdown if providers are loaded */}
+                      {/* Checking if providers are loaded in this component. Usually fetched. */}
+                      {/* Assuming 'proveedores' state exists or I should add it. Let's check state. */}
+                      {/* Using simple input for now as per minimal change pattern unless I see providers state */}
                       <input
                         type="text"
-                        value={nuevoMaterial.proveedor || ''} 
+                        value={nuevoMaterial.proveedor || ''}
                         onChange={(e) => setNuevoMaterial({ ...nuevoMaterial, proveedor: e.target.value })}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                         placeholder="Nombre del Proveedor"
                       />
                     </div>
-                     <div className="lg:col-span-3">
+                    <div className="lg:col-span-3">
                       <label className="block text-sm font-medium text-gray-700 mb-2">Descripción</label>
                       <input
                         type="text"
@@ -1372,7 +1375,7 @@ const FabricacionPage = ({ userRole }) => {
                       <input
                         type="file"
                         accept="image/*"
-                         onChange={(e) => setNuevoMaterial({ ...nuevoMaterial, imagen: e.target.files[0] })}
+                        onChange={(e) => setNuevoMaterial({ ...nuevoMaterial, imagen: e.target.files[0] })}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                       />
                     </div>
@@ -1415,8 +1418,8 @@ const FabricacionPage = ({ userRole }) => {
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-2xl font-semibold text-gray-800">Inventario de Materiales</h2>
                 </div>
-                
-                 <div className="overflow-x-auto">
+
+                <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
@@ -1426,9 +1429,10 @@ const FabricacionPage = ({ userRole }) => {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Marca</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Color</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cajas</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dimensiones</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prov.</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proveedor</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NIT/Cód.</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ubicación</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
@@ -1436,15 +1440,15 @@ const FabricacionPage = ({ userRole }) => {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {materialesFiltrados.map((item) => {
-                         let estadoColor = item.cantidad > item.cantidadMinima ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+                        let estadoColor = item.cantidad > item.cantidadMinima ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
                         return (
                           <tr key={item._id} className="hover:bg-gray-50">
                             <td className="px-6 py-4 whitespace-normal max-w-xs">
                               <div className="flex items-center">
                                 <div className="h-10 w-10 flex-shrink-0">
                                   {item.imagen ? (
-                                    <img className="h-10 w-10 rounded-full object-cover cursor-pointer hover:scale-150 transition-transform" 
-                                         src={`http://localhost:5000${item.imagen}`} alt="" 
+                                    <img className="h-10 w-10 rounded-full object-cover cursor-pointer hover:scale-150 transition-transform"
+                                      src={`http://localhost:5000${item.imagen}`} alt=""
                                     />
                                   ) : (
                                     <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">📦</div>
@@ -1457,21 +1461,21 @@ const FabricacionPage = ({ userRole }) => {
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono bg-gray-50 rounded">
-                                {item.idMateriaPrima || <span className="text-xs text-gray-400">Sin ID</span>}
+                              {item.idMateriaPrima || <span className="text-xs text-gray-400">Sin ID</span>}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.categoria}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.marca || '-'}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {item.color ? (
-                                    <span className="flex items-center gap-1">
-                                        <div className="w-3 h-3 rounded-full border border-gray-300" style={{backgroundColor: item.color}}></div>
-                                        {item.color}
-                                    </span>
-                                ) : '-'}
+                              {item.color ? (
+                                <span className="flex items-center gap-1">
+                                  <div className="w-3 h-3 rounded-full border border-gray-300" style={{ backgroundColor: item.color }}></div>
+                                  {item.color}
+                                </span>
+                              ) : '-'}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.cajas || '-'}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {item.dimensiones ? `${item.dimensiones.alto || 0}x${item.dimensiones.ancho || 0}x${item.dimensiones.profundidad || 0}` : '-'}
+                              {item.dimensiones ? `${item.dimensiones.alto || 0}x${item.dimensiones.ancho || 0}x${item.dimensiones.profundidad || 0}` : '-'}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${estadoColor}`}>
@@ -1486,14 +1490,14 @@ const FabricacionPage = ({ userRole }) => {
                               <button onClick={() => abrirModalEditarMaterial(item)} className="text-indigo-600 hover:text-indigo-900 font-bold">
                                 ✏️ Editar
                               </button>
-                               {/* Add Delete button if needed, existing code didn't list it in grid but common practice */}
+                              {/* Add Delete button if needed, existing code didn't list it in grid but common practice */}
                             </td>
                           </tr>
                         );
                       })}
                     </tbody>
                   </table>
-                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -1595,189 +1599,188 @@ const FabricacionPage = ({ userRole }) => {
                           </select>
                         </div>
                       </div>
-                    <div className="text-sm">
+                      <div className="text-sm">
                         <p className="text-gray-500">Último Mantenimiento</p>
                         <p className="font-medium">{new Date(maquina.ultimoMantenimiento).toLocaleDateString()}</p>
+                      </div>
                     </div>
-                  </div>
 
                   ))}
                 </div>
               </div>
             </div>
           )}
-          
+
           {/* Modal de Finalización de Producción */}
           {showCompletionModal && (
-              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                  <div className="bg-white rounded-lg p-6 w-full max-w-lg">
-                      <h2 className="text-xl font-bold mb-4 text-gray-800">Finalizar Producción</h2>
-                      <p className="text-gray-600 mb-4 text-sm">
-                          Complete los datos para registrar el producto terminado en el inventario.
-                      </p>
-                      
-                      <div className="space-y-4">
-                          <div>
-                              <label className="block text-sm font-medium text-gray-700">Descripción del Producto</label>
-                              <input 
-                                  type="text" 
-                                  className="w-full border rounded px-3 py-2 mt-1"
-                                  value={datosCompletados.descripcion}
-                                  onChange={(e) => setDatosCompletados({...datosCompletados, descripcion: e.target.value})}
-                              />
-                          </div>
-                          <div>
-                              <label className="block text-sm font-medium text-gray-700">Categoría</label>
-                              <input 
-                                  type="text" 
-                                  className="w-full border rounded px-3 py-2 mt-1"
-                                  value={datosCompletados.categoria}
-                                  onChange={(e) => setDatosCompletados({...datosCompletados, categoria: e.target.value})}
-                              />
-                          </div>
-                          <div>
-                              <label className="block text-sm font-medium text-gray-700">Precio de Venta Final (Bs)</label>
-                              <input 
-                                  type="number" 
-                                  className="w-full border rounded px-3 py-2 mt-1"
-                                  value={datosCompletados.precioVenta}
-                                  onChange={(e) => setDatosCompletados({...datosCompletados, precioVenta: parseFloat(e.target.value) || 0})}
-                              />
-                          </div>
-                      </div>
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg p-6 w-full max-w-lg">
+                <h2 className="text-xl font-bold mb-4 text-gray-800">Finalizar Producción</h2>
+                <p className="text-gray-600 mb-4 text-sm">
+                  Complete los datos para registrar el producto terminado en el inventario.
+                </p>
 
-                      <div className="flex justify-end space-x-3 mt-6">
-                          <button 
-                              onClick={() => setShowCompletionModal(false)}
-                              className="px-4 py-2 text-gray-600 hover:text-gray-800"
-                          >
-                              Cancelar
-                          </button>
-                          <button 
-                              onClick={confirmarProduccion}
-                              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-                          >
-                              Finalizar y Añadir al Inventario
-                          </button>
-                      </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Descripción del Producto</label>
+                    <input
+                      type="text"
+                      className="w-full border rounded px-3 py-2 mt-1"
+                      value={datosCompletados.descripcion}
+                      onChange={(e) => setDatosCompletados({ ...datosCompletados, descripcion: e.target.value })}
+                    />
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Categoría</label>
+                    <input
+                      type="text"
+                      className="w-full border rounded px-3 py-2 mt-1"
+                      value={datosCompletados.categoria}
+                      onChange={(e) => setDatosCompletados({ ...datosCompletados, categoria: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Precio de Venta Final (Bs)</label>
+                    <input
+                      type="number"
+                      className="w-full border rounded px-3 py-2 mt-1"
+                      value={datosCompletados.precioVenta}
+                      onChange={(e) => setDatosCompletados({ ...datosCompletados, precioVenta: parseFloat(e.target.value) || 0 })}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-3 mt-6">
+                  <button
+                    onClick={() => setShowCompletionModal(false)}
+                    className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={confirmarProduccion}
+                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                  >
+                    Finalizar y Añadir al Inventario
+                  </button>
+                </div>
               </div>
+            </div>
           )}
 
 
 
-      {/* Modal de Detalles de Producción */}
-      {viewingOrden && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-8 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-start mb-6">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-800">Detalles de Fabricación</h2>
-                <p className="text-gray-500">Orden #{viewingOrden.numeroOrden}</p>
-              </div>
-              <button 
-                onClick={() => setViewingOrden(null)}
-                className="text-gray-500 hover:text-gray-700 text-2xl"
-              >
-                &times;
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="font-semibold text-gray-700 mb-3">Información General</h3>
-                <div className="space-y-2">
-                  <p><span className="font-medium">Producto:</span> {viewingOrden.nombre}</p>
-                  <p><span className="font-medium">Cantidad Producida:</span> {viewingOrden.cantidad}</p>
-                  <p><span className="font-medium">Estado:</span> 
-                    <span className={`ml-2 inline-flex px-2 text-xs leading-5 font-semibold rounded-full ${
-                      viewingOrden.estado === 'Completado' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {viewingOrden.estado}
-                    </span>
-                  </p>
-                  <p><span className="font-medium">Fecha Finalización:</span> {new Date(viewingOrden.updatedAt).toLocaleDateString()}</p>
+          {/* Modal de Detalles de Producción */}
+          {viewingOrden && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-xl p-8 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+                <div className="flex justify-between items-start mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-800">Detalles de Fabricación</h2>
+                    <p className="text-gray-500">Orden #{viewingOrden.numeroOrden}</p>
+                  </div>
+                  <button
+                    onClick={() => setViewingOrden(null)}
+                    className="text-gray-500 hover:text-gray-700 text-2xl"
+                  >
+                    &times;
+                  </button>
                 </div>
-              </div>
 
-              <div className="bg-orange-50 p-4 rounded-lg">
-                <h3 className="font-semibold text-orange-800 mb-3">Tiempos de Producción</h3>
-                <div className="space-y-2 text-orange-900">
-                   <p><span className="font-medium">Tiempo Estimado:</span> {viewingOrden.tiempoEstimado} días</p>
-                   {/* Calcular tiempo real aproximado si existe fechaInicio y updatedAt (para completados) */}
-                   <p><span className="font-medium">Tiempo Transcurrido:</span> {
-                     viewingOrden.tiempoTranscurrido 
-                        ? `${(viewingOrden.tiempoTranscurrido / 24).toFixed(1)} días (${viewingOrden.tiempoTranscurrido.toFixed(1)} horas)` 
-                        : 'N/A'
-                   }</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <h3 className="font-semibold text-gray-700 mb-3">Información General</h3>
+                    <div className="space-y-2">
+                      <p><span className="font-medium">Producto:</span> {viewingOrden.nombre}</p>
+                      <p><span className="font-medium">Cantidad Producida:</span> {viewingOrden.cantidad}</p>
+                      <p><span className="font-medium">Estado:</span>
+                        <span className={`ml-2 inline-flex px-2 text-xs leading-5 font-semibold rounded-full ${viewingOrden.estado === 'Completado' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                          }`}>
+                          {viewingOrden.estado}
+                        </span>
+                      </p>
+                      <p><span className="font-medium">Fecha Finalización:</span> {new Date(viewingOrden.updatedAt).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-orange-50 p-4 rounded-lg">
+                    <h3 className="font-semibold text-orange-800 mb-3">Tiempos de Producción</h3>
+                    <div className="space-y-2 text-orange-900">
+                      <p><span className="font-medium">Tiempo Estimado:</span> {viewingOrden.tiempoEstimado} días</p>
+                      {/* Calcular tiempo real aproximado si existe fechaInicio y updatedAt (para completados) */}
+                      <p><span className="font-medium">Tiempo Transcurrido:</span> {
+                        viewingOrden.tiempoTranscurrido
+                          ? `${(viewingOrden.tiempoTranscurrido / 24).toFixed(1)} días (${viewingOrden.tiempoTranscurrido.toFixed(1)} horas)`
+                          : 'N/A'
+                      }</p>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            <div className="mb-6">
-                <h3 className="font-semibold text-gray-800 mb-4 text-lg">Materia Prima Utilizada</h3>
-                <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                <div className="mb-6">
+                  <h3 className="font-semibold text-gray-800 mb-4 text-lg">Materia Prima Utilizada</h3>
+                  <div className="overflow-x-auto border border-gray-200 rounded-lg">
                     <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Material</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Color</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prov. / Código</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Cant. Usada</th>
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Material</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Color</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prov. / Código</th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Cant. Usada</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {viewingOrden.materiales.map((item, index) => {
+                          const matInfo = item.material; // Populated object
+                          return (
+                            <tr key={index}>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {matInfo ? matInfo.nombre : 'Material Eliminado'}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {matInfo ? matInfo.categoria : '-'}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {matInfo && matInfo.color ? (
+                                  <span className="flex items-center gap-2">
+                                    <span className="w-3 h-3 rounded-full border border-gray-300" style={{ backgroundColor: matInfo.color }}></span>
+                                    {matInfo.color}
+                                  </span>
+                                ) : '-'}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {matInfo ? (
+                                  <div className="flex flex-col">
+                                    <span>{matInfo.proveedor ? matInfo.proveedor.nombreEmpresa : 'Sin Prov.'}</span>
+                                    <span className="text-xs text-gray-400">{matInfo.codigo || 'S/C'}</span>
+                                  </div>
+                                ) : '-'}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-semibold">
+                                {item.cantidad}
+                              </td>
                             </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {viewingOrden.materiales.map((item, index) => {
-                                const matInfo = item.material; // Populated object
-                                return (
-                                    <tr key={index}>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                            {matInfo ? matInfo.nombre : 'Material Eliminado'}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {matInfo ? matInfo.categoria : '-'}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {matInfo && matInfo.color ? (
-                                                <span className="flex items-center gap-2">
-                                                    <span className="w-3 h-3 rounded-full border border-gray-300" style={{ backgroundColor: matInfo.color }}></span>
-                                                    {matInfo.color}
-                                                </span>
-                                            ) : '-'}
-                                        </td>
-                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {matInfo ? (
-                                                <div className="flex flex-col">
-                                                    <span>{matInfo.proveedor ? matInfo.proveedor.nombreEmpresa : 'Sin Prov.'}</span>
-                                                    <span className="text-xs text-gray-400">{matInfo.codigo || 'S/C'}</span>
-                                                </div>
-                                            ) : '-'}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-semibold">
-                                            {item.cantidad}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
+                          );
+                        })}
+                      </tbody>
                     </table>
+                  </div>
                 </div>
+
+                <div className="flex justify-end pt-4 border-t">
+                  <button
+                    onClick={() => setViewingOrden(null)}
+                    className="bg-gray-800 text-white px-6 py-2 rounded-lg hover:bg-gray-900 transition-colors"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              </div>
             </div>
-            
-            <div className="flex justify-end pt-4 border-t">
-                <button 
-                  onClick={() => setViewingOrden(null)}
-                  className="bg-gray-800 text-white px-6 py-2 rounded-lg hover:bg-gray-900 transition-colors"
-                >
-                  Cerrar
-                </button>
-            </div>
-          </div>
+          )}
         </div>
-      )}
-    </div>
-    </div>
+      </div>
     </div>
   );
 };

@@ -6,6 +6,11 @@ const bankAccountSchema = new mongoose.Schema({
         required: true,
         trim: true
     },
+    tipo: {
+        type: String,
+        enum: ['banco', 'efectivo'],
+        default: 'banco'
+    },
     numeroCuenta: {
         type: String,
         required: true,

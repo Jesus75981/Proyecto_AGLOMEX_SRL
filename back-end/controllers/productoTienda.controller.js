@@ -6,13 +6,23 @@ import * as tripoService from "../services/tripo.service.js";
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import Contador from "../models/contador.model.js";
 
-// Función para generar un ID único
-const generarCodigoInterno = (nombre) => {
-  // Genera un código simple: primeras 3 letras del nombre + 4 dígitos aleatorios
+// Función auxiliar para obtener el siguiente valor de la secuencia (Reusada de Producción)
+const getNextSequenceValue = async (nombreSecuencia) => {
+  const secuencia = await Contador.findOneAndUpdate(
+    { nombre: nombreSecuencia },
+    { $inc: { valor: 1 } },
+    { new: true, upsert: true }
+  );
+  return secuencia.valor;
+};
+
+// Función para generar un ID único (Secuencial)
+const generarCodigoInterno = async (nombre) => {
+  const secuencia = await getNextSequenceValue('productoCodigo');
   const prefix = nombre ? nombre.substring(0, 3).toUpperCase() : 'PRO';
-  const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-  return `${prefix}-${randomSuffix}`;
+  return `${prefix}-${String(secuencia).padStart(4, '0')}`;
 };
 
 // Configuración de multer para subida de imágenes
@@ -80,7 +90,7 @@ export const crearProducto = async (req, res) => {
     }
 
     // 2. Generar el código interno usando el nombre (requerido)
-    const idProductoTienda = generarCodigoInterno(req.body.nombre);
+    const idProductoTienda = await generarCodigoInterno(req.body.nombre);
 
     // Helper for nested dimensions (Simple check for flat keys)
     let dimensiones = req.body.dimensiones;

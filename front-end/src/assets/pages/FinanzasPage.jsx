@@ -64,6 +64,7 @@ const FinanzasPage = ({ userRole }) => {
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     type: 'ingreso',
+    category: 'ingreso_manual', // Default category
     description: '',
     amount: '',
     date: new Date().toISOString().split('T')[0]
@@ -97,8 +98,10 @@ const FinanzasPage = ({ userRole }) => {
   const [editingAccountId, setEditingAccountId] = useState(null);
   const [accountFormData, setAccountFormData] = useState({
     nombreBanco: '',
+    nombreBanco: '',
     numeroCuenta: '',
-    saldoInicial: ''
+    saldoInicial: '',
+    tipo: 'banco' // Added default
   });
   const [depositFormData, setDepositFormData] = useState({
     monto: '',
@@ -213,7 +216,8 @@ const FinanzasPage = ({ userRole }) => {
 
       setShowAccountForm(false);
       setEditingAccountId(null);
-      setAccountFormData({ nombreBanco: '', numeroCuenta: '', saldoInicial: '' });
+      setEditingAccountId(null);
+      setAccountFormData({ nombreBanco: '', numeroCuenta: '', saldoInicial: '', tipo: 'banco' });
       loadBankAccounts();
     } catch (err) {
       console.error('Error al guardar cuenta:', err);
@@ -410,6 +414,7 @@ const FinanzasPage = ({ userRole }) => {
       }
       setFormData({
         type: 'ingreso',
+        category: 'ingreso_manual',
         description: '',
         amount: '',
         date: new Date().toISOString().split('T')[0]
@@ -427,6 +432,7 @@ const FinanzasPage = ({ userRole }) => {
   const handleEdit = (transaction) => {
     setFormData({
       type: transaction.type,
+      category: transaction.category || (transaction.type === 'ingreso' ? 'ingreso_manual' : 'egreso_manual'),
       description: transaction.description,
       amount: transaction.amount,
       date: new Date(transaction.date).toISOString().split('T')[0]
@@ -528,8 +534,19 @@ const FinanzasPage = ({ userRole }) => {
     }
   };
 
-  const getCategoryIcon = (desc) => {
-    const d = desc.toLowerCase();
+  const getCategoryIcon = (categoryOrDesc) => {
+    const d = categoryOrDesc.toLowerCase();
+
+    // Categorías específicas
+    if (d === 'otros_ingresos') return '💵';
+    if (d === 'gastos_fijos') return '🏢';
+    if (d === 'gastos_variables') return '📉';
+    if (d === 'salida_caja_deposito') return '🏦';
+    if (d === 'gasto_operativo') return '⚙️';
+    if (d === 'pago_deuda_compra') return '🤝';
+    if (d === 'cobro_venta') return '💳';
+
+    // Fallback por descripción
     if (d.includes('compra') || d.includes('material')) return '🛒';
     if (d.includes('servicio') || d.includes('luz') || d.includes('agua')) return '💡';
     if (d.includes('mantenimiento') || d.includes('reparacion')) return '🛠️';
@@ -707,12 +724,45 @@ const FinanzasPage = ({ userRole }) => {
                       <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
                       <select
                         value={formData.type}
-                        onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                        onChange={(e) => {
+                          const newType = e.target.value;
+                          setFormData({
+                            ...formData,
+                            type: newType,
+                            category: newType === 'ingreso' ? 'ingreso_manual' : 'egreso_manual' // Auto-switch category default
+                          });
+                        }}
                         className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                         required
                       >
                         <option value="ingreso">Ingreso</option>
                         <option value="egreso">Egreso</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
+                      <select
+                        value={formData.category}
+                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                        required
+                      >
+                        {formData.type === 'ingreso' ? (
+                          <>
+                            <option value="ingreso_manual">Ingreso General</option>
+                            <option value="otros_ingresos">Otros Ingresos</option>
+                            <option value="cobro_venta">Cobro de Venta</option>
+                          </>
+                        ) : (
+                          <>
+                            <option value="egreso_manual">Gasto General</option>
+                            <option value="gastos_fijos">Gastos Fijos (Luz, Agua, Alquiler)</option>
+                            <option value="gastos_variables">Gastos Variables</option>
+                            <option value="gasto_operativo">Gasto Operativo</option>
+                            <option value="salida_caja_deposito">Salida a Depósito Bancario</option>
+                            <option value="pago_deuda_compra">Pago Proveedor</option>
+                          </>
+                        )}
                       </select>
                     </div>
                     <div>
@@ -769,6 +819,7 @@ const FinanzasPage = ({ userRole }) => {
                         setEditingId(null);
                         setFormData({
                           type: 'ingreso',
+                          category: 'ingreso_manual',
                           description: '',
                           amount: '',
                           date: new Date().toISOString().split('T')[0]
@@ -841,8 +892,17 @@ const FinanzasPage = ({ userRole }) => {
                               </span>
                             </td>
                             <td className="px-6 py-4 text-sm text-gray-900">
-                              <span className="mr-2">{getCategoryIcon(transaction.description)}</span>
-                              {transaction.description}
+                              <div className="flex items-center">
+                                <span className="mr-3 text-xl">{getCategoryIcon(transaction.category || transaction.description)}</span>
+                                <div>
+                                  <div className="font-medium">{transaction.description}</div>
+                                  {transaction.category && (
+                                    <div className="text-xs text-gray-500 capitalize">
+                                      {transaction.category.replace(/_/g, ' ')}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                               <span className={transaction.type === 'ingreso' ? 'text-green-600' : 'text-red-600'}>
@@ -970,13 +1030,39 @@ const FinanzasPage = ({ userRole }) => {
                 </button>
               </div>
 
+              {/* Resumen de Capital - Nuevo Componente */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-green-500">
+                  <p className="text-sm text-gray-500 mb-1">Total en Banco</p>
+                  <h3 className="text-2xl font-bold text-gray-800">
+                    {formatCurrency(bankAccounts.filter(a => a.tipo === 'banco' && a.isActive).reduce((sum, a) => sum + a.saldo, 0))}
+                  </h3>
+                </div>
+                <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-emerald-600">
+                  <p className="text-sm text-gray-500 mb-1">Total en Efectivo (Caja)</p>
+                  <h3 className="text-2xl font-bold text-gray-800">
+                    {formatCurrency(bankAccounts.filter(a => a.tipo === 'efectivo' && a.isActive).reduce((sum, a) => sum + a.saldo, 0))}
+                  </h3>
+                </div>
+                <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-blue-600">
+                  <p className="text-sm text-gray-500 mb-1">Capital Liquido Total</p>
+                  <h3 className="text-2xl font-bold text-gray-800">
+                    {formatCurrency(bankAccounts.filter(a => a.isActive).reduce((sum, a) => sum + a.saldo, 0))}
+                  </h3>
+                  <p className="text-xs text-gray-400 mt-1">Caja + Bancos</p>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {bankAccounts.map(account => (
                   <div key={account._id} className={`bg-white rounded-xl shadow-lg p-6 border-l-4 ${account.isActive ? 'border-green-500' : 'border-red-500'}`}>
                     <div className="flex justify-between items-start mb-4">
                       <div>
-                        <h3 className="text-lg font-bold text-gray-800">{account.nombreBanco}</h3>
-                        <p className="text-gray-500 text-sm">{account.numeroCuenta}</p>
+                        <div className="flex items-center gap-2">
+                          <span className="text-2xl">{account.tipo === 'efectivo' ? '💵' : '🏦'}</span>
+                          <h3 className="text-lg font-bold text-gray-800">{account.nombreBanco}</h3>
+                        </div>
+                        <p className="text-gray-500 text-sm">{account.tipo === 'efectivo' ? 'Caja / Efectivo' : account.numeroCuenta}</p>
                       </div>
                       <span className={`px-2 py-1 text-xs rounded-full ${account.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                         {account.isActive ? 'Activa' : 'Inactiva'}
@@ -1028,6 +1114,17 @@ const FinanzasPage = ({ userRole }) => {
                   <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
                     <h3 className="text-xl font-bold text-gray-800 mb-4">{editingAccountId ? 'Editar Cuenta' : 'Nueva Cuenta Bancaria'}</h3>
                     <form onSubmit={handleCreateAccount} className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Cuenta</label>
+                        <select
+                          value={accountFormData.tipo}
+                          onChange={(e) => setAccountFormData({ ...accountFormData, tipo: e.target.value })}
+                          className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                        >
+                          <option value="banco">Cuenta Bancaria</option>
+                          <option value="efectivo">Caja / Efectivo</option>
+                        </select>
+                      </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del Banco</label>
                         <input

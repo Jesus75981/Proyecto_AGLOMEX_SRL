@@ -1,0 +1,104 @@
+[dotenv@17.2.3] injecting env (4) from .env -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
+Connected.
+Producto ID: new ObjectId('6952f50ace83041d127ab463') Type: object Constructor: ObjectId
+Aggregation Result (Raw Join): [
+  {
+    "_id": "6952f50ace83041d127ab463",
+    "idProductoTienda": "SIL-2830",
+    "nombre": "Silla semiejecutiva",
+    "descripcion": "Silla semiejecutiva, tapiz tela, base metalica cromada, ruedas plasticas, coderas plasticas, 1 palanca.",
+    "precioCompra": 500,
+    "precioVenta": 650,
+    "cantidad": 2,
+    "cantidadMinima": 5,
+    "cantidadMaxima": 100,
+    "tipo": "Producto Terminado",
+    "color": "Negro",
+    "categoria": "Semiejecutivo",
+    "marca": "Aguila",
+    "cajas": "1",
+    "ubicacion": "Almacen 3",
+    "tamano": "",
+    "codigo": "D19DD",
+    "proveedor": "6952f47dce83041d127ab459",
+    "imagen": "",
+    "dimensiones": {
+      "alto": 0,
+      "ancho": 0,
+      "profundidad": 0
+    },
+    "ventasAcumuladas": 3,
+    "activo": true,
+    "createdAt": "2025-12-29T21:39:22.527Z",
+    "updatedAt": "2025-12-30T16:05:30.708Z",
+    "__v": 0,
+    "ventasRealizadas": [
+      {
+        "_id": "6953f76bb77cffa856c28759",
+        "numVenta": 1,
+        "fecha": "2025-12-30T00:00:00.000Z",
+        "cliente": null,
+        "productos": {
+          "producto": "6952f50ace83041d127ab463",
+          "cantidad": 1,
+          "precioUnitario": 600,
+          "precioTotal": 600,
+          "_id": "6953f76bb77cffa856c2875a"
+        },
+        "metodosPago": [
+          {
+            "tipo": "Efectivo",
+            "monto": 600,
+            "_id": "6953f76bb77cffa856c2875b"
+          }
+        ],
+        "saldoPendiente": 0,
+        "descuento": 0,
+        "anticipo": 0,
+        "metodoEntrega": "Recojo en Tienda",
+        "tipoComprobante": "Recibo",
+        "numFactura": "01",
+        "observaciones": "",
+        "serviciosAdicionales": [],
+        "createdAt": "2025-12-30T16:01:47.018Z",
+        "updatedAt": "2025-12-30T16:01:47.018Z",
+        "__v": 0
+      },
+      {
+        "_id": "6953f84ab77cffa856c287a1",
+        "numVenta": 2,
+        "fecha": "2025-12-30T00:00:00.000Z",
+        "cliente": null,
+        "productos": {
+          "producto": "6952f50ace83041d127ab463",
+          "cantidad": 2,
+          "precioUnitario": 625,
+          "precioTotal": 1250,
+          "_id": "6953f84ab77cffa856c287a2"
+        },
+        "metodosPago": [
+          {
+            "tipo": "Efectivo",
+            "monto": 1250,
+            "_id": "6953f84ab77cffa856c287a3"
+          }
+        ],
+        "saldoPendiente": 0,
+        "descuento": 0,
+        "anticipo": 0,
+        "metodoEntrega": "Recojo en Tienda",
+        "tipoComprobante": "Recibo",
+        "numFactura": "01",
+        "observaciones": "",
+        "serviciosAdicionales": [],
+        "createdAt": "2025-12-30T16:05:30.705Z",
+        "updatedAt": "2025-12-30T16:05:30.705Z",
+        "__v": 0
+      }
+    ]
+  }
+]
+Total Ventas in DB: 2
+Sample Venta Producto ID: new ObjectId('6952f50ace83041d127ab463') Type: object
+JS Equality Check (String): true
+JS Equality Check (Object): true

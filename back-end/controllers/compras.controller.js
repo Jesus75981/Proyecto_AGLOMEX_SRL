@@ -160,9 +160,10 @@ export const registrarCompra = async (req, res) => {
         if (!datosCompra.proveedor) {
             return res.status(400).json({ message: "El proveedor es obligatorio." });
         }
-        if (!datosCompra.numeroFactura) {
-            return res.status(400).json({ message: "El número de factura es obligatorio para todas las compras." });
-        }
+        // Validación de factura ELIMINADA: ahora es opcional
+        // if (!datosCompra.numeroFactura) {
+        //    return res.status(400).json({ message: "El número de factura es obligatorio para todas las compras." });
+        // }
         const Proveedor = (await import("../models/proveedores.model.js")).default;
         const proveedorExistente = await Proveedor.findById(datosCompra.proveedor);
         if (!proveedorExistente) {
@@ -274,7 +275,8 @@ export const registrarCompra = async (req, res) => {
             // 2. Actualizar Producto
             producto.cantidad = nuevoTotalStock;
             producto.costoPromedio = nuevoCostoPromedio;
-            producto.precioCompra = costoUnitarioNuevo; // Mantenemos referencia del último precio de compra también
+            // ACTUALIZACIÓN CLAVE: El precio de compra (Costo en Inventario) ahora refleja el Ponderado
+            producto.precioCompra = nuevoCostoPromedio;
 
             console.log(`[WAC] ${producto.nombre}: Stock ${stockActual}->${nuevoTotalStock}, CostoProm ${costoPromedioActual.toFixed(2)}->${nuevoCostoPromedio.toFixed(2)}`);
 

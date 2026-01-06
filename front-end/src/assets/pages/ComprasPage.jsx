@@ -628,10 +628,11 @@ const ComprasPage = ({ userRole }) => {
       return;
     }
 
-    if (!compra.numeroFactura) {
-      alert('El número de factura es OBLIGATORIO para registrar la compra.');
-      return;
-    }
+    // Validación de factura ELIMINADA: opcional
+    // if (!compra.numeroFactura) {
+    //  alert('El número de factura es OBLIGATORIO para registrar la compra.');
+    //  return;
+    // }
 
     // Validar montos
     const totalPagos = listaPagos.reduce((sum, p) => sum + (parseFloat(p.monto) || 0), 0);

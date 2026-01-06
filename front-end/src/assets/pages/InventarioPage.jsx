@@ -169,14 +169,14 @@ const InventarioPage = ({ userRole }) => {
       formData.append('precioCompra', nuevoProducto.precioCosto || 0);
       formData.append('precioVenta', nuevoProducto.precioVenta || 0);
       formData.append('tipo', 'Producto Terminado'); // Force type
-      
+
       // New fields
       formData.append('marca', nuevoProducto.marca || '');
       formData.append('cajas', nuevoProducto.cajas || '');
       if (nuevoProducto.dimensiones) {
-          formData.append('dimensiones.alto', nuevoProducto.dimensiones.alto || 0);
-          formData.append('dimensiones.ancho', nuevoProducto.dimensiones.ancho || 0);
-          formData.append('dimensiones.profundidad', nuevoProducto.dimensiones.profundidad || 0);
+        formData.append('dimensiones.alto', nuevoProducto.dimensiones.alto || 0);
+        formData.append('dimensiones.ancho', nuevoProducto.dimensiones.ancho || 0);
+        formData.append('dimensiones.profundidad', nuevoProducto.dimensiones.profundidad || 0);
       }
 
       if (selectedImageFile) {
@@ -311,9 +311,9 @@ const InventarioPage = ({ userRole }) => {
         formData.append('marca', modificarProducto.marca);
         formData.append('cajas', modificarProducto.cajas);
         if (modificarProducto.dimensiones) {
-             formData.append('dimensiones.alto', modificarProducto.dimensiones.alto || 0);
-             formData.append('dimensiones.ancho', modificarProducto.dimensiones.ancho || 0);
-             formData.append('dimensiones.profundidad', modificarProducto.dimensiones.profundidad || 0);
+          formData.append('dimensiones.alto', modificarProducto.dimensiones.alto || 0);
+          formData.append('dimensiones.ancho', modificarProducto.dimensiones.ancho || 0);
+          formData.append('dimensiones.profundidad', modificarProducto.dimensiones.profundidad || 0);
         }
         formData.append('ubicacion', modificarProducto.ubicacion);
         formData.append('idProductoTienda', modificarProducto.codigo);
@@ -485,574 +485,574 @@ const InventarioPage = ({ userRole }) => {
           {/* Contenido de Pestañas */}
           <div className="space-y-6">
 
-              {/* Formulario de Nuevo Producto */}
-              <div className="bg-white rounded-xl shadow-md p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-semibold text-gray-800">Gestión de Productos</h2>
-                  <div className="flex space-x-3">
-                    {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && (
-                      <button
-                        onClick={() => setShowEditarProductoForm(!showEditarProductoForm)}
-                        className="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition duration-200"
-                      >
-                        {showEditarProductoForm ? 'Cancelar Editar' : 'Editar Producto'}
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Formulario Nuevo Producto */}
-                {showForm && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
-                    <input
-                      type="text"
-                      placeholder="Nombre del producto"
-                      value={nuevoProducto.nombre}
-                      onChange={(e) => setNuevoProducto({ ...nuevoProducto, nombre: e.target.value })}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="SKU (Interno)"
-                      value={nuevoProducto.sku}
-                      onChange={(e) => setNuevoProducto({ ...nuevoProducto, sku: e.target.value })}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Código Correlativo (Ej: PROD-001)"
-                      value={nuevoProducto.codigo}
-                      onChange={(e) => setNuevoProducto({ ...nuevoProducto, codigo: e.target.value })}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Color"
-                      value={nuevoProducto.color}
-                      onChange={(e) => setNuevoProducto({ ...nuevoProducto, color: e.target.value })}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="Buscar categoría"
-                        value={nuevoProducto.categoria}
-                        onChange={(e) => {
-                          setNuevoProducto({ ...nuevoProducto, categoria: e.target.value });
-                          setShowCategoriaDropdown(true);
-                        }}
-                        onFocus={() => setShowCategoriaDropdown(true)}
-                        onBlur={() => setTimeout(() => setShowCategoriaDropdown(false), 200)}
-                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 w-full"
-                      />
-                      {showCategoriaDropdown && (
-                        <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                          {categorias.filter(cat => cat.toLowerCase().includes(nuevoProducto.categoria.toLowerCase())).map(cat => (
-                            <div
-                              key={cat}
-                              onMouseDown={() => {
-                                setNuevoProducto({ ...nuevoProducto, categoria: cat });
-                                setShowCategoriaDropdown(false);
-                              }}
-                              className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
-                            >
-                              {cat}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="Buscar proveedor"
-                        value={nuevoProducto.proveedor}
-                        onChange={(e) => {
-                          setNuevoProducto({ ...nuevoProducto, proveedor: e.target.value });
-                          setShowProveedorDropdown(true);
-                        }}
-                        onFocus={() => setShowProveedorDropdown(true)}
-                        onBlur={() => setTimeout(() => setShowProveedorDropdown(false), 200)}
-                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 w-full"
-                      />
-                      {showProveedorDropdown && (
-                        <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                          {proveedores.filter(prov => prov.toLowerCase().includes(nuevoProducto.proveedor.toLowerCase())).map(prov => (
-                            <div
-                              key={prov}
-                              onMouseDown={() => {
-                                setNuevoProducto({ ...nuevoProducto, proveedor: prov });
-                                setShowProveedorDropdown(false);
-                              }}
-                              className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
-                            >
-                              {prov}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <input
-                      type="number"
-                      placeholder="Cantidad inicial"
-                      value={nuevoProducto.cantidad}
-                      onChange={(e) => setNuevoProducto({ ...nuevoProducto, cantidad: parseFloat(e.target.value) || 0 })}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Stock mínimo"
-                      value={nuevoProducto.cantidadMinima}
-                      onChange={(e) => setNuevoProducto({ ...nuevoProducto, cantidadMinima: parseInt(e.target.value) || 0 })}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Stock máximo"
-                      value={nuevoProducto.cantidadMaxima}
-                      onChange={(e) => setNuevoProducto({ ...nuevoProducto, cantidadMaxima: parseInt(e.target.value) || 0 })}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Marca"
-                      value={nuevoProducto.marca}
-                      onChange={(e) => setNuevoProducto({ ...nuevoProducto, marca: e.target.value })}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Cajas (Ej: 1 caja)"
-                      value={nuevoProducto.cajas}
-                      onChange={(e) => setNuevoProducto({ ...nuevoProducto, cajas: e.target.value })}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                     <div className="md:col-span-2 lg:col-span-3 grid grid-cols-3 gap-4 border border-gray-100 p-3 rounded-lg bg-white">
-                        <span className="col-span-3 text-sm font-medium text-gray-500">Dimensiones (cm)</span>
-                        <input
-                            type="number"
-                            placeholder="Alto"
-                            value={nuevoProducto.dimensiones?.alto}
-                            onChange={(e) => setNuevoProducto({ ...nuevoProducto, dimensiones: { ...nuevoProducto.dimensiones, alto: parseFloat(e.target.value) || 0 } })}
-                            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                        />
-                        <input
-                            type="number"
-                            placeholder="Ancho"
-                            value={nuevoProducto.dimensiones?.ancho}
-                            onChange={(e) => setNuevoProducto({ ...nuevoProducto, dimensiones: { ...nuevoProducto.dimensiones, ancho: parseFloat(e.target.value) || 0 } })}
-                            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                        />
-                         <input
-                            type="number"
-                            placeholder="Profundidad"
-                            value={nuevoProducto.dimensiones?.profundidad}
-                            onChange={(e) => setNuevoProducto({ ...nuevoProducto, dimensiones: { ...nuevoProducto.dimensiones, profundidad: parseFloat(e.target.value) || 0 } })}
-                            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                        />
-                    </div>
-                    
-                    <input
-                      type="text"
-                      placeholder="Almacén"
-                      value={nuevoProducto.ubicacion}
-                      onChange={(e) => setNuevoProducto({ ...nuevoProducto, ubicacion: e.target.value })}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <input
-                      type="number"
-                      step="0.01"
-                      placeholder="Precio costo"
-                      value={nuevoProducto.precioCosto}
-                      onChange={(e) => setNuevoProducto({ ...nuevoProducto, precioCosto: parseFloat(e.target.value) || 0 })}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <input
-                      type="number"
-                      step="0.01"
-                      placeholder="Precio venta"
-                      value={nuevoProducto.precioVenta}
-                      onChange={(e) => setNuevoProducto({ ...nuevoProducto, precioVenta: parseFloat(e.target.value) || 0 })}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <div className="md:col-span-3">
-                       <label className="block text-sm font-medium text-gray-700 mb-1">Imagen del Producto</label>
-                       <input
-                         type="file"
-                         onChange={(e) => setSelectedImageFile(e.target.files[0])}
-                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                       />
-                    </div>
-
-                    <div className="md:col-span-3 flex space-x-4">
-                      <button
-                        onClick={agregarProducto}
-                        className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition duration-200"
-                      >
-                        Agregar Producto
-                      </button>
-                      <button
-                        onClick={() => setShowForm(false)}
-                        className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition duration-200"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Formulario Movimiento */}
-                {showMovimientoForm && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-blue-50 rounded-lg">
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="Buscar producto"
-                        value={nuevoMovimiento.productoId ? inventario.find(p => p._id === nuevoMovimiento.productoId)?.nombre || '' : ''}
-                        onChange={(e) => {
-                          setNuevoMovimiento({ ...nuevoMovimiento, productoId: '' });
-                          setProductoSearch(e.target.value);
-                          setShowProductoDropdown(true);
-                        }}
-                        onFocus={() => setShowProductoDropdown(true)}
-                        onBlur={() => setTimeout(() => setShowProductoDropdown(false), 200)}
-                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
-                      />
-                      {showProductoDropdown && (
-                        <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                          {inventario.filter(prod => prod.nombre && prod.nombre.toLowerCase().includes(productoSearch.toLowerCase())).map(prod => (
-                            <div
-                              key={prod._id}
-                              onClick={() => {
-                                setNuevoMovimiento({ ...nuevoMovimiento, productoId: prod._id.toString() });
-                                setProductoSearch(prod.nombre);
-                                setShowProductoDropdown(false);
-                              }}
-                              className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
-                            >
-                              {prod.nombre} - Stock: {prod.cantidad}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <select
-                      value={nuevoMovimiento.tipo}
-                      onChange={(e) => setNuevoMovimiento({ ...nuevoMovimiento, tipo: e.target.value })}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            {/* Formulario de Nuevo Producto */}
+            <div className="bg-white rounded-xl shadow-md p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-semibold text-gray-800">Gestión de Productos</h2>
+                <div className="flex space-x-3">
+                  {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && (
+                    <button
+                      onClick={() => setShowEditarProductoForm(!showEditarProductoForm)}
+                      className="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition duration-200"
                     >
-                      <option value="Entrada">Entrada</option>
-                      <option value="Salida">Salida</option>
-                      <option value="Ajuste">Ajuste</option>
-                    </select>
-                    <input
-                      type="number"
-                      placeholder="Cantidad"
-                      value={nuevoMovimiento.cantidad}
-                      onChange={(e) => setNuevoMovimiento({ ...nuevoMovimiento, cantidad: parseInt(e.target.value) || 0 })}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Motivo"
-                      value={nuevoMovimiento.motivo}
-                      onChange={(e) => setNuevoMovimiento({ ...nuevoMovimiento, motivo: e.target.value })}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Referencia (OPCIONAL)"
-                      value={nuevoMovimiento.referencia}
-                      onChange={(e) => setNuevoMovimiento({ ...nuevoMovimiento, referencia: e.target.value })}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Usuario"
-                      value={nuevoMovimiento.usuario}
-                      onChange={(e) => setNuevoMovimiento({ ...nuevoMovimiento, usuario: e.target.value })}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <div className="md:col-span-2 flex space-x-4">
-                      <button
-                        onClick={agregarMovimiento}
-                        className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition duration-200"
-                      >
-                        Registrar Movimiento
-                      </button>
-                      <button
-                        onClick={() => setShowMovimientoForm(false)}
-                        className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition duration-200"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Formulario Editar Producto */}
-                {showEditarProductoForm && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-green-50 rounded-lg">
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="Buscar producto a editar"
-                        value={productoSeleccionadoParaEditar}
-                        onChange={(e) => {
-                          setProductoSeleccionadoParaEditar(e.target.value);
-                          setShowProductoDropdown(true);
-                        }}
-                        onFocus={() => setShowProductoDropdown(true)}
-                        onBlur={() => setTimeout(() => setShowProductoDropdown(false), 200)}
-                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 w-full"
-                      />
-                      {showProductoDropdown && (
-                        <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                          {inventario.filter(prod => prod.nombre && prod.nombre.toLowerCase().includes(productoSeleccionadoParaEditar.toLowerCase())).map(prod => (
-                            <div
-                              key={prod._id}
-                              onClick={() => {
-                                setProductoSeleccionadoParaEditar(prod.nombre);
-                                iniciarEdicion(prod);
-                                setShowEditarProductoForm(false);
-                              }}
-                              className={`px-4 py-2 cursor-pointer ${prod.cantidad === 0 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'hover:bg-gray-100'}`}
-                            >
-                              {prod.nombre} - SKU: {prod.sku}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex space-x-4">
-                      <button
-                        onClick={() => setShowEditarProductoForm(false)}
-                        className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition duration-200"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Formulario Modificar Producto */}
-                {showModificarForm && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 p-4 bg-green-50 rounded-lg">
-                    <h3 className="md:col-span-3 text-lg font-semibold text-gray-800 mb-2">Editar Producto</h3>
-                    <input
-                      type="text"
-                      placeholder="Nombre del producto"
-                      value={modificarProducto.nombre}
-                      onChange={(e) => setModificarProducto({ ...modificarProducto, nombre: e.target.value })}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Descripción"
-                      value={modificarProducto.descripcion}
-                      onChange={(e) => setModificarProducto({ ...modificarProducto, descripcion: e.target.value })}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Color"
-                      value={modificarProducto.color}
-                      onChange={(e) => setModificarProducto({ ...modificarProducto, color: e.target.value })}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Categoría"
-                      value={modificarProducto.categoria}
-                      onChange={(e) => setModificarProducto({ ...modificarProducto, categoria: e.target.value })}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Marca"
-                      value={modificarProducto.marca}
-                      onChange={(e) => setModificarProducto({ ...modificarProducto, marca: e.target.value })}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Cajas"
-                      value={modificarProducto.cajas}
-                      onChange={(e) => setModificarProducto({ ...modificarProducto, cajas: e.target.value })}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Almacén"
-                      value={modificarProducto.ubicacion}
-                      onChange={(e) => setModificarProducto({ ...modificarProducto, ubicacion: e.target.value })}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    
-                    <div className="md:col-span-2 lg:col-span-3 grid grid-cols-3 gap-4 border border-gray-100 p-3 rounded-lg bg-white">
-                        <span className="col-span-3 text-sm font-medium text-gray-500">Dimensiones (cm)</span>
-                        <input
-                            type="number"
-                            placeholder="Alto"
-                            value={modificarProducto.dimensiones?.alto}
-                            onChange={(e) => setModificarProducto({ ...modificarProducto, dimensiones: { ...modificarProducto.dimensiones, alto: parseFloat(e.target.value) || 0 } })}
-                            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                        />
-                        <input
-                            type="number"
-                            placeholder="Ancho"
-                            value={modificarProducto.dimensiones?.ancho}
-                            onChange={(e) => setModificarProducto({ ...modificarProducto, dimensiones: { ...modificarProducto.dimensiones, ancho: parseFloat(e.target.value) || 0 } })}
-                            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                        />
-                         <input
-                            type="number"
-                            placeholder="Profundidad"
-                            value={modificarProducto.dimensiones?.profundidad}
-                            onChange={(e) => setModificarProducto({ ...modificarProducto, dimensiones: { ...modificarProducto.dimensiones, profundidad: parseFloat(e.target.value) || 0 } })}
-                            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                        />
-                    </div>
-                    
-                    <input
-                      type="text"
-                      placeholder="Código"
-                      value={modificarProducto.codigo}
-                      onChange={(e) => setModificarProducto({ ...modificarProducto, codigo: e.target.value })}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-
-                    <input
-                      type="number"
-                      placeholder="Precio Venta"
-                      value={modificarProducto.precioVenta}
-                      onChange={(e) => setModificarProducto({ ...modificarProducto, precioVenta: e.target.value })}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-
-                    <div className="md:col-span-3">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Imagen del Producto</label>
-                      <input
-                        type="file"
-                        onChange={(e) => setSelectedImageFile(e.target.files[0])}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                      />
-                    </div>
-                    {erroresProducto.nombre && <p className="text-red-500 text-xs">{erroresProducto.nombre}</p>}
-                    {erroresProducto.categoria && <p className="text-red-500 text-xs">{erroresProducto.categoria}</p>}
-                    {erroresProducto.cantidad && <p className="text-red-500 text-xs">{erroresProducto.cantidad}</p>}
-                    {erroresProducto.precioCompra && <p className="text-red-500 text-xs">{erroresProducto.precioCompra}</p>}
-                    {erroresProducto.precioVenta && <p className="text-red-500 text-xs">{erroresProducto.precioVenta}</p>}
-
-                    <div className="md:col-span-3 flex space-x-4 mt-4">
-                      <button
-                        onClick={modificarProductoFunc}
-                        className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition duration-200"
-                      >
-                        Guardar Cambios
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowModificarForm(false);
-                          setProductoEditando(null);
-                        }}
-                        className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition duration-200"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Tabla de Productos */}
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKU</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código Proveedor</th>
-                        {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>}
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Marca</th>
-                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cajas</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dimens.</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Color</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
-                        {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo</th>}
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio Venta</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proveedor</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                        {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>}
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {inventarioFiltrado.map((item) => {
-                        // Calcular estado dinámicamente
-                        let estado = 'Disponible';
-                        let estadoColor = 'bg-green-100 text-green-800';
-
-                        if (item.cantidad <= 0) {
-                          estado = 'Agotado';
-                          estadoColor = 'bg-red-100 text-red-800';
-                        } else if (item.cantidad <= (item.cantidadMinima || 5)) {
-                          estado = 'Stock Bajo';
-                          estadoColor = 'bg-yellow-100 text-yellow-800';
-                        }
-
-                        return (
-                          <tr key={item._id}>
-                            <td className="px-6 py-4 whitespace-normal max-w-xs">
-                              <div className="flex items-center">
-                                <div className="h-10 w-10 flex-shrink-0">
-                                  {item.imagen ? (
-                                    <img className="h-10 w-10 rounded-full object-cover cursor-pointer" src={`http://localhost:5000${item.imagen}`} alt="" onClick={() => setSelectedImage(`http://localhost:5000${item.imagen}`)} />
-                                  ) : (
-                                    <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
-                                      📷
-                                    </div>
-                                  )}
-                                </div>
-                                <div className="ml-4">
-                                  <div className="text-sm font-medium text-gray-900">{item.nombre}</div>
-                                  <div className="text-sm text-gray-500 italic truncate max-w-[150px]" title={item.descripcion}>{item.descripcion}</div>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.idProductoTienda}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.codigo || '-'}</td>
-                            {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.categoria}</td>}
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.marca || '-'}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.cajas || '-'}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {item.dimensiones ? `${item.dimensiones.alto || 0}x${item.dimensiones.ancho || 0}x${item.dimensiones.profundidad || 0}` : '-'}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.color || '-'}</td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">{item.cantidad}</div>
-                              <div className="text-xs text-gray-500">Min: {item.cantidadMinima || 5}</div>
-                            </td>
-                            {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Bs. {item.precioCompra || 0}</td>}
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Bs. {item.precioVenta || 0}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.proveedor?.nombre || item.proveedor || '-'}</td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${estadoColor}`}>
-                                {estado}
-                              </span>
-                            </td>
-                            {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && (
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <button onClick={() => iniciarEdicion(item)} className="text-indigo-600 hover:text-indigo-900 mr-4">Editar</button>
-                                <button onClick={() => eliminarProducto(item._id)} className="text-red-600 hover:text-red-900">Eliminar</button>
-                              </td>
-                            )}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                      {showEditarProductoForm ? 'Cancelar Editar' : 'Editar Producto'}
+                    </button>
+                  )}
                 </div>
               </div>
+
+              {/* Formulario Nuevo Producto */}
+              {showForm && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+                  <input
+                    type="text"
+                    placeholder="Nombre del producto"
+                    value={nuevoProducto.nombre}
+                    onChange={(e) => setNuevoProducto({ ...nuevoProducto, nombre: e.target.value })}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="SKU (Interno)"
+                    value={nuevoProducto.sku}
+                    onChange={(e) => setNuevoProducto({ ...nuevoProducto, sku: e.target.value })}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Código Correlativo (Ej: PROD-001)"
+                    value={nuevoProducto.codigo}
+                    onChange={(e) => setNuevoProducto({ ...nuevoProducto, codigo: e.target.value })}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Color"
+                    value={nuevoProducto.color}
+                    onChange={(e) => setNuevoProducto({ ...nuevoProducto, color: e.target.value })}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Buscar categoría"
+                      value={nuevoProducto.categoria}
+                      onChange={(e) => {
+                        setNuevoProducto({ ...nuevoProducto, categoria: e.target.value });
+                        setShowCategoriaDropdown(true);
+                      }}
+                      onFocus={() => setShowCategoriaDropdown(true)}
+                      onBlur={() => setTimeout(() => setShowCategoriaDropdown(false), 200)}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 w-full"
+                    />
+                    {showCategoriaDropdown && (
+                      <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                        {categorias.filter(cat => cat.toLowerCase().includes(nuevoProducto.categoria.toLowerCase())).map(cat => (
+                          <div
+                            key={cat}
+                            onMouseDown={() => {
+                              setNuevoProducto({ ...nuevoProducto, categoria: cat });
+                              setShowCategoriaDropdown(false);
+                            }}
+                            className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                          >
+                            {cat}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Buscar proveedor"
+                      value={nuevoProducto.proveedor}
+                      onChange={(e) => {
+                        setNuevoProducto({ ...nuevoProducto, proveedor: e.target.value });
+                        setShowProveedorDropdown(true);
+                      }}
+                      onFocus={() => setShowProveedorDropdown(true)}
+                      onBlur={() => setTimeout(() => setShowProveedorDropdown(false), 200)}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 w-full"
+                    />
+                    {showProveedorDropdown && (
+                      <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                        {proveedores.filter(prov => prov.toLowerCase().includes(nuevoProducto.proveedor.toLowerCase())).map(prov => (
+                          <div
+                            key={prov}
+                            onMouseDown={() => {
+                              setNuevoProducto({ ...nuevoProducto, proveedor: prov });
+                              setShowProveedorDropdown(false);
+                            }}
+                            className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                          >
+                            {prov}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    type="number"
+                    placeholder="Cantidad inicial"
+                    value={nuevoProducto.cantidad}
+                    onChange={(e) => setNuevoProducto({ ...nuevoProducto, cantidad: parseFloat(e.target.value) || 0 })}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Stock mínimo"
+                    value={nuevoProducto.cantidadMinima}
+                    onChange={(e) => setNuevoProducto({ ...nuevoProducto, cantidadMinima: parseInt(e.target.value) || 0 })}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Stock máximo"
+                    value={nuevoProducto.cantidadMaxima}
+                    onChange={(e) => setNuevoProducto({ ...nuevoProducto, cantidadMaxima: parseInt(e.target.value) || 0 })}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Marca"
+                    value={nuevoProducto.marca}
+                    onChange={(e) => setNuevoProducto({ ...nuevoProducto, marca: e.target.value })}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Cajas (Ej: 1 caja)"
+                    value={nuevoProducto.cajas}
+                    onChange={(e) => setNuevoProducto({ ...nuevoProducto, cajas: e.target.value })}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <div className="md:col-span-2 lg:col-span-3 grid grid-cols-3 gap-4 border border-gray-100 p-3 rounded-lg bg-white">
+                    <span className="col-span-3 text-sm font-medium text-gray-500">Dimensiones (cm)</span>
+                    <input
+                      type="number"
+                      placeholder="Alto"
+                      value={nuevoProducto.dimensiones?.alto}
+                      onChange={(e) => setNuevoProducto({ ...nuevoProducto, dimensiones: { ...nuevoProducto.dimensiones, alto: parseFloat(e.target.value) || 0 } })}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Ancho"
+                      value={nuevoProducto.dimensiones?.ancho}
+                      onChange={(e) => setNuevoProducto({ ...nuevoProducto, dimensiones: { ...nuevoProducto.dimensiones, ancho: parseFloat(e.target.value) || 0 } })}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Profundidad"
+                      value={nuevoProducto.dimensiones?.profundidad}
+                      onChange={(e) => setNuevoProducto({ ...nuevoProducto, dimensiones: { ...nuevoProducto.dimensiones, profundidad: parseFloat(e.target.value) || 0 } })}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+
+                  <input
+                    type="text"
+                    placeholder="Almacén"
+                    value={nuevoProducto.ubicacion}
+                    onChange={(e) => setNuevoProducto({ ...nuevoProducto, ubicacion: e.target.value })}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="Precio costo"
+                    value={nuevoProducto.precioCosto}
+                    onChange={(e) => setNuevoProducto({ ...nuevoProducto, precioCosto: parseFloat(e.target.value) || 0 })}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="Precio venta"
+                    value={nuevoProducto.precioVenta}
+                    onChange={(e) => setNuevoProducto({ ...nuevoProducto, precioVenta: parseFloat(e.target.value) || 0 })}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <div className="md:col-span-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Imagen del Producto</label>
+                    <input
+                      type="file"
+                      onChange={(e) => setSelectedImageFile(e.target.files[0])}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+
+                  <div className="md:col-span-3 flex space-x-4">
+                    <button
+                      onClick={agregarProducto}
+                      className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition duration-200"
+                    >
+                      Agregar Producto
+                    </button>
+                    <button
+                      onClick={() => setShowForm(false)}
+                      className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition duration-200"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Formulario Movimiento */}
+              {showMovimientoForm && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-blue-50 rounded-lg">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Buscar producto"
+                      value={nuevoMovimiento.productoId ? inventario.find(p => p._id === nuevoMovimiento.productoId)?.nombre || '' : ''}
+                      onChange={(e) => {
+                        setNuevoMovimiento({ ...nuevoMovimiento, productoId: '' });
+                        setProductoSearch(e.target.value);
+                        setShowProductoDropdown(true);
+                      }}
+                      onFocus={() => setShowProductoDropdown(true)}
+                      onBlur={() => setTimeout(() => setShowProductoDropdown(false), 200)}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
+                    />
+                    {showProductoDropdown && (
+                      <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                        {inventario.filter(prod => prod.nombre && prod.nombre.toLowerCase().includes(productoSearch.toLowerCase())).map(prod => (
+                          <div
+                            key={prod._id}
+                            onClick={() => {
+                              setNuevoMovimiento({ ...nuevoMovimiento, productoId: prod._id.toString() });
+                              setProductoSearch(prod.nombre);
+                              setShowProductoDropdown(false);
+                            }}
+                            className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                          >
+                            {prod.nombre} - Stock: {prod.cantidad}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <select
+                    value={nuevoMovimiento.tipo}
+                    onChange={(e) => setNuevoMovimiento({ ...nuevoMovimiento, tipo: e.target.value })}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="Entrada">Entrada</option>
+                    <option value="Salida">Salida</option>
+                    <option value="Ajuste">Ajuste</option>
+                  </select>
+                  <input
+                    type="number"
+                    placeholder="Cantidad"
+                    value={nuevoMovimiento.cantidad}
+                    onChange={(e) => setNuevoMovimiento({ ...nuevoMovimiento, cantidad: parseInt(e.target.value) || 0 })}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Motivo"
+                    value={nuevoMovimiento.motivo}
+                    onChange={(e) => setNuevoMovimiento({ ...nuevoMovimiento, motivo: e.target.value })}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Referencia (OPCIONAL)"
+                    value={nuevoMovimiento.referencia}
+                    onChange={(e) => setNuevoMovimiento({ ...nuevoMovimiento, referencia: e.target.value })}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Usuario"
+                    value={nuevoMovimiento.usuario}
+                    onChange={(e) => setNuevoMovimiento({ ...nuevoMovimiento, usuario: e.target.value })}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <div className="md:col-span-2 flex space-x-4">
+                    <button
+                      onClick={agregarMovimiento}
+                      className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition duration-200"
+                    >
+                      Registrar Movimiento
+                    </button>
+                    <button
+                      onClick={() => setShowMovimientoForm(false)}
+                      className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition duration-200"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Formulario Editar Producto */}
+              {showEditarProductoForm && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-green-50 rounded-lg">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Buscar producto a editar"
+                      value={productoSeleccionadoParaEditar}
+                      onChange={(e) => {
+                        setProductoSeleccionadoParaEditar(e.target.value);
+                        setShowProductoDropdown(true);
+                      }}
+                      onFocus={() => setShowProductoDropdown(true)}
+                      onBlur={() => setTimeout(() => setShowProductoDropdown(false), 200)}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 w-full"
+                    />
+                    {showProductoDropdown && (
+                      <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                        {inventario.filter(prod => prod.nombre && prod.nombre.toLowerCase().includes(productoSeleccionadoParaEditar.toLowerCase())).map(prod => (
+                          <div
+                            key={prod._id}
+                            onClick={() => {
+                              setProductoSeleccionadoParaEditar(prod.nombre);
+                              iniciarEdicion(prod);
+                              setShowEditarProductoForm(false);
+                            }}
+                            className={`px-4 py-2 cursor-pointer ${prod.cantidad === 0 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'hover:bg-gray-100'}`}
+                          >
+                            {prod.nombre} - SKU: {prod.sku}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex space-x-4">
+                    <button
+                      onClick={() => setShowEditarProductoForm(false)}
+                      className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition duration-200"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Formulario Modificar Producto */}
+              {showModificarForm && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 p-4 bg-green-50 rounded-lg">
+                  <h3 className="md:col-span-3 text-lg font-semibold text-gray-800 mb-2">Editar Producto</h3>
+                  <input
+                    type="text"
+                    placeholder="Nombre del producto"
+                    value={modificarProducto.nombre}
+                    onChange={(e) => setModificarProducto({ ...modificarProducto, nombre: e.target.value })}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Descripción"
+                    value={modificarProducto.descripcion}
+                    onChange={(e) => setModificarProducto({ ...modificarProducto, descripcion: e.target.value })}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Color"
+                    value={modificarProducto.color}
+                    onChange={(e) => setModificarProducto({ ...modificarProducto, color: e.target.value })}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Categoría"
+                    value={modificarProducto.categoria}
+                    onChange={(e) => setModificarProducto({ ...modificarProducto, categoria: e.target.value })}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Marca"
+                    value={modificarProducto.marca}
+                    onChange={(e) => setModificarProducto({ ...modificarProducto, marca: e.target.value })}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Cajas"
+                    value={modificarProducto.cajas}
+                    onChange={(e) => setModificarProducto({ ...modificarProducto, cajas: e.target.value })}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Almacén"
+                    value={modificarProducto.ubicacion}
+                    onChange={(e) => setModificarProducto({ ...modificarProducto, ubicacion: e.target.value })}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+
+                  <div className="md:col-span-2 lg:col-span-3 grid grid-cols-3 gap-4 border border-gray-100 p-3 rounded-lg bg-white">
+                    <span className="col-span-3 text-sm font-medium text-gray-500">Dimensiones (cm)</span>
+                    <input
+                      type="number"
+                      placeholder="Alto"
+                      value={modificarProducto.dimensiones?.alto}
+                      onChange={(e) => setModificarProducto({ ...modificarProducto, dimensiones: { ...modificarProducto.dimensiones, alto: parseFloat(e.target.value) || 0 } })}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Ancho"
+                      value={modificarProducto.dimensiones?.ancho}
+                      onChange={(e) => setModificarProducto({ ...modificarProducto, dimensiones: { ...modificarProducto.dimensiones, ancho: parseFloat(e.target.value) || 0 } })}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Profundidad"
+                      value={modificarProducto.dimensiones?.profundidad}
+                      onChange={(e) => setModificarProducto({ ...modificarProducto, dimensiones: { ...modificarProducto.dimensiones, profundidad: parseFloat(e.target.value) || 0 } })}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+
+                  <input
+                    type="text"
+                    placeholder="Código"
+                    value={modificarProducto.codigo}
+                    onChange={(e) => setModificarProducto({ ...modificarProducto, codigo: e.target.value })}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+
+                  <input
+                    type="number"
+                    placeholder="Precio Venta"
+                    value={modificarProducto.precioVenta}
+                    onChange={(e) => setModificarProducto({ ...modificarProducto, precioVenta: e.target.value })}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+
+                  <div className="md:col-span-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Imagen del Producto</label>
+                    <input
+                      type="file"
+                      onChange={(e) => setSelectedImageFile(e.target.files[0])}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+                  {erroresProducto.nombre && <p className="text-red-500 text-xs">{erroresProducto.nombre}</p>}
+                  {erroresProducto.categoria && <p className="text-red-500 text-xs">{erroresProducto.categoria}</p>}
+                  {erroresProducto.cantidad && <p className="text-red-500 text-xs">{erroresProducto.cantidad}</p>}
+                  {erroresProducto.precioCompra && <p className="text-red-500 text-xs">{erroresProducto.precioCompra}</p>}
+                  {erroresProducto.precioVenta && <p className="text-red-500 text-xs">{erroresProducto.precioVenta}</p>}
+
+                  <div className="md:col-span-3 flex space-x-4 mt-4">
+                    <button
+                      onClick={modificarProductoFunc}
+                      className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition duration-200"
+                    >
+                      Guardar Cambios
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowModificarForm(false);
+                        setProductoEditando(null);
+                      }}
+                      className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition duration-200"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Tabla de Productos */}
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKU</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código Proveedor</th>
+                      {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>}
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Marca</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cajas</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dimens.</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Color</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
+                      {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo</th>}
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio Venta</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proveedor</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                      {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {inventarioFiltrado.map((item) => {
+                      // Calcular estado dinámicamente
+                      let estado = 'Disponible';
+                      let estadoColor = 'bg-green-100 text-green-800';
+
+                      if (item.cantidad <= 0) {
+                        estado = 'Agotado';
+                        estadoColor = 'bg-red-100 text-red-800';
+                      } else if (item.cantidad <= (item.cantidadMinima || 5)) {
+                        estado = 'Stock Bajo';
+                        estadoColor = 'bg-yellow-100 text-yellow-800';
+                      }
+
+                      return (
+                        <tr key={item._id}>
+                          <td className="px-6 py-4 whitespace-normal max-w-xs">
+                            <div className="flex items-center">
+                              <div className="h-10 w-10 flex-shrink-0">
+                                {item.imagen ? (
+                                  <img className="h-10 w-10 rounded-full object-cover cursor-pointer" src={`http://localhost:5000${item.imagen}`} alt="" onClick={() => setSelectedImage(`http://localhost:5000${item.imagen}`)} />
+                                ) : (
+                                  <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
+                                    📷
+                                  </div>
+                                )}
+                              </div>
+                              <div className="ml-4">
+                                <div className="text-sm font-medium text-gray-900">{item.nombre}</div>
+                                <div className="text-sm text-gray-500 italic truncate max-w-[150px]" title={item.descripcion}>{item.descripcion}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.idProductoTienda}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.codigo || '-'}</td>
+                          {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.categoria}</td>}
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.marca || '-'}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.cajas || '-'}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {item.dimensiones ? `${item.dimensiones.alto || 0}x${item.dimensiones.ancho || 0}x${item.dimensiones.profundidad || 0}` : '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.color || '-'}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{item.cantidad}</div>
+                            <div className="text-xs text-gray-500">Min: {item.cantidadMinima || 5}</div>
+                          </td>
+                          {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Bs. {typeof item.precioCompra === 'number' ? item.precioCompra.toFixed(2) : parseFloat(item.precioCompra || 0).toFixed(2)}</td>}
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Bs. {typeof item.precioVenta === 'number' ? item.precioVenta.toFixed(2) : parseFloat(item.precioVenta || 0).toFixed(2)}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.proveedor?.nombre || item.proveedor || '-'}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${estadoColor}`}>
+                              {estado}
+                            </span>
+                          </td>
+                          {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && (
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              <button onClick={() => iniciarEdicion(item)} className="text-indigo-600 hover:text-indigo-900 mr-4">Editar</button>
+                              <button onClick={() => eliminarProducto(item._id)} className="text-red-600 hover:text-red-900">Eliminar</button>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
+          </div>
 
 
         </div>

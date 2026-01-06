@@ -74,6 +74,40 @@ const ModuleLink = ({ to, label, icon, color }) => {
   );
 };
 
+const DashboardCard = ({ title, value, icon, trend, color, prefix = '', description }) => {
+  const colorClasses = {
+    blue: 'bg-blue-50 text-blue-600 border-blue-100',
+    green: 'bg-green-50 text-green-600 border-green-100',
+    purple: 'bg-purple-50 text-purple-600 border-purple-100',
+    orange: 'bg-orange-50 text-orange-600 border-orange-100',
+    red: 'bg-red-50 text-red-600 border-red-100',
+    yellow: 'bg-yellow-50 text-yellow-600 border-yellow-100',
+  };
+
+  return (
+    <div className={`p-6 rounded-xl border shadow-sm transition-transform hover:scale-105 ${colorClasses[color] || colorClasses.blue}`}>
+      <div className="flex justify-between items-start">
+        <div>
+          <p className="text-sm font-medium mb-1 opacity-80">{title}</p>
+          <h3 className="text-2xl font-bold">
+            {prefix}{typeof value === 'number' ? value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : value}
+          </h3>
+          {trend !== undefined && (
+            <p className={`text-xs mt-2 font-semibold ${trend >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {trend > 0 ? '+' : ''}{trend}%
+              <span className="text-gray-500 font-normal ml-1">vs mes anterior</span>
+            </p>
+          )}
+          {description && (
+            <p className="text-xs text-gray-500 mt-1">{description}</p>
+          )}
+        </div>
+        <span className="text-3xl p-2 bg-white bg-opacity-30 rounded-lg">{icon}</span>
+      </div>
+    </div>
+  );
+};
+
 const KPICard = ({ title, value, icon, color }) => {
   const colorClasses = {
     blue: 'bg-blue-50 text-blue-600 border-blue-100',
@@ -209,12 +243,21 @@ const DashboardPage = ({ userRole }) => {
       }
 
       if (activeTab === 'finanzas') {
-        const stats = await apiFetch(`/finanzas/estadisticas?${queryString}`, { headers });
+        const stats = await apiFetch(`/finanzas/estadisticas?${queryString}&t=${Date.now()}`, { headers });
         const resumen = await apiFetch('/finanzas/resumen', { headers });
-        const rentabilidad = await apiFetch(`/finanzas/rentabilidad-productos?${queryString}&search=${rentabilidadSearch}`, { headers }); // <-- Fetch rentabilidad
+        const rentabilidad = await apiFetch(`/finanzas/rentabilidad-productos?${queryString}&search=${rentabilidadSearch}&t=${Date.now()}`, { headers });
+        const metrics = await apiFetch(`/finanzas/metrics`, { headers }); // <-- Fetch metrics for capital
 
-        setFinanzasData({ ...stats, resumenTotal: resumen.data || {} });
-        setRentabilidadData(rentabilidad); // <-- Set data
+        // Merge metrics correctly: Keep filtered stats, only add capitalStats from global metrics
+        // Warning: Direct overwrite { ...metrics } was replacing filtered data (utilidadBrutaVentas) with global/undefined data
+        const mergedMetrics = {
+          ...(stats.metrics || {}),
+          capitalStats: metrics.capitalStats || {},
+          // Ensure we don't accidentally overwrite filtered fields like totalIngresos if we don't want global values
+        };
+
+        setFinanzasData({ ...stats, resumenTotal: resumen.data || {}, metrics: mergedMetrics });
+        setRentabilidadData(rentabilidad);
       }
 
       // 4. Inventario
@@ -626,68 +669,68 @@ const DashboardPage = ({ userRole }) => {
             {/* --- FINANZAS --- */}
             {activeTab === 'finanzas' && (
               <div className="space-y-6 animate-fade-in">
-                {/* Top Row: KPI Cards (Barras Arriba) */}
+
+                {/* Cards de KPIs Financieros */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  <KPICard title="Total Ingresos" value={`Bs. ${finanzasData.resumenTotal?.ingresos?.toLocaleString() || 0}`} icon="📈" color="green" />
-                  <KPICard title="Total Egresos" value={`Bs. ${finanzasData.resumenTotal?.egresos?.toLocaleString() || 0}`} icon="📉" color="red" />
-                  <KPICard title="Utilidad Neta" value={`Bs. ${((finanzasData.resumenTotal?.ingresos || 0) - (finanzasData.resumenTotal?.egresos || 0)).toLocaleString() || 0}`} icon="💰" color="blue" />
-                  <div className={`p-6 rounded-xl border shadow-sm transition-transform hover:scale-105 ${(finanzasData.resumenTotal?.balance || 0) >= 0 ? 'bg-indigo-50 border-indigo-100' : 'bg-orange-50 border-orange-100'}`}>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-sm font-medium mb-1 opacity-80">Balance General</p>
-                        <h3 className={`text-2xl font-bold ${(finanzasData.resumenTotal?.balance || 0) >= 0 ? 'text-indigo-700' : 'text-orange-700'}`}>
-                          Bs. {finanzasData.resumenTotal?.balance?.toLocaleString() || 0}
-                        </h3>
-                      </div>
-                      <span className="text-3xl p-2 bg-white bg-opacity-30 rounded-lg">⚖️</span>
-                    </div>
-                  </div>
+                  <DashboardCard
+                    title="Total Ingresos"
+                    value={finanzasData.metrics?.totalIngresos || 0}
+                    icon="📈"
+                    trend={+12}
+                    color="green"
+                    prefix="Bs. "
+                  />
+                  {/* Nueva Card: Disponibilidad Financiera */}
+                  <DashboardCard
+                    title="Disponibilidad (Caja + Bancos)"
+                    value={finanzasData.metrics?.capitalStats?.totalCapital || 0}
+                    icon="🏦"
+                    color="blue"
+                    prefix="Bs. "
+                    description={`Caja: Bs. ${(finanzasData.metrics?.capitalStats?.totalEfectivo || 0).toLocaleString()} | Bancos: Bs. ${(finanzasData.metrics?.capitalStats?.totalBanco || 0).toLocaleString()}`}
+                  />
+                  <DashboardCard
+                    title="Total Egresos"
+                    value={finanzasData.metrics?.totalEgresos || 0}
+                    icon="📉"
+                    trend={-5}
+                    color="red"
+                    prefix="Bs. "
+                  />
+                  <DashboardCard
+                    title="Utilidad por Venta (Bruta)"
+                    value={finanzasData.metrics?.utilidadBrutaVentas || 0}
+                    icon="💰"
+                    trend={+8}
+                    color="blue"
+                    prefix="Bs. "
+                    description="Ganancia Bruta (Ventas - Costo Prod.)"
+                  />
+
                 </div>
 
-                {/* Middle Row: Charts */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  {/* Left: Financial Evolution (2/3 width) */}
-                  <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-lg border border-gray-100">
-                    <div className="flex justify-between items-center mb-6">
-                      <h3 className="text-lg font-semibold flex items-center gap-2">
-                        <span className="p-2 bg-green-100 rounded-lg text-green-600 font-bold">📊</span>
-                        Evolución Financiera ({selectedYear})
-                      </h3>
-                      <div className="flex gap-2 text-sm">
-                        <span className="flex items-center gap-1"><div className="w-3 h-3 bg-green-500 rounded-full"></div> Ingresos</span>
-                        <span className="flex items-center gap-1"><div className="w-3 h-3 bg-red-500 rounded-full"></div> Egresos</span>
-                      </div>
-                    </div>
-                    <div className="h-96 w-full">
-                      <ResponsiveContainer width="100%" height="100%">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Evolución Financiera */}
+                  <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 flex flex-col">
+                    <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
+                      <span className="p-2 bg-green-100 rounded-lg text-green-600 font-bold">📊</span>
+                      Evolución Financiera
+                    </h3>
+                    <div className="flex-grow">
+                      <ResponsiveContainer width="100%" height="100%" minHeight={300}>
                         <BarChart data={cashflowChartData} barGap={0} barCategoryGap="20%">
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                          <XAxis dataKey="label" stroke="#9CA3AF" tick={{ fontSize: 12 }} />
-                          <YAxis stroke="#9CA3AF" tick={{ fontSize: 12 }} />
+                          <XAxis dataKey="label" stroke="#9CA3AF" tick={{ fontSize: 11 }} />
+                          <YAxis stroke="#9CA3AF" tick={{ fontSize: 11 }} />
                           <Tooltip cursor={{ fill: '#F3F4F6' }} content={<CustomTooltip prefix="Bs. " />} />
-                          <Legend iconType="circle" />
-                          <Bar dataKey="ingresos" name="Ingresos" fill="url(#colorIngresosBar)" radius={[4, 4, 0, 0]} animationDuration={1000}>
-                            <defs>
-                              <linearGradient id="colorIngresosBar" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor="#34D399" stopOpacity={1} />
-                                <stop offset="100%" stopColor="#10B981" stopOpacity={1} />
-                              </linearGradient>
-                            </defs>
-                          </Bar>
-                          <Bar dataKey="egresos" name="Egresos" fill="url(#colorEgresosBar)" radius={[4, 4, 0, 0]} animationDuration={1000}>
-                            <defs>
-                              <linearGradient id="colorEgresosBar" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor="#F87171" stopOpacity={1} />
-                                <stop offset="100%" stopColor="#EF4444" stopOpacity={1} />
-                              </linearGradient>
-                            </defs>
-                          </Bar>
+                          <Bar dataKey="ingresos" name="Ingresos" fill="#10B981" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="egresos" name="Egresos" fill="#EF4444" radius={[4, 4, 0, 0]} />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
                   </div>
 
-                  {/* Right: Cash Flow (1/3 width) - "A lado derecho se vea flujo de caja" */}
+                  {/* Flujo de Caja */}
                   <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 flex flex-col">
                     <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
                       <span className="p-2 bg-blue-100 rounded-lg text-blue-600 font-bold">💸</span>
@@ -697,131 +740,81 @@ const DashboardPage = ({ userRole }) => {
                       <ResponsiveContainer width="100%" height="100%" minHeight={300}>
                         <BarChart data={cashflowChartData}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                          <XAxis dataKey="label" stroke="#9CA3AF" tick={{ fontSize: 10 }} interval={0} />
+                          <XAxis dataKey="label" stroke="#9CA3AF" tick={{ fontSize: 10 }} />
                           <YAxis stroke="#9CA3AF" tick={{ fontSize: 10 }} />
-                          <Tooltip cursor={{ fill: 'transparent' }} content={({ active, payload }) => {
-                            if (active && payload && payload.length) {
-                              return (
-                                <div className="bg-white p-3 border border-gray-100 shadow-xl rounded-lg">
-                                  <p className="font-bold text-gray-700 mb-1">{payload[0].payload.label}</p>
-                                  <p className={`text-sm font-semibold ${payload[0].value >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                    Neto: Bs. {payload[0].value.toLocaleString()}
-                                  </p>
-                                </div>
-                              );
-                            }
-                            return null;
-                          }}
-                          />
+                          <Tooltip content={<CustomTooltip prefix="Bs. " />} />
                           <ReferenceLine y={0} stroke="#9CA3AF" />
-                          <Bar dataKey="neto" name="Flujo Neto" radius={[4, 4, 0, 0]} animationDuration={1200}>
+                          <Bar dataKey="neto" name="Flujo Neto" radius={[4, 4, 0, 0]}>
                             {cashflowChartData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.neto >= 0 ? '#10B981' : '#EF4444'} />
+                              <Cell key={`cell-${index} `} fill={entry.neto >= 0 ? '#10B981' : '#EF4444'} />
                             ))}
                           </Bar>
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
-                    <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-100">
-                      <p className="text-sm text-gray-500 mb-1 text-center">Balance del Período</p>
-                      <p className={`text-2xl font-bold text-center ${(finanzasData.resumenTotal.balance || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        Bs. {finanzasData.resumenTotal.balance?.toLocaleString() || 0}
-                      </p>
-                    </div>
                   </div>
                 </div>
 
-                {/* --- SECCIÓN NUEVA: ANÁLISIS DE RENTABILIDAD POR PRODUCTO --- */}
-                <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 mt-6 overflow-hidden">
-                  <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                {/* --- TABLA: DETALLE DE UTILIDAD POR VENTA --- */}
+                <div className="bg-white rounded-xl shadow-lg border border-gray-100 mt-6 overflow-hidden">
+                  <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                     <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                      <span className="p-2 bg-indigo-100 rounded-lg text-indigo-600">📊</span>
-                      Rentabilidad por Producto
+                      <span className="p-2 bg-blue-100 rounded-lg text-blue-600">📑</span>
+                      Detalle de Rentabilidad por Venta
                     </h3>
-                    <div className="relative w-full md:w-64">
-                      <input
-                        type="text"
-                        placeholder="Buscar por código o nombre..."
-                        className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                        value={rentabilidadSearch}
-                        onChange={(e) => setRentabilidadSearch(e.target.value)}
-                      />
-                      <span className="absolute left-3 top-2.5 text-gray-400">🔍</span>
-                    </div>
+                    <span className="text-xs font-medium text-gray-500 bg-white px-3 py-1 rounded-full border border-gray-200">
+                      Últimas 100 ventas
+                    </span>
                   </div>
-
-                  <div className="h-96 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        layout="vertical"
-                        data={rentabilidadData.slice(0, 10)} // Top 10 productos
-                        margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5E7EB" />
-                        <XAxis type="number" stroke="#9CA3AF" tickFormatter={(value) => `Bs. ${value}`} />
-                        <YAxis
-                          type="category"
-                          dataKey="nombre"
-                          stroke="#4B5563"
-                          width={150}
-                          tick={{ fontSize: 12 }}
-                        />
-                        <Tooltip
-                          content={({ active, payload, label }) => {
-                            if (active && payload && payload.length) {
-                              const data = payload[0].payload;
-                              return (
-                                <div className="bg-white p-4 border border-gray-200 shadow-lg rounded-lg">
-                                  <p className="font-bold text-gray-800 mb-2">{label}</p>
-                                  <div className="space-y-1 text-sm">
-                                    <p className="flex justify-between gap-4">
-                                      <span className="text-gray-500">Utilidad Neta:</span>
-                                      <span className={`font-bold ${data.utilidad >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                        Bs. {data.utilidad.toLocaleString()}
-                                      </span>
-                                    </p>
-                                    <p className="flex justify-between gap-4">
-                                      <span className="text-gray-500">Vendidos:</span>
-                                      <span className="font-medium">{data.cantidadVendida} u.</span>
-                                    </p>
-                                    <p className="flex justify-between gap-4">
-                                      <span className="text-gray-500">Ingreso Total:</span>
-                                      <span className="font-medium text-blue-600">Bs. {data.ingresoTotal.toLocaleString()}</span>
-                                    </p>
-                                    <p className="flex justify-between gap-4">
-                                      <span className="text-gray-500">Costo Total:</span>
-                                      <span className="font-medium text-gray-600">Bs. {data.costoTotal.toLocaleString()}</span>
-                                    </p>
-                                    <p className="flex justify-between gap-4">
-                                      <span className="text-gray-500">Margen %:</span>
-                                      <span className={`font-bold ${data.margen >= 20 ? 'text-green-600' : data.margen > 0 ? 'text-yellow-600' : 'text-red-600'}`}>
-                                        {data.margen.toFixed(1)}%
-                                      </span>
-                                    </p>
-                                  </div>
-                                </div>
-                              );
-                            }
-                            return null;
-                          }}
-                        />
-                        <Bar
-                          dataKey="utilidad"
-                          fill="#10B981"
-                          radius={[0, 4, 4, 0]}
-                          barSize={20}
-                          name="Utilidad Neta"
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
-                    {rentabilidadData.length > 10 && (
-                      <p className="text-center text-xs text-gray-400 mt-2">Mostrando los 10 productos más rentables</p>
-                    )}
+                  <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-200 sticky top-0 bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3">Fecha</th>
+                          <th className="px-6 py-3">Nº Venta</th>
+                          <th className="px-6 py-3">Producto</th>
+                          <th className="px-6 py-3 text-right">Cant.</th>
+                          <th className="px-6 py-3 text-right">P. Venta</th>
+                          <th className="px-6 py-3 text-right">C. Compra (Histórico)</th>
+                          <th className="px-6 py-3 text-right">Utilidad Unit.</th>
+                          <th className="px-6 py-3 text-right">Utilidad Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {(finanzasData.salesDetail || []).length > 0 ? (
+                          (finanzasData.salesDetail || []).map((sale, idx) => (
+                            <tr key={idx} className="hover:bg-blue-50 transition-colors">
+                              <td className="px-6 py-3 text-gray-500 whitespace-nowrap">
+                                {new Date(sale.fecha).toLocaleDateString()}
+                              </td>
+                              <td className="px-6 py-3 font-mono text-gray-600">#{sale.numVenta}</td>
+                              <td className="px-6 py-3 font-medium text-gray-800">
+                                {sale.producto} <span className="text-xs text-gray-400 font-normal">({sale.codigo || 'S/C'})</span>
+                              </td>
+                              <td className="px-6 py-3 text-right text-gray-600">{sale.cantidad}</td>
+                              <td className="px-6 py-3 text-right text-blue-600 font-medium">Bs. {(sale.precioVenta || 0).toFixed(2)}</td>
+                              <td className="px-6 py-3 text-right text-gray-500">Bs. {(sale.costoCompra || 0).toFixed(2)}</td>
+                              <td className={`px-6 py-3 text-right font-medium ${(sale.utilidadUnitario || 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                                Bs. {(sale.utilidadUnitario || 0).toFixed(2)}
+                              </td>
+                              <td className={`px-6 py-3 text-right font-bold ${(sale.utilidadTotal || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                Bs. {(sale.utilidadTotal || 0).toFixed(2)}
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan="8" className="px-6 py-8 text-center text-gray-400 italic">
+                              No hay ventas registradas en este periodo.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
 
               </div>
-
             )}
 
             {/* --- INVENTARIO --- */}

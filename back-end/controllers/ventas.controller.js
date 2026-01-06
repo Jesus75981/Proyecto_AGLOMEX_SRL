@@ -32,7 +32,9 @@ export const registrarVenta = async (req, res) => {
 
       // SNAPSHOT DEL COSTO PROMEDIO (WAC) AL MOMENTO DE LA VENTA
       // Si no tiene costoPromedio (legacy), usar precioCompra
-      item.costoUnitario = producto.costoPromedio || producto.precioCompra || 0;
+      // SNAPSHOT DEL COSTO AL MOMENTO DE LA VENTA
+      // Priorizar precioCompra (Costo de ReposiciónActual) según requerimiento del usuario
+      item.costoUnitario = producto.precioCompra || producto.costoPromedio || 0;
       item.nombreProducto = producto.nombre; // Snapshot
       item.codigo = producto.codigo; // Snapshot
     }
@@ -43,7 +45,14 @@ export const registrarVenta = async (req, res) => {
     // 2. VALIDACIÓN Y CÁLCULO DE PAGOS Y CRÉDITO
     const pagosReales = [];
     let montoCredito = 0;
-    const totalVenta = ventaData.productos.reduce((sum, item) => sum + (item.cantidad * item.precioUnitario), 0);
+    let totalVenta = ventaData.productos.reduce((sum, item) => sum + (item.cantidad * item.precioUnitario), 0);
+
+    // Aplicar descuento global si existe
+    if (ventaData.descuento && ventaData.descuento > 0) {
+      totalVenta -= ventaData.descuento;
+    }
+    // Asegurar que no sea negativo
+    totalVenta = Math.max(0, totalVenta);
 
     if (!ventaData.metodosPago || !Array.isArray(ventaData.metodosPago) || ventaData.metodosPago.length === 0) {
       montoCredito = totalVenta; // Asumir toda la venta a crédito si no hay métodos de pago

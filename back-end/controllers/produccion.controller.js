@@ -16,11 +16,11 @@ const getNextSequenceValue = async (nombreSecuencia) => {
   return secuencia.valor;
 };
 
-// Función para generar código interno
-const generarCodigoInterno = (nombre) => {
-  const timestamp = Date.now();
-  const nombreLimpio = nombre.replace(/\s+/g, '').toUpperCase();
-  return `PROD-${nombreLimpio}-${timestamp}`;
+// Función para generar código interno (Secuencial)
+const generarCodigoInterno = async (nombre) => {
+  const secuencia = await getNextSequenceValue('productoCodigo');
+  const nombreLimpio = nombre ? nombre.substring(0, 3).toUpperCase() : 'PRO';
+  return `${nombreLimpio}-${String(secuencia).padStart(4, '0')}`;
 };
 
 export const crearProduccion = async (req, res) => {
@@ -210,7 +210,7 @@ const completarProduccionAutomatica = async (produccion, datosExtra = {}) => {
       await productoFinal.save();
     } else {
       // Si no existe, lo creamos
-      const idProductoTienda = generarCodigoInterno(produccion.nombre);
+      const idProductoTienda = await generarCodigoInterno(produccion.nombre);
       productoFinal = new ProductoTienda({
         idProductoTienda: idProductoTienda,
         nombre: produccion.nombre,

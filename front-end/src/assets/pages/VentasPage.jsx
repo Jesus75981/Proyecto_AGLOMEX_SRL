@@ -1126,6 +1126,28 @@ const VentasPage = ({ userRole }) => {
                     )
                   }
 
+                  {/* Descuento Global Input */}
+                  <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6 flex justify-end items-center gap-4">
+                    <label className="text-sm font-medium text-gray-700">Descuento Global (Bs):</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={nuevaVenta.descuento}
+                      onChange={(e) => setNuevaVenta({ ...nuevaVenta, descuento: parseFloat(e.target.value) || 0 })}
+                      className="w-32 px-3 py-2 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-right font-bold text-gray-800"
+                    />
+                  </div>
+
+                  {/* Detalle de Totales con Descuento */}
+                  <div className="flex justify-end mb-6 text-right">
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Subtotal: <span className="font-medium text-gray-800">Bs. {calcularTotal().toFixed(2)}</span></p>
+                      <p className="text-sm text-red-500">Descuento: <span className="font-bold">- Bs. {nuevaVenta.descuento.toFixed(2)}</span></p>
+                      <p className="text-xl font-bold text-green-700">Total a Pagar: Bs. {Math.max(0, calcularTotal() - nuevaVenta.descuento).toFixed(2)}</p>
+                    </div>
+                  </div>
+
                   {/* Detalles Adicionales de la Venta */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                     <div className="md:col-span-2 bg-gray-50 p-4 rounded-lg border border-gray-200">
@@ -1507,20 +1529,13 @@ const VentasPage = ({ userRole }) => {
                                   <td className="px-4 py-2 text-center font-semibold">{item.cantidad}</td>
                                   <td className="px-4 py-2 text-right">
                                     <div className="flex flex-col">
-                                      <span className="text-gray-900">Bs. {(item.producto?.precioVenta || item.producto?.precio || 0).toFixed(2)}</span>
-                                      {item.producto?.precioVenta !== item.precioUnitario && (
-                                        <span className="text-xs text-gray-500 line-through">Oficial</span>
-                                      )}
+                                      {/* MODIFIED: Mostrar solo el precio unitario real de la venta */}
+                                      <span className="text-gray-900">Bs. {item.precioUnitario.toFixed(2)}</span>
                                     </div>
                                   </td>
                                   <td className="px-4 py-2 text-right font-medium text-green-600">
                                     <div className="flex flex-col">
                                       <span>Bs. {(item.cantidad * item.precioUnitario).toFixed(2)}</span>
-                                      {item.producto?.precioVenta !== item.precioUnitario && (
-                                        <span className="text-xs text-blue-600">
-                                          (A: Bs. {item.precioUnitario.toFixed(2)})
-                                        </span>
-                                      )}
                                     </div>
                                   </td>
                                 </tr>
