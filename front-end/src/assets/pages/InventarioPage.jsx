@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // --- API Helper ---
 const API_URL = 'http://localhost:5000/api';
@@ -116,6 +118,53 @@ const InventarioPage = ({ userRole }) => {
   const [showModificarForm, setShowModificarForm] = useState(false);
   const [productoSeleccionadoParaEditar, setProductoSeleccionadoParaEditar] = useState('');
 
+
+
+  // Función para exportar PDF
+  const exportarPDF = () => {
+    const doc = new jsPDF('l', 'mm', 'a4');
+
+    const fecha = new Date().toLocaleDateString();
+    doc.setFontSize(18);
+    doc.text(`Reporte de Inventario de Productos Terminados - ${fecha}`, 14, 20);
+
+    const columns = [
+      { header: 'Código', dataKey: 'codigo' },
+      { header: 'Nombre', dataKey: 'nombre' },
+      { header: 'Categoría', dataKey: 'categoria' },
+      { header: 'Color', dataKey: 'color' },
+      { header: 'Marca', dataKey: 'marca' },
+      { header: 'Proveedor', dataKey: 'proveedor' },
+      { header: 'Stock', dataKey: 'cantidad' },
+      { header: 'Costo Unit.', dataKey: 'precioCompra' },
+      { header: 'Costo Total', dataKey: 'costoTotal' },
+      { header: 'Ubicación', dataKey: 'ubicacion' }
+    ];
+
+    const rows = inventario.map(item => ({
+      codigo: item.codigo || 'S/C',
+      nombre: item.nombre,
+      categoria: item.categoria,
+      color: item.color || '-',
+      marca: item.marca || '-',
+      proveedor: item.proveedor || '-',
+      cantidad: item.cantidad,
+      precioCompra: `Bs. ${item.precioCompra}`,
+      costoTotal: `Bs. ${(item.cantidad * item.precioCompra).toFixed(2)}`,
+      ubicacion: item.ubicacion || '-'
+    }));
+
+    autoTable(doc, {
+      head: [columns.map(col => col.header)],
+      body: rows.map(row => columns.map(col => row[col.dataKey])),
+      startY: 30,
+      theme: 'grid',
+      styles: { fontSize: 7 },
+      headStyles: { fillColor: [34, 197, 94] }
+    });
+
+    doc.save(`Inventario_Productos_${fecha.replace(/\//g, '-')}.pdf`);
+  };
 
   // Cargar productos y movimientos
   const cargarProductos = async () => {
@@ -834,6 +883,41 @@ const InventarioPage = ({ userRole }) => {
                   </div>
                 </div>
               )}
+
+              <button
+                onClick={exportarPDF}
+                className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition duration-200 flex items-center space-x-2"
+              >
+                <span>📄 Exportar PDF</span>
+              </button>
+              <button
+                onClick={() => {
+                  setShowForm(true);
+                  setProductoEditando(null);
+                  setNuevoProducto({
+                    nombre: '',
+                    sku: '',
+                    codigo: '',
+                    color: '',
+                    descripcion: '',
+                    marca: '',
+                    cajas: '',
+                    dimensiones: { alto: '', ancho: '', profundidad: '' },
+                    categoria: '',
+                    proveedor: '',
+                    cantidad: '',
+                    cantidadMinima: '',
+                    cantidadMaxima: '',
+                    ubicacion: '',
+                    precioCosto: '',
+                    precioVenta: ''
+                  });
+                  setSelectedImageFile(null);
+                }}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition duration-200 flex items-center space-x-2"
+              >
+                <span>+ Agregar Producto</span>
+              </button>
 
               {/* Formulario Modificar Producto */}
               {showModificarForm && (

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import QRCode from 'react-qr-code';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const FabricacionPage = ({ userRole }) => {
   const navigate = useNavigate();
@@ -141,6 +143,52 @@ const FabricacionPage = ({ userRole }) => {
     } catch (error) {
       console.error('Error cargando productos para categorías:', error);
     }
+  };
+
+  // PDF Export for Materials
+  const exportarMaterialesPDF = () => {
+    const doc = new jsPDF('l', 'mm', 'a4');
+
+    const fecha = new Date().toLocaleDateString();
+    doc.setFontSize(18);
+    doc.text(`Inventario de Materiales - ${fecha}`, 14, 20);
+
+    const columns = [
+      { header: 'Código', dataKey: 'codigo' },
+      { header: 'Material', dataKey: 'nombre' },
+      { header: 'Categoría', dataKey: 'categoria' },
+      { header: 'Marca', dataKey: 'marca' },
+      { header: 'Color', dataKey: 'color' },
+      { header: 'Dimensiones', dataKey: 'dimensiones' },
+      { header: 'Stock', dataKey: 'cantidad' },
+      { header: 'Costo Unit.', dataKey: 'costo' },
+      { header: 'Costo Total', dataKey: 'costoTotal' },
+      { header: 'Proveedor', dataKey: 'proveedor' }
+    ];
+
+    const rows = materiales.map(item => ({
+      codigo: item.idMateriaPrima || 'S/C',
+      nombre: item.nombre,
+      categoria: item.categoria,
+      marca: item.marca || '-',
+      color: item.color || '-',
+      dimensiones: item.dimensiones ? `${item.dimensiones.alto || 0}x${item.dimensiones.ancho || 0}x${item.dimensiones.profundidad || 0}` : '-',
+      cantidad: `${item.cantidad} ${item.unidad || ''}`,
+      costo: `Bs. ${item.precioCompra}`,
+      costoTotal: `Bs. ${(item.cantidad * item.precioCompra).toFixed(2)}`,
+      proveedor: item.proveedor ? (item.proveedor.nombre || item.proveedor.nombreEmpresa || item.proveedor) : '-'
+    }));
+
+    autoTable(doc, {
+      head: [columns.map(col => col.header)],
+      body: rows.map(row => columns.map(col => row[col.dataKey])),
+      startY: 30,
+      theme: 'grid',
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [249, 115, 22] } // Orange theme to match Fabrication
+    });
+
+    doc.save(`Inventario_Materiales_${fecha.replace(/\//g, '-')}.pdf`);
   };
 
   const cargarOrdenes = async () => {
@@ -922,38 +970,19 @@ const FabricacionPage = ({ userRole }) => {
                                   onClick={() => {
                                     // Quick Add Logic - Multi Select
                                     if (mat.cantidad <= 0) {
-                                      alert("No hay stock disponible de este material.");
-                                      return;
+                                      alert(`⚠️ ATENCIÓN: El material "${mat.nombre}" está AGOTADO. Debe adquirirlo para completar esta orden.`);
                                     }
-
-                                    // Toggle or Append? User said "elegir varios". Usually implies toggling or adding.
-                                    // If already added, maybe just flash it or ignore? 
-                                    // Let's implement toggle behavior (Add/Remove) or just Increment?
-                                    // User said "elegir uno o mas", likely "Check" behavior.
 
                                     setNuevaOrden(prev => {
                                       const exists = prev.materiales.find(m => m.material === mat._id);
                                       let updatedMaterials;
                                       if (exists) {
-                                        // Remove if clicked again? Or increment? 
-                                        // "Elegir" suggests selection state. If I click again, I likely want to unselect OR I'm done.
-                                        // Let's go with "Toggle" for purely selection, but since we have quantity, maybe just Add is safer?
-                                        // Use case: I want screws, wood, paint. Click, Click, Click.
-                                        // If I click screws again, do I want 2 screws or 0? 
-                                        // Given the "Quantity" input in table, let's assuming clicking ADDS.
-                                        // But duplicate rows are bad.
-                                        // Let's Toggle. Red highlight if removing? 
-                                        // Simpler: If added, remove. If not, add 1.
                                         updatedMaterials = prev.materiales.filter(m => m.material !== mat._id);
                                       } else {
                                         updatedMaterials = [...prev.materiales, { material: mat._id, cantidad: 1 }];
                                       }
                                       return { ...prev, materiales: updatedMaterials };
                                     });
-
-                                    // Keep dropdown open!
-                                    // setSearchTermMaterial(''); // Don't clear search if they are picking multiple from same query?
-                                    // Actually, if I typed "tornillo", I want to pick "tornillo 1" and "tornillo 2". So keep search.
                                   }}
                                   className={`px-4 py-3 cursor-pointer text-sm flex justify-between items-center transition-colors ${isAdded ? 'bg-orange-50 border-l-4 border-orange-500' : 'hover:bg-gray-50'}`}
                                 >
@@ -1006,7 +1035,8 @@ const FabricacionPage = ({ userRole }) => {
                               <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Color</th>
                               <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cód/Prov</th>
                               <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Costo Unit.</th>
-                              <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Cant.</th>
+                              <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Stock Disp.</th>
+                              <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Cant. Req.</th>
                               <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Subtotal</th>
                               <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Acción</th>
                             </tr>
@@ -1015,8 +1045,11 @@ const FabricacionPage = ({ userRole }) => {
                             {nuevaOrden.materiales.map((item, index) => {
                               const mat = materiales.find(m => m._id === item.material);
                               const precio = mat ? (mat.precioCompra || 0) : 0;
+                              const stock = mat ? mat.cantidad : 0;
+                              const deficit = item.cantidad > stock;
+
                               return (
-                                <tr key={index}>
+                                <tr key={index} className={deficit ? 'bg-red-50' : ''}>
                                   <td className="px-4 py-2 text-sm text-gray-900">{mat ? mat.nombre : 'Desconocido'}</td>
                                   <td className="px-4 py-2 text-sm text-gray-500">
                                     {mat && mat.color ? (
@@ -1035,6 +1068,9 @@ const FabricacionPage = ({ userRole }) => {
                                     ) : '-'}
                                   </td>
                                   <td className="px-4 py-2 text-sm text-gray-600 text-right">{precio} Bs</td>
+                                  <td className={`px-4 py-2 text-sm font-bold text-center ${stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    {stock}
+                                  </td>
                                   <td className="px-4 py-2 text-sm text-gray-900 text-right">
                                     <input
                                       type="number"
@@ -1042,17 +1078,15 @@ const FabricacionPage = ({ userRole }) => {
                                       value={item.cantidad}
                                       onChange={(e) => {
                                         const newQty = parseInt(e.target.value) || 0;
-                                        // Optional: Check stock limit
-                                        if (mat && newQty > mat.cantidad) {
-                                          // Could alert or just visually warn
-                                        }
+                                        // Optional: Check stock limit (Removed strict check, just visual warning now)
                                         const updated = nuevaOrden.materiales.map(m =>
                                           m.material === item.material ? { ...m, cantidad: newQty } : m
                                         );
                                         setNuevaOrden({ ...nuevaOrden, materiales: updated });
                                       }}
-                                      className="w-20 px-2 py-1 text-right border border-gray-300 rounded focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
+                                      className={`w-24 px-2 py-1 text-right border rounded focus:ring-orange-500 focus:border-orange-500 sm:text-sm ${deficit ? 'border-red-500 text-red-700 bg-red-100' : 'border-gray-300'}`}
                                     />
+                                    {deficit && <div className="text-xs text-red-600 font-bold mt-1">Faltan: {item.cantidad - stock} (COMPRAR)</div>}
                                   </td>
                                   <td className="px-4 py-2 text-sm font-medium text-gray-900 text-right">{(precio * item.cantidad).toFixed(2)} Bs</td>
                                   <td className="px-4 py-2 text-center">
@@ -1417,6 +1451,39 @@ const FabricacionPage = ({ userRole }) => {
               <div className="bg-white rounded-xl shadow-md p-6 overflow-hidden">
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-2xl font-semibold text-gray-800">Inventario de Materiales</h2>
+                  <div className="flex space-x-3">
+                    <button
+                      onClick={exportarMaterialesPDF}
+                      className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition duration-200 flex items-center space-x-2 text-sm font-medium"
+                    >
+                      <span>📄 Exportar PDF</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowForm(true);
+                        setEditingMaterial(null);
+                        setNuevoMaterial({
+                          nombre: '',
+                          categoria: '',
+                          cantidad: 0,
+                          cantidadMinima: 10,
+                          precioCompra: 0,
+                          precioVenta: 0,
+                          unidad: '',
+                          ubicacion: '',
+                          color: '',
+                          descripcion: '',
+                          marca: '',
+                          cajas: '',
+                          dimensiones: { alto: '', ancho: '', profundidad: '' },
+                          imagen: null
+                        });
+                      }}
+                      className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition duration-200 text-sm font-medium"
+                    >
+                      + Agregar Material
+                    </button>
+                  </div>
                 </div>
 
                 <div className="overflow-x-auto">

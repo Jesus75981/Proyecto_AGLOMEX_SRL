@@ -50,13 +50,52 @@ export const getTransactions = async (req, res) => {
 
 // Crear una nueva transacción
 export const createTransaction = async (req, res) => {
-  const { type, category, description, amount, currency, exchangeRate, date } = req.body;
+  const { type, category, description, amount, currency, exchangeRate, date, cuentaId } = req.body;
 
   if (!type || !category || !description || !amount) {
     return res.status(400).json({ message: 'Todos los campos son obligatorios.' });
   }
 
   try {
+    const montoNum = parseFloat(amount);
+    const amountBOB = currency === 'USD' ? montoNum * (exchangeRate || 1) : montoNum;
+    let metadata = {};
+
+    // --- Lógica de Cuenta Bancaria / Caja ---
+    if (cuentaId) {
+      const banco = await BankAccount.findById(cuentaId);
+      if (!banco) {
+        return res.status(404).json({ message: 'Cuenta seleccionada no encontrada.' });
+      }
+
+      // Actualizar saldo
+      if (type === 'ingreso') {
+        banco.saldo += amountBOB;
+      } else {
+        // egreso
+        banco.saldo -= amountBOB;
+      }
+      await banco.save();
+
+      // Registrar movimiento bancario
+      const bankTx = new BankTransaction({
+        cuentaId: banco._id,
+        tipo: type === 'ingreso' ? 'Deposito' : 'Retiro',
+        monto: amountBOB,
+        fecha: date || Date.now(),
+        descripcion: `[Manual] ${description}`,
+        referenciaId: null // Se vinculará implícitamente por descripción/fecha
+      });
+      await bankTx.save();
+
+      metadata = {
+        cuentaId: banco._id,
+        cuenta: `${banco.nombreBanco} - ${banco.tipo === 'efectivo' ? 'Caja' : banco.numeroCuenta}`,
+        banco: banco.nombreBanco
+      };
+    }
+    // ----------------------------------------
+
     const newTransaction = new Finanzas({
       type,
       category,
@@ -64,8 +103,9 @@ export const createTransaction = async (req, res) => {
       amount,
       currency: currency || 'BOB',
       exchangeRate: exchangeRate || 1,
-      amountBOB: currency === 'USD' ? amount * (exchangeRate || 1) : amount,
-      date: date || Date.now()
+      amountBOB: amountBOB,
+      date: date || Date.now(),
+      metadata
     });
     await newTransaction.save();
     res.status(201).json(newTransaction);

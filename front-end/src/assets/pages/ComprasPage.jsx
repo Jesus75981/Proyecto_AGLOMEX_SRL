@@ -169,8 +169,10 @@ const ComprasPage = ({ userRole }) => {
   // Data from API
   const [proveedores, setProveedores] = useState([]);
   const [productos, setProductos] = useState([]);
+  const [materiasPrimas, setMateriasPrimas] = useState([]); // Nuevo estado para Materia Prima
   const [categorias, setCategorias] = useState([]);
   const [bankAccounts, setBankAccounts] = useState([]); // New state for bank accounts
+  const [historialCompras, setHistorialCompras] = useState([]); // Historial state
 
   // Search & Filtering
   const [busquedaProveedor, setBusquedaProveedor] = useState('');
@@ -297,13 +299,15 @@ const ComprasPage = ({ userRole }) => {
 
     const fetchData = async () => {
       try {
-        const [proveedoresData, productosData, cuentasData] = await Promise.all([
+        const [proveedoresData, productosData, materiaPrimaData, cuentasData] = await Promise.all([
           apiFetch('/proveedores'),
           apiFetch('/productos'),
+          apiFetch('/materiaPrima'),
           apiFetch('/finanzas/cuentas') // Fetch bank accounts
         ]);
         setProveedores(proveedoresData);
         setProductos(productosData);
+        setMateriasPrimas(materiaPrimaData);
         setBankAccounts(cuentasData);
 
       } catch (error) {
@@ -357,7 +361,8 @@ const ComprasPage = ({ userRole }) => {
 
   useEffect(() => {
     if (busquedaProducto) {
-      const filtrados = productos.filter(p =>
+      const listaBusqueda = compra.tipoCompra === 'Materia Prima' ? materiasPrimas : productos;
+      const filtrados = listaBusqueda.filter(p =>
         (p.nombre && p.nombre.toLowerCase().includes(busquedaProducto.toLowerCase())) ||
         (p.codigo && p.codigo.toLowerCase().includes(busquedaProducto.toLowerCase()))
       );
@@ -367,7 +372,7 @@ const ComprasPage = ({ userRole }) => {
       setProductosFiltrados([]);
       setMostrarResultadosProducto(false);
     }
-  }, [busquedaProducto, productos]);
+  }, [busquedaProducto, productos, materiasPrimas, compra.tipoCompra]);
 
   // --- Calculations ---
   const totalCompra = compra.productos.reduce((total, item) => total + item.costoTotal, 0);
@@ -553,7 +558,11 @@ const ComprasPage = ({ userRole }) => {
 
       const productoCreado = await response.json();
 
-      setProductos([...productos, productoCreado]);
+      if (isMateriaPrima) {
+        setMateriasPrimas([...materiasPrimas, productoCreado]);
+      } else {
+        setProductos([...productos, productoCreado]);
+      }
       setShowProductoForm(false);
       setNuevoProducto({ nombre: '', descripcion: '', categoria: '', nuevaCategoria: '', color: '', marca: '', ubicacion: '', proveedor: '', codigo: '', cajas: '', tipo: 'Producto Terminado', dimensiones: { alto: '', ancho: '', profundidad: '' } });
       setSelectedImageFile(null);
@@ -587,7 +596,8 @@ const ComprasPage = ({ userRole }) => {
       return;
     }
 
-    const productoSeleccionado = productos.find(p => p._id === productoTemporal.productoId);
+    const listaBusqueda = compra.tipoCompra === 'Materia Prima' ? materiasPrimas : productos;
+    const productoSeleccionado = listaBusqueda.find(p => p._id === productoTemporal.productoId);
     if (!productoSeleccionado) return;
 
     const productoCompra = {
@@ -675,7 +685,7 @@ const ComprasPage = ({ userRole }) => {
         monto: parseFloat(p.monto) || 0,
         referencia: p.tipo === 'Cheque' ? 'REF-CHQ-' + Date.now() : '',
         cuenta: p.cuenta || '',
-        cuentaId: p.tipo === 'Transferencia' ? p.cuentaId : null // Send account ID for transfers
+        cuentaId: (p.tipo === 'Transferencia' || p.tipo === 'Efectivo') ? p.cuentaId : null // Send account ID for transfers and cash
       })),
       totalCompra: totalCompra,
       observaciones: compra.observaciones,
@@ -739,6 +749,33 @@ const ComprasPage = ({ userRole }) => {
     setListaPagos(listaPagos.map(p => p.id === id ? { ...p, [campo]: valor } : p));
   };
 
+  // --- Historial Logic ---
+  useEffect(() => {
+    if (activeSection === 'historial') {
+      const cargarHistorial = async () => {
+        try {
+          const compras = await apiFetch('/compras');
+          setHistorialCompras(compras);
+        } catch (error) {
+          console.error("Error cargando historial de compras:", error);
+        }
+      };
+      cargarHistorial();
+    }
+  }, [activeSection]);
+
+  const handleEliminarCompra = async (id) => {
+    if (!window.confirm('¿Estás seguro de eliminar esta compra? Esta acción revertirá el inventario y devolverá el dinero a la cuenta si corresponde.')) return;
+    try {
+      await apiFetch(`/compras/${id}`, { method: 'DELETE' });
+      setHistorialCompras(historialCompras.filter(c => c._id !== id));
+      alert('Compra eliminada y transacciones revertidas correctamente.');
+    } catch (error) {
+      console.error("Error eliminando compra:", error);
+      alert(`Error al eliminar compra: ${error.message}`);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header */}
@@ -774,6 +811,15 @@ const ComprasPage = ({ userRole }) => {
             >
               Gestionar Proveedores
             </button>
+            <button
+              onClick={() => setActiveSection('historial')}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeSection === 'historial'
+                ? 'bg-purple-600 text-white shadow-md'
+                : 'bg-white text-gray-600 hover:bg-gray-100'
+                }`}
+            >
+              Historial
+            </button>
           </div>
         </div>
       </header>
@@ -793,8 +839,8 @@ const ComprasPage = ({ userRole }) => {
               <div className="bg-white rounded-xl shadow-md p-6">
                 <h2 className="text-2xl font-semibold text-gray-800 mb-6 border-b pb-4">Información General de la Compra</h2>
 
-                {/* Basic Info */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                {/* Basic Info Row 1: Fecha & Número (Compacto) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Fecha</label>
                     <input type="date" value={compra.fecha} onChange={(e) => setCompra({ ...compra, fecha: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" />
@@ -803,27 +849,12 @@ const ComprasPage = ({ userRole }) => {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Número de Compra (Automático)</label>
                     <input type="text" value={compra.numeroCompra} readOnly className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600" />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Compra</label>
-                    <select value={compra.tipoCompra} onChange={(e) => setCompra({ ...compra, tipoCompra: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
-                      <option value="Materia Prima">Materia Prima</option>
-                      <option value="Producto Terminado">Producto Terminado</option>
-                    </select>
-                  </div>
-                  <div className="md:col-span-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Número de Factura <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={compra.numeroFactura}
-                      onChange={(e) => setCompra({ ...compra, numeroFactura: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
-                      placeholder="Ej: F-123456"
-                      required
-                    />
-                  </div>    {/* Supplier */}
-                  <div className="mb-6">
+                </div>
+
+                {/* Basic Info Row 2: Proveedor, Tipo & Factura (Alineados) */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6 items-end">
+                  {/* Supplier - Takes 2 columns */}
+                  <div className="md:col-span-2 relative">
                     <label className="block text-sm font-medium text-gray-700 mb-2">Proveedor</label>
                     <div className="flex space-x-3">
                       <div className="flex-1 relative">
@@ -859,7 +890,7 @@ const ComprasPage = ({ userRole }) => {
                       </div>
 
                       {mostrarResultadosProveedor && (
-                        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto">
+                        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto top-full left-0">
                           {proveedores
                             .filter(p =>
                               p.nombre.toLowerCase().includes(busquedaProveedor.toLowerCase()) ||
@@ -898,442 +929,466 @@ const ComprasPage = ({ userRole }) => {
                       {showProveedorForm ? 'Cancelar' : '+ Crear Proveedor'}
                     </button>
                   </div>
-                  {compra.proveedorNombre && (
-                    <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded">
-                      <span className="text-sm text-green-800">✅ Proveedor seleccionado: <strong>{compra.proveedorNombre}</strong></span>
-                    </div>
-                  )}
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Compra</label>
+                    <select value={compra.tipoCompra} onChange={(e) => setCompra({ ...compra, tipoCompra: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                      <option value="Materia Prima">Materia Prima</option>
+                      <option value="Producto Terminado">Producto Terminado</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Número de Factura <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={compra.numeroFactura}
+                      onChange={(e) => setCompra({ ...compra, numeroFactura: e.target.value })}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
+                      placeholder="Ej: F-123456"
+                      required
+                    />
+                  </div>
                 </div>
+                {compra.proveedorNombre && (
+                  <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded">
+                    <span className="text-sm text-green-800">✅ Proveedor seleccionado: <strong>{compra.proveedorNombre}</strong></span>
+                  </div>
+                )}
+              </div>
 
-                {/* New Supplier Form */}
-                {showProveedorForm && (
-                  <div className="mb-6 p-4 bg-green-50 rounded-lg border border-green-200">
-                    <h3 className="text-lg font-semibold text-green-800 mb-4">Nuevo Proveedor</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <input type="text" placeholder="Nombre del proveedor" value={nuevoProveedor.nombre} onChange={(e) => setNuevoProveedor({ ...nuevoProveedor, nombre: e.target.value })} className="px-4 py-2 border border-gray-300 rounded-lg" />
-                      <input type="text" placeholder="Nombre comercial" value={nuevoProveedor.nombreComercial} onChange={(e) => setNuevoProveedor({ ...nuevoProveedor, nombreComercial: e.target.value })} className="px-4 py-2 border border-gray-300 rounded-lg" />
-                      <input type="text" placeholder="NIT" value={nuevoProveedor.nit} onChange={(e) => setNuevoProveedor({ ...nuevoProveedor, nit: e.target.value })} className="px-4 py-2 border border-gray-300 rounded-lg" />
-                      <input type="text" placeholder="Ubicación" value={nuevoProveedor.ubicacion} onChange={(e) => setNuevoProveedor({ ...nuevoProveedor, ubicacion: e.target.value })} className="px-4 py-2 border border-gray-300 rounded-lg" />
-                      <input type="text" placeholder="Teléfono" value={nuevoProveedor.contacto.telefono} onChange={(e) => setNuevoProveedor({ ...nuevoProveedor, contacto: { ...nuevoProveedor.contacto, telefono: e.target.value } })} className="px-4 py-2 border border-gray-300 rounded-lg" />
-                      <input type="email" placeholder="Email" value={nuevoProveedor.contacto.email} onChange={(e) => setNuevoProveedor({ ...nuevoProveedor, contacto: { ...nuevoProveedor.contacto, email: e.target.value } })} className="px-4 py-2 border border-gray-300 rounded-lg" />
-                      <div className="md:col-span-2">
-                        <input type="text" placeholder="Dirección" value={nuevoProveedor.direccion} onChange={(e) => setNuevoProveedor({ ...nuevoProveedor, direccion: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg" />
-                      </div>
+              {/* New Supplier Form */}
+              {showProveedorForm && (
+                <div className="mb-6 p-4 bg-green-50 rounded-lg border border-green-200">
+                  <h3 className="text-lg font-semibold text-green-800 mb-4">Nuevo Proveedor</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input type="text" placeholder="Nombre del proveedor" value={nuevoProveedor.nombre} onChange={(e) => setNuevoProveedor({ ...nuevoProveedor, nombre: e.target.value })} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                    <input type="text" placeholder="Nombre comercial" value={nuevoProveedor.nombreComercial} onChange={(e) => setNuevoProveedor({ ...nuevoProveedor, nombreComercial: e.target.value })} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                    <input type="text" placeholder="NIT" value={nuevoProveedor.nit} onChange={(e) => setNuevoProveedor({ ...nuevoProveedor, nit: e.target.value })} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                    <input type="text" placeholder="Ubicación" value={nuevoProveedor.ubicacion} onChange={(e) => setNuevoProveedor({ ...nuevoProveedor, ubicacion: e.target.value })} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                    <input type="text" placeholder="Teléfono" value={nuevoProveedor.contacto.telefono} onChange={(e) => setNuevoProveedor({ ...nuevoProveedor, contacto: { ...nuevoProveedor.contacto, telefono: e.target.value } })} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                    <input type="email" placeholder="Email" value={nuevoProveedor.contacto.email} onChange={(e) => setNuevoProveedor({ ...nuevoProveedor, contacto: { ...nuevoProveedor.contacto, email: e.target.value } })} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                    <div className="md:col-span-2">
+                      <input type="text" placeholder="Dirección" value={nuevoProveedor.direccion} onChange={(e) => setNuevoProveedor({ ...nuevoProveedor, direccion: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg" />
+                    </div>
 
-                      {/* Información Bancaria */}
-                      <div className="md:col-span-2">
-                        <h4 className="text-md font-semibold text-gray-800 mb-3">Información Bancaria</h4>
-                        {nuevoProveedor.bancos.map((banco, index) => (
-                          <div key={index} className="mb-4 p-3 bg-gray-50 rounded-lg border">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-2">
-                              <input
-                                type="text"
-                                placeholder="Nombre del banco"
-                                value={banco.nombre}
-                                onChange={(e) => actualizarBanco(index, 'nombre', e.target.value)}
-                                className="px-3 py-2 border border-gray-300 rounded-lg"
-                              />
-                              <input
-                                type="text"
-                                placeholder="Número de cuenta"
-                                value={banco.numeroCuenta}
-                                onChange={(e) => actualizarBanco(index, 'numeroCuenta', e.target.value)}
-                                className="px-3 py-2 border border-gray-300 rounded-lg"
-                              />
-                              <div className="flex items-center space-x-2">
-                                {nuevoProveedor.bancos.length > 1 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => eliminarBanco(index)}
-                                    className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm"
-                                  >
-                                    Eliminar
-                                  </button>
-                                )}
-                              </div>
+                    {/* Información Bancaria */}
+                    <div className="md:col-span-2">
+                      <h4 className="text-md font-semibold text-gray-800 mb-3">Información Bancaria</h4>
+                      {nuevoProveedor.bancos.map((banco, index) => (
+                        <div key={index} className="mb-4 p-3 bg-gray-50 rounded-lg border">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-2">
+                            <input
+                              type="text"
+                              placeholder="Nombre del banco"
+                              value={banco.nombre}
+                              onChange={(e) => actualizarBanco(index, 'nombre', e.target.value)}
+                              className="px-3 py-2 border border-gray-300 rounded-lg"
+                            />
+                            <input
+                              type="text"
+                              placeholder="Número de cuenta"
+                              value={banco.numeroCuenta}
+                              onChange={(e) => actualizarBanco(index, 'numeroCuenta', e.target.value)}
+                              className="px-3 py-2 border border-gray-300 rounded-lg"
+                            />
+                            <div className="flex items-center space-x-2">
+                              {nuevoProveedor.bancos.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => eliminarBanco(index)}
+                                  className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm"
+                                >
+                                  Eliminar
+                                </button>
+                              )}
                             </div>
                           </div>
-                        ))}
-                        <button
-                          type="button"
-                          onClick={agregarBanco}
-                          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm"
-                        >
-                          + Agregar Banco
-                        </button>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={agregarBanco}
+                        className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm"
+                      >
+                        + Agregar Banco
+                      </button>
+                    </div>
+
+                    <div className="md:col-span-2 flex space-x-4">
+                      <button onClick={handleCrearProveedor} className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">Guardar</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Observations */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Observaciones</label>
+                <textarea value={compra.observaciones} onChange={(e) => setCompra({ ...compra, observaciones: e.target.value })} placeholder="Ej: El proveedor enviará la mercadería una vez se cancele el saldo." rows="3" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" />
+              </div>
+
+              {/* --- Products Section --- */}
+              <div className="border-t pt-6">
+                <h2 className="text-2xl font-semibold text-gray-800 mb-6">Productos de la Compra</h2>
+
+                {/* Search and Add Product */}
+                <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <h3 className="text-lg font-semibold text-blue-800 mb-4">Buscar y Agregar Producto</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 items-end">
+                    <div className="md:col-span-2 relative">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Buscar Producto</label>
+                      <input type="text" placeholder="Buscar por nombre o código..." value={busquedaProducto} onChange={(e) => setBusquedaProducto(e.target.value)} onFocus={() => busquedaProducto && setMostrarResultadosProducto(true)} className="w-full px-4 py-2 border border-gray-300 rounded-lg" />
+                      {mostrarResultadosProducto && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                          {productosFiltrados.length > 0 ? productosFiltrados.map(p => (
+                            <div key={p._id} onMouseDown={() => seleccionarProducto(p)} className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0">
+                              <div className="font-semibold text-gray-800">{p.nombre}</div>
+                              <div className="text-sm text-gray-600 mt-1">
+                                <span className="font-medium">Código:</span> {p.codigo || 'N/A'}
+                                {p.color && <> <span className="mx-2">•</span> <span className="font-medium">Color:</span> {p.color}</>}
+                              </div>
+                              <div className="text-sm text-gray-600">
+                                {p.marca && <><span className="font-medium">Marca:</span> {p.marca} <span className="mx-2">•</span></>}
+                                <span className="font-medium">Categoría:</span> {p.categoria}
+                              </div>
+                            </div>
+                          )) : <div className="px-4 py-3 text-gray-500 text-center">No se encontraron productos</div>}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Cantidad</label>
+                      <input type="number" placeholder="Cantidad" value={productoTemporal.cantidad || ''} onChange={(e) => setProductoTemporal({ ...productoTemporal, cantidad: e.target.value === '' ? '' : parseInt(e.target.value) })} className="w-full px-4 py-2 border border-gray-300 rounded-lg" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Costo Unitario</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="Costo"
+                        value={productoTemporal.costoUnitario || ''}
+                        onChange={(e) => setProductoTemporal({ ...productoTemporal, costoUnitario: e.target.value === '' ? '' : parseFloat(e.target.value) })}
+                        onFocus={(e) => e.target.select()}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                      />
+                    </div>
+                  </div>
+                  {productoTemporal.productoNombre && (
+                    <div className="mb-4 p-2 bg-blue-100 border border-blue-200 rounded">
+                      <span className="text-sm text-blue-800">✅ Producto: <strong>{productoTemporal.productoNombre}</strong></span>
+                    </div>
+                  )}
+                  <div className="flex space-x-3">
+                    <button onClick={agregarProductoACompra} disabled={!productoTemporal.productoId} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-400">
+                      Agregar Producto a la Compra
+                    </button>
+                    <button onClick={() => setShowProductoForm(!showProductoForm)} className="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700">
+                      {showProductoForm ? 'Cancelar' : '+ Crear Nuevo Producto'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* New Product Form */}
+                {showProductoForm && (
+                  <div className="mb-6 p-4 bg-teal-50 rounded-lg border border-teal-200">
+                    <h3 className="text-lg font-semibold text-teal-800 mb-4">Crear Nuevo Producto</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <input type="text" placeholder="Nombre del producto" value={nuevoProducto.nombre} onChange={(e) => setNuevoProducto({ ...nuevoProducto, nombre: e.target.value })} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                      <input type="text" placeholder="Código del producto" value={nuevoProducto.codigo} onChange={(e) => { const val = e.target.value; setNuevoProducto(prev => ({ ...prev, codigo: val })); }} className="px-4 py-2 border border-gray-300 rounded-lg" />
+
+                      {/* Selector de Tipo de Producto */}
+                      <select
+                        value={nuevoProducto.tipo}
+                        onChange={(e) => { const val = e.target.value; setNuevoProducto(prev => ({ ...prev, tipo: val })); }}
+                        className="px-4 py-2 border border-gray-300 rounded-lg"
+                      >
+                        <option value="Producto Terminado">Producto Terminado</option>
+                        <option value="Materia Prima">Materia Prima</option>
+                      </select>
+
+                      {/* Combo Box de Categoría */}
+                      <div className="relative">
+                        <div className="relative w-full">
+                          <input
+                            type="text"
+                            placeholder="Buscar o crear categoría..."
+                            value={nuevoProducto.categoria === 'nueva' ? nuevoProducto.nuevaCategoria : nuevoProducto.categoria}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setNuevoProducto(prev => ({ ...prev, categoria: val, nuevaCategoria: val }));
+                              setMostrarResultadosCategoria(true);
+                            }}
+                            onBlur={() => setTimeout(() => setMostrarResultadosCategoria(false), 200)}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 pr-10"
+                          />
+                          <div
+                            className="absolute inset-y-0 right-0 flex items-center px-2 cursor-pointer text-gray-500 hover:text-teal-600"
+                            onClick={() => {
+                              setMostrarResultadosCategoria(!mostrarResultadosCategoria);
+                              if (!mostrarResultadosCategoria) {
+                                document.querySelector('input[placeholder="Buscar o crear categoría..."]').focus();
+                              }
+                            }}
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </div>
+                        </div>
+
+                        {mostrarResultadosCategoria && (
+                          <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto">
+                            {categorias
+                              .filter(cat => cat.toLowerCase().includes((nuevoProducto.categoria === 'nueva' ? nuevoProducto.nuevaCategoria : nuevoProducto.categoria).toLowerCase()))
+                              .map(cat => (
+                                <div
+                                  key={cat}
+                                  onMouseDown={() => setNuevoProducto(prev => ({ ...prev, categoria: cat, nuevaCategoria: cat }))}
+                                  className="px-4 py-2 hover:bg-teal-50 cursor-pointer border-b border-gray-100 last:border-0 text-gray-700"
+                                >
+                                  {cat}
+                                </div>
+                              ))}
+                            {categorias.filter(cat => cat.toLowerCase().includes((nuevoProducto.categoria === 'nueva' ? nuevoProducto.nuevaCategoria : nuevoProducto.categoria).toLowerCase())).length === 0 && (
+                              <div className="px-4 py-2 text-gray-500 text-sm italic">
+                                Presiona Enter o guarda para crear "{nuevoProducto.categoria === 'nueva' ? nuevoProducto.nuevaCategoria : nuevoProducto.categoria}"
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
 
+                      <input type="text" placeholder="Color" value={nuevoProducto.color} onChange={(e) => { const val = e.target.value; setNuevoProducto(prev => ({ ...prev, color: val })); }} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                      <input type="text" placeholder="Marca" value={nuevoProducto.marca} onChange={(e) => { const val = e.target.value; setNuevoProducto(prev => ({ ...prev, marca: val })); }} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                      <input type="text" placeholder="Cajas (Ej: 1 caja 2 sillas)" value={nuevoProducto.cajas} onChange={(e) => { const val = e.target.value; setNuevoProducto(prev => ({ ...prev, cajas: val })); }} className="px-4 py-2 border border-gray-300 rounded-lg" />
+
+                      <input type="number" step="0.01" placeholder="Alto (cm)" value={nuevoProducto.dimensiones.alto || ''} onChange={(e) => { const val = e.target.value; setNuevoProducto(prev => ({ ...prev, dimensiones: { ...prev.dimensiones, alto: val } })); }} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                      <input type="number" step="0.01" placeholder="Ancho (cm)" value={nuevoProducto.dimensiones.ancho || ''} onChange={(e) => { const val = e.target.value; setNuevoProducto(prev => ({ ...prev, dimensiones: { ...prev.dimensiones, ancho: val } })); }} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                      <input type="number" step="0.01" placeholder="Profundidad (cm)" value={nuevoProducto.dimensiones.profundidad || ''} onChange={(e) => { const val = e.target.value; setNuevoProducto(prev => ({ ...prev, dimensiones: { ...prev.dimensiones, profundidad: val } })); }} className="px-4 py-2 border border-gray-300 rounded-lg" />
+
+                      <input type="text" placeholder="Almacén" value={nuevoProducto.ubicacion} onChange={(e) => { const val = e.target.value; setNuevoProducto(prev => ({ ...prev, ubicacion: val })); }} className="px-4 py-2 border border-gray-300 rounded-lg" />
+                      <select value={nuevoProducto.proveedor} onChange={(e) => { const val = e.target.value; setNuevoProducto(prev => ({ ...prev, proveedor: val })); }} className="px-4 py-2 border border-gray-300 rounded-lg">
+                        <option value="">-- Seleccionar Proveedor --</option>
+                        {proveedores.map(p => <option key={p._id} value={p._id}>{p.nombre}</option>)}
+                      </select>
+
+                      <textarea
+                        placeholder="Descripción del producto"
+                        value={nuevoProducto.descripcion}
+                        onChange={(e) => { const val = e.target.value; setNuevoProducto(prev => ({ ...prev, descripcion: val })); }}
+                        className="px-4 py-2 border border-gray-300 rounded-lg md:col-span-2"
+                        rows="2"
+                      />
+
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Imagen del Producto</label>
+                        <input
+                          type="file"
+                          onChange={(e) => setSelectedImageFile(e.target.files[0])}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                          accept="image/*"
+                        />
+                      </div>
                       <div className="md:col-span-2 flex space-x-4">
-                        <button onClick={handleCrearProveedor} className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">Guardar</button>
+                        <button onClick={handleCrearProducto} className="bg-teal-600 text-white px-6 py-2 rounded-lg hover:bg-teal-700">Guardar Producto</button>
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* Observations */}
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Observaciones</label>
-                  <textarea value={compra.observaciones} onChange={(e) => setCompra({ ...compra, observaciones: e.target.value })} placeholder="Ej: El proveedor enviará la mercadería una vez se cancele el saldo." rows="3" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" />
-                </div>
-
-                {/* --- Products Section --- */}
-                <div className="border-t pt-6">
-                  <h2 className="text-2xl font-semibold text-gray-800 mb-6">Productos de la Compra</h2>
-
-                  {/* Search and Add Product */}
-                  <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <h3 className="text-lg font-semibold text-blue-800 mb-4">Buscar y Agregar Producto</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 items-end">
-                      <div className="md:col-span-2 relative">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Buscar Producto</label>
-                        <input type="text" placeholder="Buscar por nombre o código..." value={busquedaProducto} onChange={(e) => setBusquedaProducto(e.target.value)} onFocus={() => busquedaProducto && setMostrarResultadosProducto(true)} className="w-full px-4 py-2 border border-gray-300 rounded-lg" />
-                        {mostrarResultadosProducto && (
-                          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                            {productosFiltrados.length > 0 ? productosFiltrados.map(p => (
-                              <div key={p._id} onMouseDown={() => seleccionarProducto(p)} className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0">
-                                <div className="font-semibold text-gray-800">{p.nombre}</div>
-                                <div className="text-sm text-gray-600 mt-1">
-                                  <span className="font-medium">Código:</span> {p.codigo || 'N/A'}
-                                  {p.color && <> <span className="mx-2">•</span> <span className="font-medium">Color:</span> {p.color}</>}
-                                </div>
-                                <div className="text-sm text-gray-600">
-                                  {p.marca && <><span className="font-medium">Marca:</span> {p.marca} <span className="mx-2">•</span></>}
-                                  <span className="font-medium">Categoría:</span> {p.categoria}
-                                </div>
-                              </div>
-                            )) : <div className="px-4 py-3 text-gray-500 text-center">No se encontraron productos</div>}
-                          </div>
-                        )}
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Cantidad</label>
-                        <input type="number" placeholder="Cantidad" value={productoTemporal.cantidad || ''} onChange={(e) => setProductoTemporal({ ...productoTemporal, cantidad: e.target.value === '' ? '' : parseInt(e.target.value) })} className="w-full px-4 py-2 border border-gray-300 rounded-lg" />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Costo Unitario</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          placeholder="Costo"
-                          value={productoTemporal.costoUnitario || ''}
-                          onChange={(e) => setProductoTemporal({ ...productoTemporal, costoUnitario: e.target.value === '' ? '' : parseFloat(e.target.value) })}
-                          onFocus={(e) => e.target.select()}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                        />
-                      </div>
-                    </div>
-                    {productoTemporal.productoNombre && (
-                      <div className="mb-4 p-2 bg-blue-100 border border-blue-200 rounded">
-                        <span className="text-sm text-blue-800">✅ Producto: <strong>{productoTemporal.productoNombre}</strong></span>
-                      </div>
-                    )}
-                    <div className="flex space-x-3">
-                      <button onClick={agregarProductoACompra} disabled={!productoTemporal.productoId} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-400">
-                        Agregar Producto a la Compra
-                      </button>
-                      <button onClick={() => setShowProductoForm(!showProductoForm)} className="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700">
-                        {showProductoForm ? 'Cancelar' : '+ Crear Nuevo Producto'}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* New Product Form */}
-                  {showProductoForm && (
-                    <div className="mb-6 p-4 bg-teal-50 rounded-lg border border-teal-200">
-                      <h3 className="text-lg font-semibold text-teal-800 mb-4">Crear Nuevo Producto</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <input type="text" placeholder="Nombre del producto" value={nuevoProducto.nombre} onChange={(e) => setNuevoProducto({ ...nuevoProducto, nombre: e.target.value })} className="px-4 py-2 border border-gray-300 rounded-lg" />
-                        <input type="text" placeholder="Código del producto" value={nuevoProducto.codigo} onChange={(e) => { const val = e.target.value; setNuevoProducto(prev => ({ ...prev, codigo: val })); }} className="px-4 py-2 border border-gray-300 rounded-lg" />
-
-                        {/* Selector de Tipo de Producto */}
-                        <select
-                          value={nuevoProducto.tipo}
-                          onChange={(e) => { const val = e.target.value; setNuevoProducto(prev => ({ ...prev, tipo: val })); }}
-                          className="px-4 py-2 border border-gray-300 rounded-lg"
-                        >
-                          <option value="Producto Terminado">Producto Terminado</option>
-                          <option value="Materia Prima">Materia Prima</option>
-                        </select>
-
-                        {/* Combo Box de Categoría */}
-                        <div className="relative">
-                          <div className="relative w-full">
-                            <input
-                              type="text"
-                              placeholder="Buscar o crear categoría..."
-                              value={nuevoProducto.categoria === 'nueva' ? nuevoProducto.nuevaCategoria : nuevoProducto.categoria}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setNuevoProducto(prev => ({ ...prev, categoria: val, nuevaCategoria: val }));
-                                setMostrarResultadosCategoria(true);
-                              }}
-                              onBlur={() => setTimeout(() => setMostrarResultadosCategoria(false), 200)}
-                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 pr-10"
-                            />
-                            <div
-                              className="absolute inset-y-0 right-0 flex items-center px-2 cursor-pointer text-gray-500 hover:text-teal-600"
-                              onClick={() => {
-                                setMostrarResultadosCategoria(!mostrarResultadosCategoria);
-                                if (!mostrarResultadosCategoria) {
-                                  document.querySelector('input[placeholder="Buscar o crear categoría..."]').focus();
-                                }
-                              }}
+                {/* Products in Purchase Table */}
+                <div className="overflow-x-auto">
+                  <table className="min-w-full bg-white">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="text-left py-3 px-4">Producto</th>
+                        <th className="text-left py-3 px-4">Código</th>
+                        <th className="text-left py-3 px-4">Color</th>
+                        <th className="text-right py-3 px-4">Cantidad</th>
+                        <th className="text-right py-3 px-4">Costo Unit.</th>
+                        <th className="text-right py-3 px-4">Costo Total</th>
+                        <th className="text-center py-3 px-4">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {compra.productos.map((p, index) => (
+                        <tr key={index} className="border-b">
+                          <td className="py-3 px-4">{p.nombre}</td>
+                          <td className="py-3 px-4">{p.codigo}</td>
+                          <td className="py-3 px-4">{p.color}</td>
+                          <td className="text-right py-3 px-4">{p.cantidad}</td>
+                          <td className="text-right py-3 px-4">Bs. {p.costoUnitario.toFixed(2)}</td>
+                          <td className="py-3 px-4 text-right">Bs {p.costoTotal.toFixed(2)}</td>
+                          <td className="py-3 px-4 text-center">
+                            <button
+                              onClick={() => eliminarProductoDeCompra(index)}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Eliminar producto"
                             >
                               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                               </svg>
-                            </div>
-                          </div>
-
-                          {mostrarResultadosCategoria && (
-                            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto">
-                              {categorias
-                                .filter(cat => cat.toLowerCase().includes((nuevoProducto.categoria === 'nueva' ? nuevoProducto.nuevaCategoria : nuevoProducto.categoria).toLowerCase()))
-                                .map(cat => (
-                                  <div
-                                    key={cat}
-                                    onMouseDown={() => setNuevoProducto(prev => ({ ...prev, categoria: cat, nuevaCategoria: cat }))}
-                                    className="px-4 py-2 hover:bg-teal-50 cursor-pointer border-b border-gray-100 last:border-0 text-gray-700"
-                                  >
-                                    {cat}
-                                  </div>
-                                ))}
-                              {categorias.filter(cat => cat.toLowerCase().includes((nuevoProducto.categoria === 'nueva' ? nuevoProducto.nuevaCategoria : nuevoProducto.categoria).toLowerCase())).length === 0 && (
-                                <div className="px-4 py-2 text-gray-500 text-sm italic">
-                                  Presiona Enter o guarda para crear "{nuevoProducto.categoria === 'nueva' ? nuevoProducto.nuevaCategoria : nuevoProducto.categoria}"
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        <input type="text" placeholder="Color" value={nuevoProducto.color} onChange={(e) => { const val = e.target.value; setNuevoProducto(prev => ({ ...prev, color: val })); }} className="px-4 py-2 border border-gray-300 rounded-lg" />
-                        <input type="text" placeholder="Marca" value={nuevoProducto.marca} onChange={(e) => { const val = e.target.value; setNuevoProducto(prev => ({ ...prev, marca: val })); }} className="px-4 py-2 border border-gray-300 rounded-lg" />
-                        <input type="text" placeholder="Cajas (Ej: 1 caja 2 sillas)" value={nuevoProducto.cajas} onChange={(e) => { const val = e.target.value; setNuevoProducto(prev => ({ ...prev, cajas: val })); }} className="px-4 py-2 border border-gray-300 rounded-lg" />
-
-                        <input type="number" step="0.01" placeholder="Alto (cm)" value={nuevoProducto.dimensiones.alto || ''} onChange={(e) => { const val = e.target.value; setNuevoProducto(prev => ({ ...prev, dimensiones: { ...prev.dimensiones, alto: val } })); }} className="px-4 py-2 border border-gray-300 rounded-lg" />
-                        <input type="number" step="0.01" placeholder="Ancho (cm)" value={nuevoProducto.dimensiones.ancho || ''} onChange={(e) => { const val = e.target.value; setNuevoProducto(prev => ({ ...prev, dimensiones: { ...prev.dimensiones, ancho: val } })); }} className="px-4 py-2 border border-gray-300 rounded-lg" />
-                        <input type="number" step="0.01" placeholder="Profundidad (cm)" value={nuevoProducto.dimensiones.profundidad || ''} onChange={(e) => { const val = e.target.value; setNuevoProducto(prev => ({ ...prev, dimensiones: { ...prev.dimensiones, profundidad: val } })); }} className="px-4 py-2 border border-gray-300 rounded-lg" />
-
-                        <input type="text" placeholder="Almacén" value={nuevoProducto.ubicacion} onChange={(e) => { const val = e.target.value; setNuevoProducto(prev => ({ ...prev, ubicacion: val })); }} className="px-4 py-2 border border-gray-300 rounded-lg" />
-                        <select value={nuevoProducto.proveedor} onChange={(e) => { const val = e.target.value; setNuevoProducto(prev => ({ ...prev, proveedor: val })); }} className="px-4 py-2 border border-gray-300 rounded-lg">
-                          <option value="">-- Seleccionar Proveedor --</option>
-                          {proveedores.map(p => <option key={p._id} value={p._id}>{p.nombre}</option>)}
-                        </select>
-
-                        <textarea
-                          placeholder="Descripción del producto"
-                          value={nuevoProducto.descripcion}
-                          onChange={(e) => { const val = e.target.value; setNuevoProducto(prev => ({ ...prev, descripcion: val })); }}
-                          className="px-4 py-2 border border-gray-300 rounded-lg md:col-span-2"
-                          rows="2"
-                        />
-
-                        <div className="md:col-span-2">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Imagen del Producto</label>
-                          <input
-                            type="file"
-                            onChange={(e) => setSelectedImageFile(e.target.files[0])}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                            accept="image/*"
-                          />
-                        </div>
-                        <div className="md:col-span-2 flex space-x-4">
-                          <button onClick={handleCrearProducto} className="bg-teal-600 text-white px-6 py-2 rounded-lg hover:bg-teal-700">Guardar Producto</button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Products in Purchase Table */}
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full bg-white">
-                      <thead className="bg-gray-100">
-                        <tr>
-                          <th className="text-left py-3 px-4">Producto</th>
-                          <th className="text-left py-3 px-4">Código</th>
-                          <th className="text-left py-3 px-4">Color</th>
-                          <th className="text-right py-3 px-4">Cantidad</th>
-                          <th className="text-right py-3 px-4">Costo Unit.</th>
-                          <th className="text-right py-3 px-4">Costo Total</th>
-                          <th className="text-center py-3 px-4">Acciones</th>
+                            </button>
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {compra.productos.map((p, index) => (
-                          <tr key={index} className="border-b">
-                            <td className="py-3 px-4">{p.nombre}</td>
-                            <td className="py-3 px-4">{p.codigo}</td>
-                            <td className="py-3 px-4">{p.color}</td>
-                            <td className="text-right py-3 px-4">{p.cantidad}</td>
-                            <td className="text-right py-3 px-4">Bs. {p.costoUnitario.toFixed(2)}</td>
-                            <td className="py-3 px-4 text-right">Bs {p.costoTotal.toFixed(2)}</td>
-                            <td className="py-3 px-4 text-center">
-                              <button
-                                onClick={() => eliminarProductoDeCompra(index)}
-                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                title="Eliminar producto"
-                              >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
 
-                  {/* --- Totals and Payment Section --- */}
-                  <div className="border-t pt-6 mt-6">
-                    <h2 className="text-2xl font-semibold text-gray-800 mb-6">Pago y Confirmación</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      {/* Payment Methods */}
-                      <div>
-                        <div className="flex justify-between items-center mb-4">
-                          <h3 className="text-lg font-semibold text-gray-700">Métodos de Pago</h3>
-                          <button onClick={agregarPago} className="text-sm bg-purple-100 text-purple-700 px-3 py-1 rounded-full hover:bg-purple-200 font-medium">
-                            + Agregar Método
-                          </button>
-                        </div>
+                {/* --- Totals and Payment Section --- */}
+                <div className="border-t pt-6 mt-6">
+                  <h2 className="text-2xl font-semibold text-gray-800 mb-6">Pago y Confirmación</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {/* Payment Methods */}
+                    <div>
+                      <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-semibold text-gray-700">Métodos de Pago</h3>
+                        <button onClick={agregarPago} className="text-sm bg-purple-100 text-purple-700 px-3 py-1 rounded-full hover:bg-purple-200 font-medium">
+                          + Agregar Método
+                        </button>
+                      </div>
 
-                        <div className="space-y-3">
-                          {listaPagos.length === 0 && (
-                            <p className="text-gray-500 italic text-sm">No hay pagos registrados. Se considerará como deuda total.</p>
-                          )}
-                          {listaPagos.map((pago) => (
-                            <div key={pago.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200 relative">
-                              <button onClick={() => eliminarPago(pago.id)} className="absolute top-2 right-2 text-red-400 hover:text-red-600">
-                                ✕
-                              </button>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-1">Método</label>
-                                  <select value={pago.tipo} onChange={(e) => actualizarPago(pago.id, 'tipo', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                                    <option value="Efectivo">Efectivo</option>
-                                    <option value="Transferencia">Transferencia</option>
-                                    <option value="Cheque">Cheque</option>
-                                  </select>
-                                </div>
-                                <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-1">Monto</label>
-                                  <input type="number" step="0.01" value={pago.monto} onChange={(e) => actualizarPago(pago.id, 'monto', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="0.00" />
-                                </div>
+                      <div className="space-y-3">
+                        {listaPagos.length === 0 && (
+                          <p className="text-gray-500 italic text-sm">No hay pagos registrados. Se considerará como deuda total.</p>
+                        )}
+                        {listaPagos.map((pago) => (
+                          <div key={pago.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200 relative">
+                            <button onClick={() => eliminarPago(pago.id)} className="absolute top-2 right-2 text-red-400 hover:text-red-600">
+                              ✕
+                            </button>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Método</label>
+                                <select value={pago.tipo} onChange={(e) => actualizarPago(pago.id, 'tipo', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                                  <option value="Efectivo">Efectivo</option>
+                                  <option value="Transferencia">Transferencia</option>
+                                  <option value="Cheque">Cheque</option>
+                                </select>
                               </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Monto</label>
+                                <input type="number" step="0.01" value={pago.monto} onChange={(e) => actualizarPago(pago.id, 'monto', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="0.00" />
+                              </div>
+                            </div>
 
-                              {/* Bank Account Selector for Transferencia */}
-                              {pago.tipo === 'Transferencia' && (
-                                <div className="mt-3">
-                                  <label className="block text-sm font-medium text-gray-700 mb-1">Cuenta Bancaria de Origen</label>
-                                  <select
-                                    value={pago.cuentaId || ''}
-                                    onChange={(e) => actualizarPago(pago.id, 'cuentaId', e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                                  >
-                                    <option value="">-- Seleccionar Cuenta --</option>
-                                    {bankAccounts.filter(acc => acc.isActive).map(acc => (
+                            {/* Bank Account / Cash Box Selector */}
+                            {(pago.tipo === 'Transferencia' || pago.tipo === 'Efectivo') && (
+                              <div className="mt-3">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  {pago.tipo === 'Transferencia' ? 'Cuenta Bancaria de Origen' : 'Caja de Origen'}
+                                </label>
+                                <select
+                                  value={pago.cuentaId || ''}
+                                  onChange={(e) => actualizarPago(pago.id, 'cuentaId', e.target.value)}
+                                  className={`w-full px-3 py-2 border rounded-lg ${pago.tipo === 'Transferencia' ? 'border-blue-300 bg-blue-50' : 'border-green-300 bg-green-50'}`}
+                                >
+                                  <option value="">-- Seleccionar {pago.tipo === 'Transferencia' ? 'Cuenta' : 'Caja'} --</option>
+                                  {bankAccounts
+                                    .filter(acc => acc.isActive && (pago.tipo === 'Transferencia' ? acc.tipo === 'banco' : acc.tipo === 'efectivo'))
+                                    .map(acc => (
                                       <option key={acc._id} value={acc._id}>
                                         {acc.nombreBanco} - {acc.numeroCuenta} (Saldo: Bs. {acc.saldo.toFixed(2)})
                                       </option>
                                     ))}
-                                  </select>
-                                  {pago.cuentaId && (
-                                    <div className="mt-1 text-xs">
-                                      {(() => {
-                                        const acc = bankAccounts.find(a => a._id === pago.cuentaId);
-                                        if (acc) {
-                                          const saldoInsuficiente = parseFloat(pago.monto || 0) > acc.saldo;
-                                          return (
-                                            <span className={saldoInsuficiente ? 'text-red-600 font-bold' : 'text-green-600'}>
-                                              Saldo disponible: Bs. {acc.saldo.toFixed(2)}
-                                              {saldoInsuficiente && ' (Fondos Insuficientes)'}
-                                            </span>
-                                          );
-                                        }
-                                        return null;
-                                      })()}
-                                    </div>
-                                  )}
-                                </div>
-                              )}
+                                </select>
+                                {pago.cuentaId && (
+                                  <div className="mt-1 text-xs">
+                                    {(() => {
+                                      const acc = bankAccounts.find(a => a._id === pago.cuentaId);
+                                      if (acc) {
+                                        const saldoInsuficiente = parseFloat(pago.monto || 0) > acc.saldo;
+                                        return (
+                                          <span className={saldoInsuficiente ? 'text-red-600 font-bold' : 'text-green-600'}>
+                                            Saldo disponible: Bs. {acc.saldo.toFixed(2)}
+                                            {saldoInsuficiente && ' (Fondos Insuficientes)'}
+                                          </span>
+                                        );
+                                      }
+                                      return null;
+                                    })()}
+                                  </div>
+                                )}
+                              </div>
+                            )}
 
-                              {/* Additional fields for Cheque */}
-                              {pago.tipo === 'Cheque' && (
-                                <div className="mt-3">
-                                  <label className="block text-sm font-medium text-gray-700 mb-1">Número de Cheque / Banco</label>
-                                  <input type="text" value={pago.cuenta} onChange={(e) => actualizarPago(pago.id, 'cuenta', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Ej: Cheque #123456 - BNB" />
-                                </div>
-                              )}
-                            </div>
-                          ))}
+                            {/* Additional fields for Cheque */}
+                            {pago.tipo === 'Cheque' && (
+                              <div className="mt-3">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Número de Cheque / Banco</label>
+                                <input type="text" value={pago.cuenta} onChange={(e) => actualizarPago(pago.id, 'cuenta', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Ej: Cheque #123456 - BNB" />
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Resumen de Saldos */}
+                      <div className="mt-6 p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-gray-600">Total Compra:</span>
+                          <span className="font-bold text-lg">Bs. {totalCompra.toFixed(2)}</span>
                         </div>
-
-                        {/* Resumen de Saldos */}
-                        <div className="mt-6 p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="text-gray-600">Total Compra:</span>
-                            <span className="font-bold text-lg">Bs. {totalCompra.toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="text-green-600">Total Pagado:</span>
-                            <span className="font-bold text-green-600">Bs. {totalPagado.toFixed(2)}</span>
-                          </div>
-                          <div className="border-t pt-2 flex justify-between items-center">
-                            <span className="text-red-600 font-semibold">Saldo Pendiente:</span>
-                            <span className="font-bold text-xl text-red-600">Bs. {saldoPendiente.toFixed(2)}</span>
-                          </div>
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-green-600">Total Pagado:</span>
+                          <span className="font-bold text-green-600">Bs. {totalPagado.toFixed(2)}</span>
                         </div>
+                        <div className="border-t pt-2 flex justify-between items-center">
+                          <span className="text-red-600 font-semibold">Saldo Pendiente:</span>
+                          <span className="font-bold text-xl text-red-600">Bs. {saldoPendiente.toFixed(2)}</span>
+                        </div>
+                      </div>
 
-                        {listaPagos.some(p => p.tipo === 'Cheque') && (
-                          <div className="mt-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Imagen del Cheque</label>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => setChequeImage(e.target.files[0])}
-                              className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
-                            />
-                          </div>
-                        )}
+                      {listaPagos.some(p => p.tipo === 'Cheque') && (
+                        <div className="mt-4">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Imagen del Cheque</label>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => setChequeImage(e.target.files[0])}
+                            className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Summary */}
+                  <div className="bg-purple-50 p-6 rounded-xl border border-purple-200">
+                    <h3 className="text-xl font-bold text-purple-800 mb-4">Resumen de la Compra</h3>
+                    <div className="space-y-3">
+                      <div className="flex justify-between text-lg">
+                        <span className="text-gray-700">Subtotal:</span>
+                        <span className="font-semibold text-gray-800">Bs. {totalCompra.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-lg">
+                        <span className="text-gray-700">Total Pagado:</span>
+                        <span className="font-semibold text-green-600">Bs. {totalPagado.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-xl font-bold border-t pt-3 mt-3">
+                        <span className="text-purple-800">Saldo Pendiente:</span>
+                        <span className="text-red-600">Bs. {(totalCompra - totalPagado).toFixed(2)}</span>
                       </div>
                     </div>
-
-                    {/* Summary */}
-                    <div className="bg-purple-50 p-6 rounded-xl border border-purple-200">
-                      <h3 className="text-xl font-bold text-purple-800 mb-4">Resumen de la Compra</h3>
-                      <div className="space-y-3">
-                        <div className="flex justify-between text-lg">
-                          <span className="text-gray-700">Subtotal:</span>
-                          <span className="font-semibold text-gray-800">Bs. {totalCompra.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between text-lg">
-                          <span className="text-gray-700">Total Pagado:</span>
-                          <span className="font-semibold text-green-600">Bs. {totalPagado.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between text-xl font-bold border-t pt-3 mt-3">
-                          <span className="text-purple-800">Saldo Pendiente:</span>
-                          <span className="text-red-600">Bs. {(totalCompra - totalPagado).toFixed(2)}</span>
-                        </div>
-                      </div>
-                      <div className="mt-6">
-                        <button
-                          onClick={confirmarCompra}
-                          disabled={compra.productos.length === 0 || totalPagado > totalCompra}
-                          className="w-full bg-purple-600 text-white py-3 rounded-lg text-lg font-semibold hover:bg-purple-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
-                        >
-                          Confirmar y Registrar Compra
-                        </button>
-                        {totalPagado > totalCompra && (
-                          <p className="text-red-500 text-sm mt-2 text-center">El total pagado no puede ser mayor al total de la compra.</p>
-                        )}
-                      </div>
+                    <div className="mt-6">
+                      <button
+                        onClick={confirmarCompra}
+                        disabled={compra.productos.length === 0 || totalPagado > totalCompra}
+                        className="w-full bg-purple-600 text-white py-3 rounded-lg text-lg font-semibold hover:bg-purple-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
+                      >
+                        Confirmar y Registrar Compra
+                      </button>
+                      {totalPagado > totalCompra && (
+                        <p className="text-red-500 text-sm mt-2 text-center">El total pagado no puede ser mayor al total de la compra.</p>
+                      )}
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-
           </>
         )}
 
@@ -1574,8 +1629,70 @@ const ComprasPage = ({ userRole }) => {
           </div>
         )}
 
+        {/* --- SECCIÓN HISTORIAL --- */}
+        {activeSection === 'historial' && (
+          <div className="bg-white rounded-xl shadow-md p-6">
+            <h2 className="text-2xl font-semibold text-gray-800 mb-6">Historial de Compras</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left text-gray-500">
+                <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b">
+                  <tr>
+                    <th className="px-6 py-3">Número / Fecha</th>
+                    <th className="px-6 py-3">Proveedor</th>
+                    <th className="px-6 py-3">Productos</th>
+                    <th className="px-6 py-3">Total</th>
+                    <th className="px-6 py-3 text-center">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {historialCompras.map(compra => (
+                    <tr key={compra._id} className="bg-white hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="font-bold text-gray-900">{compra.numCompra || compra._id}</div>
+                        <div className="text-xs text-gray-500">{new Date(compra.fecha).toLocaleDateString()}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        {compra.proveedor?.nombre || ' - '}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col gap-1">
+                          {compra.productos.map((prod, idx) => (
+                            <span key={idx} className="text-xs">{prod.cantidad} x {prod.nombreProducto || 'Item'}</span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 font-bold text-gray-900">
+                        Bs. {compra.totalCompra ? compra.totalCompra.toFixed(2) : '0.00'}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <button
+                          onClick={() => handleEliminarCompra(compra._id)}
+                          className="text-red-600 hover:text-red-900 hover:bg-red-50 p-2 rounded-lg transition-colors group relative"
+                          title="Eliminar Compra (Revierte Inventario y Finanzas)"
+                        >
+                          <span className="sr-only">Eliminar</span>
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {historialCompras.length === 0 && (
+                    <tr>
+                      <td colSpan="5" className="px-6 py-8 text-center text-gray-400">
+                        No hay compras registradas
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
       </div>
-    </div>
+    </div >
   );
 };
 

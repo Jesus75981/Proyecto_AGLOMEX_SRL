@@ -113,7 +113,6 @@ const VentasPage = ({ userRole }) => {
     metodoEntrega: 'Recojo en Tienda', // ✅ Default delivery method
     numFactura: '', // Manual y opcional
     observaciones: '',
-    observaciones: '',
     descuento: 0, // Global discount
     tipoComprobante: 'Recibo' // Default informal
   });
@@ -1196,21 +1195,25 @@ const VentasPage = ({ userRole }) => {
                             </div>
                           </div>
 
-                          {/* Cuenta Bancaria (Condicional) */}
-                          {pagoTemporal.metodo === 'Transferencia' && (
+                          {/* Cuenta Bancaria o Caja (Condicional) */}
+                          {(pagoTemporal.metodo === 'Transferencia' || pagoTemporal.metodo === 'Efectivo') && (
                             <div className="col-span-12 md:col-span-5">
-                              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Cuenta Destino</label>
+                              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                                {pagoTemporal.metodo === 'Transferencia' ? 'Cuenta Bancaria Destino' : 'Caja de Destino'}
+                              </label>
                               <select
                                 value={pagoTemporal.cuentaId || ''}
                                 onChange={(e) => setPagoTemporal({ ...pagoTemporal, cuentaId: e.target.value })}
-                                className="w-full px-4 py-2.5 bg-blue-50 border border-blue-200 text-blue-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block transition-colors"
+                                className={`w-full px-4 py-2.5 border text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block transition-colors ${pagoTemporal.metodo === 'Transferencia' ? 'bg-blue-50 border-blue-200 text-blue-900' : 'bg-green-50 border-green-200 text-green-900'}`}
                               >
-                                <option value="">Seleccione Cuenta...</option>
-                                {activeBankAccounts.map(cuenta => (
-                                  <option key={cuenta._id} value={cuenta._id}>
-                                    {cuenta.banco} - {cuenta.numeroCuenta} (Bs. {cuenta.saldo ? cuenta.saldo.toFixed(2) : '0.00'})
-                                  </option>
-                                ))}
+                                <option value="">Seleccione {pagoTemporal.metodo === 'Transferencia' ? 'Cuenta' : 'Caja'}...</option>
+                                {activeBankAccounts
+                                  .filter(c => pagoTemporal.metodo === 'Transferencia' ? c.tipo === 'banco' : c.tipo === 'efectivo')
+                                  .map(cuenta => (
+                                    <option key={cuenta._id} value={cuenta._id}>
+                                      {cuenta.nombreBanco} - {cuenta.numeroCuenta} (Bs. {cuenta.saldo ? cuenta.saldo.toFixed(2) : '0.00'})
+                                    </option>
+                                  ))}
                               </select>
                             </div>
                           )}
@@ -1242,7 +1245,7 @@ const VentasPage = ({ userRole }) => {
                                     <span className="font-medium text-gray-700">{pago.tipo}</span>
                                     {cuentaBancaria && (
                                       <span className="text-xs text-gray-500">
-                                        {cuentaBancaria.nombreBanco} - {cuentaBancaria.numeroCuenta}
+                                        👉 {cuentaBancaria.nombreBanco}
                                       </span>
                                     )}
                                   </div>

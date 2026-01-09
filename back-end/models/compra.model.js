@@ -14,6 +14,10 @@ const pagoSchema = new mongoose.Schema({
     },
     referencia: String, // Número de Cheque, ID de transferencia, o número de operación
     cuenta: String, // Por ejemplo: "BANCO 01", "ANTICIPO 02", etc.
+    cuentaId: { // ID de la cuenta bancaria (para conciliación)
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'BankAccount'
+    },
     fechaPago: {
         type: Date,
         default: Date.now

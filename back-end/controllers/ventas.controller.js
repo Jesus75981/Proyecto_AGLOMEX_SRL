@@ -2,6 +2,7 @@ import Venta from "../models/venta.model.js";
 import ProductoTienda from "../models/productoTienda.model.js";
 import Compra from "../models/compra.model.js";
 import DeudaVenta from "../models/deudaVenta.model.js"; // Importar el modelo de deudas de venta
+import Finanzas from "../models/finanzas.model.js";
 
 import BankAccount from "../models/bankAccount.model.js";
 import BankTransaction from "../models/bankTransaction.model.js";
@@ -111,26 +112,30 @@ export const registrarVenta = async (req, res) => {
     // 5. REGISTRAR TRANSACCIÓN FINANCIERA (SOLO INGRESO REAL) Y ACTUALIZAR BANCOS
     if (totalPagadoDirectamente > 0) {
       // Registrar cada pago
+      // Registrar cada pago
       for (const pago of pagosReales) {
-        if (pago.tipo === 'Transferencia' && pago.cuentaId) {
-          // Actualizar Saldo Banco
-          const banco = await BankAccount.findById(pago.cuentaId);
-          if (banco) {
-            banco.saldo += pago.monto;
-            await banco.save();
+        // ACTUALIZACIÓN GENÉRICA DE CUENTA (Sea Banco o Efectivo/Caja)
+        if (pago.cuentaId) {
+          const cuenta = await BankAccount.findById(pago.cuentaId);
+          if (cuenta) {
+            cuenta.saldo += pago.monto;
+            await cuenta.save();
 
-            // Crear Transacción Bancaria
-            const txBanco = new BankTransaction({
-              cuentaId: banco._id,
-              tipo: 'Deposito',
+            // Crear Transacción
+            const tx = new BankTransaction({
+              cuentaId: cuenta._id,
+              tipo: 'Deposito', // Ingreso
               monto: pago.monto,
-              descripcion: `Venta #${ventaGuardada.numVenta}`,
-              fecha: new Date()
+              descripcion: `Ingreso por Venta #${ventaGuardada.numVenta} (${pago.tipo})`,
+              fecha: new Date(),
+              referencia: ventaGuardada._id, // Link to sale
+              metodoPago: pago.tipo
             });
-            await txBanco.save();
-            console.log(`[BANCO] Depósito de ${pago.monto} a ${banco.nombreBanco} por Venta #${ventaGuardada.numVenta}`);
+            await tx.save();
+            console.log(`[FINANZAS] Ingreso de ${pago.monto} a ${cuenta.nombreBanco} (${cuenta.tipo}) por Venta #${ventaGuardada.numVenta}`);
           }
         }
+
 
         // Registrar en Finanzas Globales (uno por cada pago o uno global? 
         // El código original hacía uno global. Desglosarlo es mejor tracking, pero mantendré lo simple 
@@ -498,6 +503,33 @@ export const eliminarVenta = async (req, res) => {
       })
     );
     await Promise.all(updatePromises);
+
+    // Revertir Finanzas (Restar saldo de la cuenta - Devolución)
+    if (venta.metodosPago && Array.isArray(venta.metodosPago)) {
+      for (const pago of venta.metodosPago) {
+        if ((pago.tipo === 'Transferencia' || pago.tipo === 'Efectivo') && pago.cuentaId) {
+          const bankAccount = await BankAccount.findById(pago.cuentaId);
+          if (bankAccount) {
+            // Restamos el dinero (Salida/Devolución)
+            bankAccount.saldo -= parseFloat(pago.monto);
+            await bankAccount.save();
+
+            await BankTransaction.create({
+              cuentaId: bankAccount._id,
+              tipo: 'Retiro', // Salida de dinero
+              monto: parseFloat(pago.monto),
+              fecha: new Date(),
+              descripcion: `Devolución por anulación de Venta #${venta.numVenta || 'S/N'}`,
+              referenciaId: venta._id,
+              comprobanteUrl: 'AnulacionSistema'
+            });
+          }
+        }
+      }
+    }
+
+    // Eliminar registro financiero global si existe
+    await Finanzas.findOneAndDelete({ referenceId: venta._id, referenceModel: 'Venta' });
 
     // Eliminar deudas asociadas
     await DeudaVenta.deleteMany({ ventaId: id });

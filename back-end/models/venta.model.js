@@ -47,6 +47,10 @@ const ventaSchema = new mongoose.Schema({
       monto: {
         type: Number,
         required: true
+      },
+      cuentaId: { // ID de la cuenta bancaria (para conciliación)
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'BankAccount'
       }
     }
   ],

@@ -67,7 +67,8 @@ const FinanzasPage = ({ userRole }) => {
     category: 'ingreso_manual', // Default category
     description: '',
     amount: '',
-    date: new Date().toISOString().split('T')[0]
+    date: new Date().toISOString().split('T')[0],
+    cuentaId: ''
   });
   const [editingId, setEditingId] = useState(null);
   const [summary, setSummary] = useState({ ingresos: 0, egresos: 0, balance: 0 });
@@ -97,7 +98,6 @@ const FinanzasPage = ({ userRole }) => {
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [editingAccountId, setEditingAccountId] = useState(null);
   const [accountFormData, setAccountFormData] = useState({
-    nombreBanco: '',
     nombreBanco: '',
     numeroCuenta: '',
     saldoInicial: '',
@@ -417,7 +417,8 @@ const FinanzasPage = ({ userRole }) => {
         category: 'ingreso_manual',
         description: '',
         amount: '',
-        date: new Date().toISOString().split('T')[0]
+        date: new Date().toISOString().split('T')[0],
+        cuentaId: ''
       });
       setErrors({});
       setShowForm(false);
@@ -435,7 +436,8 @@ const FinanzasPage = ({ userRole }) => {
       category: transaction.category || (transaction.type === 'ingreso' ? 'ingreso_manual' : 'egreso_manual'),
       description: transaction.description,
       amount: transaction.amount,
-      date: new Date(transaction.date).toISOString().split('T')[0]
+      date: new Date(transaction.date).toISOString().split('T')[0],
+      cuentaId: transaction.metadata?.cuentaId || ''
     });
     setEditingId(transaction._id);
     setShowForm(true);
@@ -765,6 +767,24 @@ const FinanzasPage = ({ userRole }) => {
                         )}
                       </select>
                     </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Cuenta / Caja (Opcional)</label>
+                      <select
+                        value={formData.cuentaId || ''}
+                        onChange={(e) => setFormData({ ...formData, cuentaId: e.target.value })}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                      >
+                        <option value="">-- Ninguna (Solo Registro) --</option>
+                        {bankAccounts.filter(acc => acc.isActive).map(acc => (
+                          <option key={acc._id} value={acc._id}>
+                            {acc.nombreBanco} ({acc.tipo === 'efectivo' ? 'Caja' : acc.numeroCuenta}) - {formatCurrency(acc.saldo)}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">Si selecciona una cuenta, el saldo se actualizará.</p>
+                    </div>
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Monto</label>
                       <input
@@ -822,7 +842,8 @@ const FinanzasPage = ({ userRole }) => {
                           category: 'ingreso_manual',
                           description: '',
                           amount: '',
-                          date: new Date().toISOString().split('T')[0]
+                          date: new Date().toISOString().split('T')[0],
+                          cuentaId: ''
                         });
                       }}
                       className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition-colors"

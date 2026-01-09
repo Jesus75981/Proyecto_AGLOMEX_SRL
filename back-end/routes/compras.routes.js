@@ -8,7 +8,8 @@ import {
     generarReporteCompras,
     obtenerEstadisticas,
     obtenerSiguienteNumeroCompra,
-    getComprasPorProducto
+    getComprasPorProducto,
+    deleteCompra
 } from "../controllers/compras.controller.js";
 
 const router = express.Router();
@@ -23,5 +24,6 @@ router.post("/reportes", generarReporteCompras);
 
 router.get("/:id", obtenerCompraPorId);
 router.put("/:id", actualizarCompra);
+router.delete("/:id", deleteCompra);
 
 export default router;

@@ -5,6 +5,7 @@ import DeudaCompra from "../models/deudaCompra.model.js";
 import BankAccount from "../models/bankAccount.model.js";
 import BankTransaction from "../models/bankTransaction.model.js";
 import { registrarTransaccionFinanciera } from './finanzas.controller.js';
+import Finanzas from "../models/finanzas.model.js";
 import Objeto3D from "../models/objetos3d.model.js";
 import * as tripoService from "../services/tripo.service.js";
 
@@ -187,16 +188,16 @@ export const registrarCompra = async (req, res) => {
         const pagosReales = [];
         if (datosCompra.metodosPago && Array.isArray(datosCompra.metodosPago)) {
             for (const pago of datosCompra.metodosPago) {
-                if (pago.tipo === 'Transferencia') {
+                if (pago.tipo === 'Transferencia' || pago.tipo === 'Efectivo') {
                     if (!pago.cuentaId) {
-                        return res.status(400).json({ message: "Para transferencias, debe seleccionar una cuenta bancaria." });
+                        return res.status(400).json({ message: `Para pagos en ${pago.tipo}, debe seleccionar una cuenta/caja de origen.` });
                     }
                     const bankAccount = await BankAccount.findById(pago.cuentaId);
                     if (!bankAccount) {
-                        return res.status(400).json({ message: "La cuenta bancaria seleccionada no existe." });
+                        return res.status(400).json({ message: "La cuenta/caja seleccionada no existe." });
                     }
                     if (bankAccount.saldo < pago.monto) {
-                        return res.status(400).json({ message: `Fondos insuficientes en la cuenta ${bankAccount.nombreBanco}.` });
+                        return res.status(400).json({ message: `Fondos insuficientes en ${bankAccount.nombreBanco}.` });
                     }
                     pago._bankAccount = bankAccount;
                 }
@@ -300,37 +301,40 @@ export const registrarCompra = async (req, res) => {
         // Finanzas
         if (totalPagadoDirectamente > 0) {
             for (const pago of pagosReales) {
-                if (pago.tipo === 'Transferencia' && pago._bankAccount) {
-                    const bankAccount = pago._bankAccount;
-                    bankAccount.saldo -= pago.monto;
-                    await bankAccount.save();
+                // Deduct from Bank/Cash Account if cuentaId is present
+                if (pago.cuentaId) {
+                    const cuenta = await BankAccount.findById(pago.cuentaId);
+                    if (cuenta) {
+                        cuenta.saldo -= pago.monto;
+                        await cuenta.save();
 
-                    const bankTx = new BankTransaction({
-                        cuentaId: bankAccount._id,
-                        tipo: 'Compra',
-                        monto: pago.monto,
-                        descripcion: `Compra #${compraGuardada.numCompra}`,
-                        referenciaId: compraGuardada._id,
-                        fecha: new Date()
-                    });
-                    await bankTx.save();
+                        const tx = new BankTransaction({
+                            cuentaId: cuenta._id,
+                            tipo: 'Retiro', // Egreso
+                            monto: pago.monto,
+                            descripcion: `Pago Compra #${compraGuardada.numCompra} (${pago.tipo})`,
+                            fecha: new Date(),
+                            referencia: compraGuardada._id,
+                            metodoPago: pago.tipo
+                        });
+                        await tx.save();
+                        console.log(`[FINANZAS] Egreso de ${pago.monto} de ${cuenta.nombreBanco} por Compra #${compraGuardada.numCompra}`);
+                    }
                 }
             }
+
+            // Registrar en Historial Financiero Global
             await registrarTransaccionFinanciera(
                 'egreso',
                 datosCompra.tipoCompra === 'Materia Prima' ? 'compra_materias' : 'compra_productos',
-                `Pago de Compra #${compraGuardada.numCompra}`,
+                `Pago Compra #${compraGuardada.numCompra}`,
                 totalPagadoDirectamente,
                 compraGuardada._id,
                 'Compra',
                 {
                     numCompra: compraGuardada.numCompra,
-                    tipoCompra: datosCompra.tipoCompra,
-                    metodosPago: pagosReales.map(p => ({
-                        tipo: p.tipo,
-                        monto: p.monto,
-                        cuenta: p._bankAccount ? p._bankAccount.nombreBanco : null
-                    }))
+                    proveedor: compraGuardada.proveedor,
+                    metodosPago: pagosReales
                 },
                 'BOB',
                 1
@@ -741,5 +745,65 @@ export const obtenerSiguienteNumeroCompra = async (req, res) => {
     } catch (error) {
         console.error("Error al obtener siguiente número de compra:", error);
         res.status(500).json({ message: "Error al generar el número de compra", error: error.message });
+    }
+};
+
+export const deleteCompra = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const compra = await Compra.findById(id);
+
+        if (!compra) {
+            return res.status(404).json({ message: "Compra no encontrada" });
+        }
+
+        // 1. Revertir Inventario (Restar Stock)
+        if (compra.productos && Array.isArray(compra.productos)) {
+            for (const item of compra.productos) {
+                const Modelo = compra.tipoCompra === "Materia Prima" ? MateriaPrima : ProductoTienda;
+                let producto = await Modelo.findById(item.producto);
+
+                if (producto) {
+                    producto.cantidad = Math.max(0, producto.cantidad - item.cantidad);
+                    await producto.save();
+                }
+            }
+        }
+
+        // 2. Revertir Finanzas (Devolver dinero a la cuenta)
+        if (compra.metodosPago && Array.isArray(compra.metodosPago)) {
+            for (const pago of compra.metodosPago) {
+                if ((pago.tipo === 'Transferencia' || pago.tipo === 'Efectivo') && pago.cuentaId) {
+                    const bankAccount = await BankAccount.findById(pago.cuentaId);
+                    if (bankAccount) {
+                        bankAccount.saldo += parseFloat(pago.monto);
+                        await bankAccount.save();
+
+                        await BankTransaction.create({
+                            cuentaId: bankAccount._id,
+                            tipo: 'Deposito',
+                            monto: parseFloat(pago.monto),
+                            fecha: new Date(),
+                            descripcion: `Reembolso por anulación de Compra #${compra.numCompra || 'S/N'}`,
+                            referenciaId: compra._id,
+                            comprobanteUrl: 'AnulacionSistema'
+                        });
+                    }
+                }
+            }
+        }
+
+        // 3. Eliminar Registros Asociados
+        await Finanzas.findOneAndDelete({ referenceId: compra._id, referenceModel: 'Compra' });
+        await DeudaCompra.findOneAndDelete({ compra: compra._id });
+
+        // 4. Eliminar la Compra
+        await Compra.findByIdAndDelete(id);
+
+        res.json({ message: "Compra eliminada y transacciones revertidas exitosamente" });
+
+    } catch (error) {
+        console.error("Error al eliminar compra:", error);
+        res.status(500).json({ message: "Error al eliminar la compra", error: error.message });
     }
 };

@@ -82,7 +82,7 @@ const ReportesPage = ({ userRole }) => {
         setReportPeriod(period);
         const hoy = new Date();
         const hoyStr = hoy.toISOString().split('T')[0];
-        
+
         let start = new Date();
         let end = new Date();
 
@@ -149,7 +149,7 @@ const ReportesPage = ({ userRole }) => {
     const exportarPDF = () => {
         if (!reporteData) return;
 
-        const doc = new jsPDF();
+        const doc = new jsPDF('l', 'mm', 'a4');
         const titulo = activeTab === 'ventas' ? 'Reporte Detallado de Ventas' : 'Reporte Detallado de Compras';
         const subtitulo = `Del ${fechaInicio} al ${fechaFin}`;
 
@@ -158,7 +158,7 @@ const ReportesPage = ({ userRole }) => {
         doc.text(titulo, 14, 22);
         doc.setFontSize(11);
         doc.text(subtitulo, 14, 30);
-        
+
         doc.setFontSize(10);
         doc.text(`Generado el: ${new Date().toLocaleString()}`, 14, 38);
 
@@ -269,11 +269,11 @@ const ReportesPage = ({ userRole }) => {
                 <div className="flex space-x-4 mb-6 border-b border-gray-200">
                     <button
                         className={`pb-2 px-4 font-semibold ${activeTab === 'ventas' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
-                        onClick={() => { 
-                            setActiveTab('ventas'); 
-                            setReporteData(null); 
-                            setEntidadId(''); 
-                            setProductoId(''); 
+                        onClick={() => {
+                            setActiveTab('ventas');
+                            setReporteData(null);
+                            setEntidadId('');
+                            setProductoId('');
                             setSearchTerm('');
                         }}
                     >
@@ -281,12 +281,12 @@ const ReportesPage = ({ userRole }) => {
                     </button>
                     <button
                         className={`pb-2 px-4 font-semibold ${activeTab === 'compras' ? 'text-orange-600 border-b-2 border-orange-600' : 'text-gray-500 hover:text-gray-700'}`}
-                        onClick={() => { 
-                            setActiveTab('compras'); 
-                            setReporteData(null); 
-                            setEntidadId(''); 
+                        onClick={() => {
+                            setActiveTab('compras');
+                            setReporteData(null);
+                            setEntidadId('');
                             setProductoId('');
-                            setSearchTerm(''); 
+                            setSearchTerm('');
                         }}
                     >
                         Reporte de Compras
@@ -295,18 +295,17 @@ const ReportesPage = ({ userRole }) => {
 
                 {/* Filtros */}
                 <div className="bg-white p-6 rounded-xl shadow-md mb-8 space-y-4">
-                    
+
                     {/* Botones de Periodo */}
                     <div className="flex flex-wrap gap-2 pb-4 border-b border-gray-100">
                         {['daily', 'weekly', 'monthly', 'annual', 'custom'].map((p) => (
                             <button
                                 key={p}
                                 onClick={() => handlePeriodChange(p)}
-                                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                                    reportPeriod === p 
-                                    ? (activeTab === 'ventas' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700')
-                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                }`}
+                                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${reportPeriod === p
+                                        ? (activeTab === 'ventas' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700')
+                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    }`}
                             >
                                 {p === 'daily' && 'Diario'}
                                 {p === 'weekly' && 'Semanal'}
@@ -336,7 +335,7 @@ const ReportesPage = ({ userRole }) => {
                                 className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                             />
                         </div>
-                        
+
                         {/* Filtro Entidad */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -369,76 +368,76 @@ const ReportesPage = ({ userRole }) => {
                             />
                         </div>
 
-                            {/* Custom Searchable Select */}
+                        {/* Custom Searchable Select */}
+                        <div className="relative">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Producto (Opcional)
+                            </label>
                             <div className="relative">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Producto (Opcional)
-                                </label>
-                                <div className="relative">
-                                    <input
-                                        type="text"
-                                        placeholder="Buscar por nombre o código..."
-                                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 pl-10"
-                                        value={searchTerm}
-                                        onChange={(e) => {
-                                            setSearchTerm(e.target.value);
-                                            setShowProductDropdown(true);
-                                            setProductoId(''); // Reset selection on type
+                                <input
+                                    type="text"
+                                    placeholder="Buscar por nombre o código..."
+                                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 pl-10"
+                                    value={searchTerm}
+                                    onChange={(e) => {
+                                        setSearchTerm(e.target.value);
+                                        setShowProductDropdown(true);
+                                        setProductoId(''); // Reset selection on type
+                                    }}
+                                    onFocus={() => setShowProductDropdown(true)}
+                                />
+                                <span className="absolute left-3 top-2.5 text-gray-400">🔍</span>
+                                {searchTerm && (
+                                    <button
+                                        onClick={() => {
+                                            setSearchTerm('');
+                                            setProductoId('');
+                                            setShowProductDropdown(false);
                                         }}
-                                        onFocus={() => setShowProductDropdown(true)}
-                                    />
-                                    <span className="absolute left-3 top-2.5 text-gray-400">🔍</span>
-                                    {searchTerm && (
-                                        <button
-                                            onClick={() => {
-                                                setSearchTerm('');
-                                                setProductoId('');
-                                                setShowProductDropdown(false);
-                                            }}
-                                            className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
-                                        >
-                                            ✕
-                                        </button>
-                                    )}
-                                </div>
+                                        className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+                                    >
+                                        ✕
+                                    </button>
+                                )}
+                            </div>
 
-                                {showProductDropdown && (
-                                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                                        {productos
-                                            .filter(p => 
-                                                p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                                p.codigo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                                p.idProductoTienda?.toLowerCase().includes(searchTerm.toLowerCase())
-                                            )
-                                            .map(p => (
-                                                <div
-                                                    key={p._id}
-                                                    className="px-4 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-0"
-                                                    onClick={() => {
-                                                        setProductoId(p._id);
-                                                        setSearchTerm(`${p.nombre} - ${p.codigo}`);
-                                                        setShowProductDropdown(false);
-                                                    }}
-                                                >
-                                                    <div className="font-medium text-gray-800">{p.nombre}</div>
-                                                    <div className="text-xs text-gray-500 flex justify-between">
-                                                        <span>Cod: {p.codigo}</span>
-                                                        <span>ID: {p.idProductoTienda?.slice(0, 8)}...</span>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        {productos.filter(p => 
+                            {showProductDropdown && (
+                                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                    {productos
+                                        .filter(p =>
                                             p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                             p.codigo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                             p.idProductoTienda?.toLowerCase().includes(searchTerm.toLowerCase())
-                                        ).length === 0 && (
+                                        )
+                                        .map(p => (
+                                            <div
+                                                key={p._id}
+                                                className="px-4 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-0"
+                                                onClick={() => {
+                                                    setProductoId(p._id);
+                                                    setSearchTerm(`${p.nombre} - ${p.codigo}`);
+                                                    setShowProductDropdown(false);
+                                                }}
+                                            >
+                                                <div className="font-medium text-gray-800">{p.nombre}</div>
+                                                <div className="text-xs text-gray-500 flex justify-between">
+                                                    <span>Cod: {p.codigo}</span>
+                                                    <span>ID: {p.idProductoTienda?.slice(0, 8)}...</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    {productos.filter(p =>
+                                        p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                        p.codigo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                        p.idProductoTienda?.toLowerCase().includes(searchTerm.toLowerCase())
+                                    ).length === 0 && (
                                             <div className="px-4 py-3 text-sm text-gray-500 text-center">
                                                 No se encontraron productos
                                             </div>
                                         )}
-                                    </div>
-                                )}
-                            </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     <button
@@ -454,13 +453,13 @@ const ReportesPage = ({ userRole }) => {
                 {reporteData && (
                     <div className="space-y-6 animate-fade-in-up">
                         <div className="flex justify-between items-center">
-                             <h2 className="text-xl font-bold text-gray-800">Resultados del Reporte</h2>
-                             <button 
+                            <h2 className="text-xl font-bold text-gray-800">Resultados del Reporte</h2>
+                            <button
                                 onClick={exportarPDF}
                                 className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 shadow-md flex items-center gap-2"
-                             >
+                            >
                                 <span className="text-lg">📄</span> Descargar PDF
-                             </button>
+                            </button>
                         </div>
 
                         {/* Resumen Cards */}
@@ -609,15 +608,15 @@ const ReportesPage = ({ userRole }) => {
                                     </thead>
                                     <tbody className="divide-y border-gray-100">
                                         {selectedItem.productos.map((p, idx) => {
-                                             const esProductoFiltrado = productoId && (p.producto?._id === productoId || p.producto === productoId);
-                                             const productoInfo = p.producto || {};
-                                             const caracteristicas = [
-                                                 productoInfo.color ? `Color: ${productoInfo.color}` : '',
-                                                 productoInfo.marca ? `Marca: ${productoInfo.marca}` : '',
-                                                 productoInfo.dimensiones ? `Dim: ${productoInfo.dimensiones.alto || '?'}x${productoInfo.dimensiones.ancho || '?'}x${productoInfo.dimensiones.profundidad || '?'}` : ''
-                                             ].filter(Boolean).join(', ');
+                                            const esProductoFiltrado = productoId && (p.producto?._id === productoId || p.producto === productoId);
+                                            const productoInfo = p.producto || {};
+                                            const caracteristicas = [
+                                                productoInfo.color ? `Color: ${productoInfo.color}` : '',
+                                                productoInfo.marca ? `Marca: ${productoInfo.marca}` : '',
+                                                productoInfo.dimensiones ? `Dim: ${productoInfo.dimensiones.alto || '?'}x${productoInfo.dimensiones.ancho || '?'}x${productoInfo.dimensiones.profundidad || '?'}` : ''
+                                            ].filter(Boolean).join(', ');
 
-                                             return (
+                                            return (
                                                 <tr key={idx} className={esProductoFiltrado ? "bg-yellow-50" : ""}>
                                                     <td className="px-3 py-2 text-xs flex flex-col font-mono">
                                                         <span className="font-bold text-gray-800">{productoInfo.codigo || 'S/C'}</span>
@@ -636,30 +635,30 @@ const ReportesPage = ({ userRole }) => {
                                                     <td className="px-3 py-2 text-right">Bs. {p.precioUnitario.toFixed(2)}</td>
                                                     <td className="px-3 py-2 text-right font-medium">Bs. {(p.cantidad * p.precioUnitario).toFixed(2)}</td>
                                                 </tr>
-                                             );
+                                            );
                                         })}
                                     </tbody>
                                     <tfoot className="border-t border-gray-100 bg-gray-50">
-                                       <tr>
-                                           <td colSpan="5" className="px-3 py-2 text-right text-gray-600 text-xs uppercase font-bold">Subtotal:</td>
-                                           <td className="px-3 py-2 text-right font-medium">
-                                               Bs. {selectedItem.productos.reduce((s, p) => s + (p.cantidad * p.precioUnitario), 0).toFixed(2)}
-                                           </td>
-                                       </tr>
-                                       {selectedItem.descuento > 0 && (
-                                           <tr className="text-red-600">
-                                               <td colSpan="5" className="px-3 py-1 text-right text-xs uppercase font-bold">Descuento Global:</td>
-                                               <td className="px-3 py-1 text-right font-medium">
-                                                   - Bs. {selectedItem.descuento.toFixed(2)}
-                                               </td>
-                                           </tr>
-                                       )}
-                                       <tr className="bg-green-50">
-                                           <td colSpan="5" className="px-3 py-2 text-right text-green-800 text-sm uppercase font-bold">Total Final:</td>
-                                           <td className="px-3 py-2 text-right font-bold text-green-700 text-sm">
-                                               Bs. {Math.max(0, (selectedItem.productos.reduce((s, p) => s + (p.cantidad * p.precioUnitario), 0) - (selectedItem.descuento || 0))).toFixed(2)}
-                                           </td>
-                                       </tr>
+                                        <tr>
+                                            <td colSpan="5" className="px-3 py-2 text-right text-gray-600 text-xs uppercase font-bold">Subtotal:</td>
+                                            <td className="px-3 py-2 text-right font-medium">
+                                                Bs. {selectedItem.productos.reduce((s, p) => s + (p.cantidad * p.precioUnitario), 0).toFixed(2)}
+                                            </td>
+                                        </tr>
+                                        {selectedItem.descuento > 0 && (
+                                            <tr className="text-red-600">
+                                                <td colSpan="5" className="px-3 py-1 text-right text-xs uppercase font-bold">Descuento Global:</td>
+                                                <td className="px-3 py-1 text-right font-medium">
+                                                    - Bs. {selectedItem.descuento.toFixed(2)}
+                                                </td>
+                                            </tr>
+                                        )}
+                                        <tr className="bg-green-50">
+                                            <td colSpan="5" className="px-3 py-2 text-right text-green-800 text-sm uppercase font-bold">Total Final:</td>
+                                            <td className="px-3 py-2 text-right font-bold text-green-700 text-sm">
+                                                Bs. {Math.max(0, (selectedItem.productos.reduce((s, p) => s + (p.cantidad * p.precioUnitario), 0) - (selectedItem.descuento || 0))).toFixed(2)}
+                                            </td>
+                                        </tr>
                                     </tfoot>
                                 </table>
                             </div>
