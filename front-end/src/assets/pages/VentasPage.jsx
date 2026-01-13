@@ -662,15 +662,17 @@ const VentasPage = ({ userRole }) => {
             >
               Ventas
             </button>
-            <button
-              onClick={() => setActiveTab('clientes')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'clientes'
-                ? 'bg-green-600 text-white shadow-md'
-                : 'bg-white text-gray-600 hover:bg-gray-100'
-                }`}
-            >
-              Gestionar Clientes
-            </button>
+            {(userRole !== 'empleado_stock') && (
+              <button
+                onClick={() => setActiveTab('clientes')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'clientes'
+                  ? 'bg-green-600 text-white shadow-md'
+                  : 'bg-white text-gray-600 hover:bg-gray-100'
+                  }`}
+              >
+                Gestionar Clientes
+              </button>
+            )}
           </div>
         </div>
       </header>
