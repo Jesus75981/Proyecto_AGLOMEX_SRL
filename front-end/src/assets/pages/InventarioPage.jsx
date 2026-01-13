@@ -4,7 +4,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 // --- API Helper ---
-const API_URL = 'http://localhost:5000/api';
+import { API_URL, API_BASE_URL } from '../../config/api';
 
 const getAuthToken = () => {
   return localStorage.getItem('token');
@@ -1089,7 +1089,7 @@ const InventarioPage = ({ userRole }) => {
                             <div className="flex items-center">
                               <div className="h-10 w-10 flex-shrink-0">
                                 {item.imagen ? (
-                                  <img className="h-10 w-10 rounded-full object-cover cursor-pointer" src={`http://localhost:5000${item.imagen}`} alt="" onClick={() => setSelectedImage(`http://localhost:5000${item.imagen}`)} />
+                                  <img className="h-10 w-10 rounded-full object-cover cursor-pointer" src={`${API_BASE_URL}${item.imagen}`} alt="" onClick={() => setSelectedImage(`${API_BASE_URL}${item.imagen}`)} />
                                 ) : (
                                   <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
                                     📷

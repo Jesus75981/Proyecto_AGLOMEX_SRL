@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { API_URL, API_BASE_URL } from '../../config/api';
+
 // --- API Helper ---
-const API_URL = 'http://localhost:5000/api';
 
 const getAuthToken = () => {
   return localStorage.getItem('token');
@@ -1536,7 +1537,7 @@ const VentasPage = ({ userRole }) => {
                                   <td className="px-4 py-2 font-medium text-gray-900">
                                     <div className="flex items-center gap-2">
                                       {item.producto?.imagen && (
-                                        <img src={`http://localhost:5000${item.producto.imagen}`} alt="" className="w-8 h-8 rounded object-cover border" />
+                                        <img src={`${API_BASE_URL}${item.producto.imagen}`} alt="" className="w-8 h-8 rounded object-cover border" />
                                       )}
                                       <span>{item.producto?.nombre || item.productoNombre || 'Producto Eliminado'}</span>
                                     </div>

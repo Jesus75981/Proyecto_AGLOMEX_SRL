@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 // --- API Helper ---
-const API_URL = 'http://localhost:5000/api';
+import { API_URL } from '../../config/api';
 
 const getAuthToken = () => {
   return localStorage.getItem('token');

@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import QRCode from 'react-qr-code';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { API_URL, API_BASE_URL } from '../../config/api';
 
 const FabricacionPage = ({ userRole }) => {
   const navigate = useNavigate();
@@ -132,7 +133,7 @@ const FabricacionPage = ({ userRole }) => {
 
   const cargarProductos = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/productos?tipo=Producto Terminado', {
+      const response = await fetch(`${API_URL}/productos?tipo=Producto Terminado`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       if (response.ok) {
@@ -193,7 +194,7 @@ const FabricacionPage = ({ userRole }) => {
 
   const cargarOrdenes = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/produccion', {
+      const response = await fetch(`${API_URL}/produccion`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -210,7 +211,7 @@ const FabricacionPage = ({ userRole }) => {
   const cargarMateriales = async () => {
     try {
       // Fetch from dedicated Materia Prima endpoint
-      const response = await fetch('http://localhost:5000/api/materiaPrima', {
+      const response = await fetch(`${API_URL}/materiaPrima`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -226,7 +227,7 @@ const FabricacionPage = ({ userRole }) => {
 
   const cargarMaquinas = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/maquinas', {
+      const response = await fetch(`${API_URL}/maquinas`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -312,8 +313,8 @@ const FabricacionPage = ({ userRole }) => {
   const guardarOrden = async () => {
     try {
       const url = editingOrden
-        ? `http://localhost:5000/api/produccion/${editingOrden._id}`
-        : 'http://localhost:5000/api/produccion';
+        ? `${API_URL}/produccion/${editingOrden._id}`
+        : `${API_URL}/produccion`;
 
       const method = editingOrden ? 'PUT' : 'POST';
 
@@ -383,7 +384,7 @@ const FabricacionPage = ({ userRole }) => {
 
   const iniciarProduccionAutomatica = async (id) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/produccion/${id}/iniciar`, {
+      const response = await fetch(`${API_URL}/produccion/${id}/iniciar`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -420,7 +421,7 @@ const FabricacionPage = ({ userRole }) => {
     try {
       if (!selectedOrdenId) return;
 
-      const response = await fetch(`http://localhost:5000/api/produccion/${selectedOrdenId}/confirmar`, {
+      const response = await fetch(`${API_URL}/produccion/${selectedOrdenId}/confirmar`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -483,8 +484,8 @@ const FabricacionPage = ({ userRole }) => {
       }
 
       const url = editingMaterial
-        ? `http://localhost:5000/api/materiaPrima/${editingMaterial._id}`
-        : 'http://localhost:5000/api/materiaPrima';
+        ? `${API_URL}/materiaPrima/${editingMaterial._id}`
+        : `${API_URL}/materiaPrima`;
 
       const method = editingMaterial ? 'PUT' : 'POST';
 
@@ -554,7 +555,7 @@ const FabricacionPage = ({ userRole }) => {
   // Funciones para máquinas
   const cambiarEstadoMaquina = async (id, nuevoEstado) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/maquinas/${id}`, {
+      const response = await fetch(`${API_URL}/maquinas/${id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -575,7 +576,7 @@ const FabricacionPage = ({ userRole }) => {
 
   const agregarMaquina = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/maquinas', {
+      const response = await fetch(`${API_URL}/maquinas`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -608,7 +609,7 @@ const FabricacionPage = ({ userRole }) => {
   const checkWhatsAppStatus = async () => {
     setLoadingQr(true);
     try {
-      const response = await fetch('http://localhost:5000/api/whatsapp/status');
+      const response = await fetch(`${API_URL}/whatsapp/status`);
       const data = await response.json();
       setWhatsappStatus(data.status);
       setQrCode(data.qr);
@@ -630,7 +631,7 @@ const FabricacionPage = ({ userRole }) => {
   const restartWhatsApp = async () => {
     if (!window.confirm("¿Reiniciar la conexión de WhatsApp? Esto generará un nuevo QR.")) return;
     try {
-      await fetch('http://localhost:5000/api/whatsapp/restart', { method: 'POST' });
+      await fetch(`${API_URL}/whatsapp/restart`, { method: 'POST' });
       alert("Reiniciando servicio... Espere unos segundos.");
       setQrCode('');
       setWhatsappStatus('INITIALIZING');
@@ -1515,7 +1516,7 @@ const FabricacionPage = ({ userRole }) => {
                                 <div className="h-10 w-10 flex-shrink-0">
                                   {item.imagen ? (
                                     <img className="h-10 w-10 rounded-full object-cover cursor-pointer hover:scale-150 transition-transform"
-                                      src={`http://localhost:5000${item.imagen}`} alt=""
+                                      src={`${API_BASE_URL}${item.imagen}`} alt=""
                                     />
                                   ) : (
                                     <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">📦</div>

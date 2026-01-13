@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_URL, API_BASE_URL } from '../../config/api';
 
 const AdminCatalogPage = ({ userRole }) => {
   const [productos, setProductos] = useState([]);
@@ -32,7 +33,7 @@ const AdminCatalogPage = ({ userRole }) => {
     proveedor: ''
   });
 
-  const API_URL = 'http://localhost:5000/api/productos';
+
 
   // Cargar productos, categorías y proveedores
   useEffect(() => {
@@ -65,7 +66,7 @@ const AdminCatalogPage = ({ userRole }) => {
 
   const fetchProveedores = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/proveedores');
+      const response = await fetch(`${API_BASE_URL}/api/proveedores`);
       if (!response.ok) throw new Error('Error al cargar proveedores');
       const data = await response.json();
       setProveedores(data);

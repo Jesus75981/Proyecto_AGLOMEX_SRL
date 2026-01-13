@@ -7,7 +7,7 @@ import autoTable from 'jspdf-autotable';
 
 
 // --- API Helper ---
-const API_URL = 'http://localhost:5000/api';
+import { API_URL } from '../../config/api';
 
 const getAuthToken = () => {
     return localStorage.getItem('token');
@@ -303,8 +303,8 @@ const ReportesPage = ({ userRole }) => {
                                 key={p}
                                 onClick={() => handlePeriodChange(p)}
                                 className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${reportPeriod === p
-                                        ? (activeTab === 'ventas' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700')
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    ? (activeTab === 'ventas' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700')
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                     }`}
                             >
                                 {p === 'daily' && 'Diario'}

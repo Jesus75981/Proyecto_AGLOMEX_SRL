@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 // --- Helper para API (Igual que DashboardPage) ---
-const API_URL = 'http://localhost:5000/api';
+import { API_URL, API_BASE_URL } from '../../config/api';
 
 const getAuthToken = () => localStorage.getItem('token');
 
@@ -38,8 +38,8 @@ const apiFetch = async (endpoint, options = {}) => {
 
   // Simplification to match original logic exactly but using fetch:
   const urlToFetch = endpoint.startsWith('/api')
-    ? `http://localhost:5000${endpoint}`
-    : `http://localhost:5000/api/finanzas${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
+    ? `${API_BASE_URL}${endpoint}`
+    : `${API_URL}/finanzas${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
 
   const response = await fetch(urlToFetch, { ...options, headers });
 

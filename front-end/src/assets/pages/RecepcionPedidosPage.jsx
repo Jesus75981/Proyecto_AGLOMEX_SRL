@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { API_BASE_URL } from '../../config/api';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
@@ -31,7 +31,7 @@ const RecepcionPedidosPage = () => {
     setShowConfirm(false);
 
     try {
-      const response = await axios.get(`http://localhost:5000/api/pedidos-publico/numero/${pedidoNumero.trim()}`);
+      const response = await axios.get(`${API_BASE_URL}/api/pedidos-publico/numero/${pedidoNumero.trim()}`);
       const { pedido, logistica } = response.data;
       setPedidoInfo(pedido);
       setLogisticaInfo(logistica);
@@ -73,7 +73,7 @@ const RecepcionPedidosPage = () => {
     setMessage('');
 
     try {
-      const response = await axios.post('http://localhost:5000/api/pedidos-publico/confirmar-recepcion', {
+      const response = await axios.post(`${API_BASE_URL}/api/pedidos-publico/confirmar-recepcion`, {
         pedidoNumero: pedidoNumero.trim()
       });
 

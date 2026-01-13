@@ -8,7 +8,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
 // --- API Helper ---
-const API_URL = 'http://localhost:5000/api';
+import { API_URL } from '../../config/api';
 
 const getAuthToken = () => localStorage.getItem('token');
 

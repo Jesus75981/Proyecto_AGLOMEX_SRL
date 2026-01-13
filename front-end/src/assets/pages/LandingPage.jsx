@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../../config/api';
 
 
 
@@ -13,15 +14,15 @@ const ImageCarousel = () => {
   React.useEffect(() => {
     const fetchTopProducts = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/ventas/estadisticas');
+        const response = await fetch(`${API_BASE_URL}/api/ventas/estadisticas`);
         const data = await response.json();
-        
+
         // Obtener los productos más vendidos
         const topProducts = data.productosMasVendidos || [];
-        
+
         // Filtrar solo productos con imagen
         const productsWithImages = topProducts.filter(p => p.imagen);
-        
+
         setProducts(productsWithImages.slice(0, 10)); // Máximo 10 productos
         setLoading(false);
       } catch (error) {
@@ -35,11 +36,11 @@ const ImageCarousel = () => {
 
   React.useEffect(() => {
     if (products.length === 0) return;
-    
+
     const interval = setInterval(() => {
       setCurrentIndex((prevIndex) => (prevIndex + 1) % products.length);
     }, 3000); // Cambia cada 3 segundos
-    
+
     return () => clearInterval(interval);
   }, [products.length]);
 
@@ -76,7 +77,7 @@ const ImageCarousel = () => {
         alt={currentProduct._id}
         className="w-full h-full object-cover transition-opacity duration-500"
       />
-      
+
       <button
         onClick={prevSlide}
         className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-75 transition-all"

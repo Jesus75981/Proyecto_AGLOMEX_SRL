@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { API_URL, API_BASE_URL } from '../../config/api';
 import { useNavigate } from 'react-router-dom';
 import aglomexLogo from '../images/aglomex6.jpg'; // Asegúrate de que la ruta sea correcta
 
@@ -22,7 +23,7 @@ const LoginPage = ({ onLogin }) => {
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/login', {
+      const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -59,7 +60,7 @@ const LoginPage = ({ onLogin }) => {
   // Función para crear usuarios de prueba (si el servidor no responde)
   const createTestUsers = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/auth/create-test-users', {
+      const response = await fetch(`${API_URL}/auth/create-test-users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -161,13 +162,13 @@ const LoginPage = ({ onLogin }) => {
           </button>
         </div>
 
-        {/* Información de usuarios de prueba - REMOVIDO POR SEGURIDAD */} 
+        {/* Información de usuarios de prueba - REMOVIDO POR SEGURIDAD */}
         {/* <div className="mt-6 p-4 bg-gray-900 rounded-lg border border-gray-700"> ... </div> */}
 
         {/* Información de conexión */}
         <div className="mt-4 text-center">
           <p className="text-xs text-gray-400">
-            Servidor: localhost:5000
+            Servidor: {API_BASE_URL}
           </p>
           <p className="text-xs text-gray-400">
             {isLoading ? 'Conectando al servidor...' : 'Servidor listo'}

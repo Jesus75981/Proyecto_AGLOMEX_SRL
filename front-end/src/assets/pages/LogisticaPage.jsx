@@ -4,7 +4,7 @@ import { SkeletonMetrics, SkeletonTable, SkeletonCard } from '../../components/S
 import useDebounce from '../../hooks/useDebounce';
 
 // --- API Helper ---
-const API_URL = 'http://localhost:5000/api';
+import { API_URL } from '../../config/api';
 
 const getAuthToken = () => {
   return localStorage.getItem('token');
