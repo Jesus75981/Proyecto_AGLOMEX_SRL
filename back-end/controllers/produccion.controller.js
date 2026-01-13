@@ -227,6 +227,7 @@ const completarProduccionAutomatica = async (produccion, datosExtra = {}) => {
       await productoFinal.save();
 
       // [New] Trigger 3D generation if image is present (Automatic Creation)
+      /* [DISABLED 3D GENERATION]
       if (productoFinal.imagen) {
         const simulUrl = productoFinal.imagen.startsWith('http')
           ? productoFinal.imagen
@@ -253,6 +254,7 @@ const completarProduccionAutomatica = async (produccion, datosExtra = {}) => {
           }
         })();
       }
+      */
     }
 
     produccion.productoFinal = productoFinal._id;

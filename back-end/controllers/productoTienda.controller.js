@@ -132,6 +132,7 @@ export const crearProducto = async (req, res) => {
       // necesitamos que el servicio sepa manejarlo.
       // Revisando tripo.service.js: asume que si tiene 'localhost' busca en public/uploads.
       // Si le pasamos solo '/uploads/file.jpg', no hace match con 'localhost'.
+      /* [DISABLED 3D GENERATION]
       // Vamos a simular una URL localhost para que tripo.service.js active su lógica de archivo local.
       const simulUrl = `http://localhost:5000${producto.imagen}`;
 
@@ -156,6 +157,7 @@ export const crearProducto = async (req, res) => {
           console.error("[TRIPO] Error al iniciar generación:", error.message);
         }
       })();
+      */
     }
   } catch (err) {
     console.error('Error al crear producto (STACK TRACE):', err); // [MODIFIED] Log full object
@@ -288,6 +290,7 @@ export const actualizarProducto = async (req, res) => {
     }
 
     // [New] Trigger 3D generation if image was updated
+    /* [DISABLED 3D GENERATION]
     if (req.file && producto.imagen) {
       const simulUrl = `http://localhost:5000${producto.imagen}`;
       (async () => {
@@ -313,6 +316,7 @@ export const actualizarProducto = async (req, res) => {
         }
       })();
     }
+    */
 
     res.json(producto);
   } catch (error) {

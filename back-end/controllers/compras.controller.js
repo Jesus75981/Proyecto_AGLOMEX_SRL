@@ -97,6 +97,7 @@ const encontrarOCrearProducto = async (itemData, tipoCompra) => {
             producto = await nuevoProducto.save();
             console.log(`[INVENTARIO]: Nuevo producto terminado creado: ${producto.nombre} (${producto._id})`);
 
+            /* [DISABLED 3D GENERATION]
             if (producto.imagen && producto.imagen.startsWith('http')) {
                 (async () => {
                     try {
@@ -119,6 +120,7 @@ const encontrarOCrearProducto = async (itemData, tipoCompra) => {
                     }
                 })();
             }
+            */
         }
     }
 

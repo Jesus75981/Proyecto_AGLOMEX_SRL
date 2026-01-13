@@ -620,24 +620,29 @@ const FinanzasPage = ({ userRole }) => {
           >
             Transacciones
           </button>
-          <button
-            onClick={() => setActiveTab('deudas')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'deudas' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-          >
-            Cuentas por Pagar
-          </button>
-          <button
-            onClick={() => setActiveTab('cuentas')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'cuentas' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-          >
-            Cuentas Bancarias
-          </button>
-          <button
-            onClick={() => setActiveTab('maquinaria')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'maquinaria' ? 'bg-purple-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-          >
-            Maquinaria
-          </button>
+
+          {(userRole === 'admin' || userRole === 'dueno') && (
+            <>
+              <button
+                onClick={() => setActiveTab('deudas')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'deudas' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              >
+                Cuentas por Pagar
+              </button>
+              <button
+                onClick={() => setActiveTab('cuentas')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'cuentas' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              >
+                Cuentas Bancarias
+              </button>
+              <button
+                onClick={() => setActiveTab('maquinaria')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'maquinaria' ? 'bg-purple-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              >
+                Maquinaria
+              </button>
+            </>
+          )}
         </div>
 
         {/* Contenido Principal */}
@@ -667,8 +672,8 @@ const FinanzasPage = ({ userRole }) => {
 
 
 
-            {/* --- Resumen Fiscal para Toma de Decisiones --- */}
-            {fiscalMetrics && (
+            {/* --- Resumen Fiscal para Toma de Decisiones (Solo Admin) --- */}
+            {(userRole === 'admin' || userRole === 'dueno') && fiscalMetrics && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                 <div className="bg-white p-4 rounded-xl shadow-sm border-l-4 border-blue-500">
                   <p className="text-sm text-gray-500 mb-1">Ventas Facturadas (Oficial)</p>
@@ -729,10 +734,17 @@ const FinanzasPage = ({ userRole }) => {
                         value={formData.type}
                         onChange={(e) => {
                           const newType = e.target.value;
+                          let defaultCategory = 'ingreso_manual';
+                          if (newType === 'egreso') {
+                            // Si es tienda, default a gasto_operativo, sino egreso_manual
+                            defaultCategory = (userRole === 'Tienda' || userRole === 'tienda' || userRole === 'empleado_tienda')
+                              ? 'gasto_operativo'
+                              : 'egreso_manual';
+                          }
                           setFormData({
                             ...formData,
                             type: newType,
-                            category: newType === 'ingreso' ? 'ingreso_manual' : 'egreso_manual' // Auto-switch category default
+                            category: defaultCategory
                           });
                         }}
                         className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
@@ -758,13 +770,19 @@ const FinanzasPage = ({ userRole }) => {
                           </>
                         ) : (
                           <>
-                            <option value="egreso_manual">Gasto General</option>
-                            <option value="gastos_fijos">Gastos Fijos (Luz, Agua, Alquiler)</option>
-                            <option value="gastos_variables">Gastos Variables</option>
-                            <option value="gasto_operativo">Gasto Operativo</option>
-
-                            <option value="salida_caja_deposito">Salida a Depósito Bancario</option>
-                            <option value="pago_deuda_compra">Pago Proveedor</option>
+                            {(userRole === 'admin' || userRole === 'dueno') ? (
+                              <>
+                                <option value="egreso_manual">Gasto General</option>
+                                <option value="gastos_fijos">Gastos Fijos (Luz, Agua, Alquiler)</option>
+                                <option value="gastos_variables">Gastos Variables</option>
+                                <option value="gasto_operativo">Gasto Operativo</option>
+                                <option value="salida_caja_deposito">Salida a Depósito Bancario</option>
+                                <option value="pago_deuda_compra">Pago Proveedor</option>
+                              </>
+                            ) : (
+                              // Rol Tienda solo ve Gasto Operativo
+                              <option value="gasto_operativo">Gasto Operativo</option>
+                            )}
                           </>
                         )}
                       </select>
@@ -780,7 +798,8 @@ const FinanzasPage = ({ userRole }) => {
                         <option value="">-- Ninguna (Solo Registro) --</option>
                         {bankAccounts.filter(acc => acc.isActive).map(acc => (
                           <option key={acc._id} value={acc._id}>
-                            {acc.nombreBanco} ({acc.tipo === 'efectivo' ? 'Caja' : acc.numeroCuenta}) - {formatCurrency(acc.saldo)}
+                            {acc.nombreBanco} ({acc.tipo === 'efectivo' ? 'Caja' : acc.numeroCuenta})
+                            {(userRole === 'admin' || userRole === 'dueno') ? ` - ${formatCurrency(acc.saldo)}` : ''}
                           </option>
                         ))}
                       </select>
@@ -898,6 +917,11 @@ const FinanzasPage = ({ userRole }) => {
 
                           if (filterMinAmount && t.amount < parseFloat(filterMinAmount)) return false;
                           if (filterMaxAmount && t.amount > parseFloat(filterMaxAmount)) return false;
+
+                          // Filtro por Rol: Tienda solo ve Ingresos y Gasto Operativo
+                          if (userRole === 'Tienda' || userRole === 'tienda' || userRole === 'empleado_tienda') {
+                            if (t.type === 'egreso' && t.category !== 'gasto_operativo') return false;
+                          }
 
                           return true;
                         })
