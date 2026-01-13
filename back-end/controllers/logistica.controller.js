@@ -3,6 +3,9 @@ import Venta from "../models/venta.model.js"; // Import Venta model
 import Contador from "../models/contador.model.js";
 import ProductoTienda from "../models/productoTienda.model.js";
 import Ruta from "../models/ruta.model.js";
+import BankAccount from "../models/bankAccount.model.js";
+import BankTransaction from "../models/bankTransaction.model.js";
+import Finanzas from "../models/finanzas.model.js";
 
 // Función auxiliar para obtener el siguiente valor de la secuencia del contador
 const getNextSequenceValue = async (nombreSecuencia) => {
@@ -59,6 +62,46 @@ export const crearPedido = async (req, res) => {
 
     const pedido = new Logistica(pedidoFinal);
     await pedido.save();
+
+    // 4. INTEGRACIÓN FINANCIERA AUTOMÁTICA
+    if (pedidoFinal.costoEnvio > 0 && pedidoFinal.cuentaId) {
+      const cuenta = await BankAccount.findById(pedidoFinal.cuentaId);
+      if (cuenta) {
+        // Descontar saldo
+        cuenta.saldo -= pedidoFinal.costoEnvio;
+        await cuenta.save();
+
+        // Crear transacción bancaria
+        await BankTransaction.create({
+          cuentaId: cuenta._id,
+          tipo: 'Retiro',
+          monto: pedidoFinal.costoEnvio,
+          descripcion: `Pago de Envío - Pedido #${pedidoFinal.pedidoNumero}`,
+          fecha: new Date(),
+          referencia: pedido._id,
+          metodoPago: 'Transferencia'
+        });
+
+        // Registrar en Finanzas Globales
+        const nuevaTransaccion = new Finanzas({
+          tipo: 'egreso',
+          categoria: 'costo_envio',
+          monto: pedidoFinal.costoEnvio,
+          descripcion: `Costo de envío para Pedido #${pedidoFinal.pedidoNumero}`,
+          fecha: new Date(),
+          referenceId: pedido._id,
+          referenceModel: 'Logistica',
+          moneda: 'BOB',
+          usuario: req.user ? req.user._id : null,
+          metadata: {
+            cuentaId: cuenta._id,
+            nombreBanco: cuenta.nombreBanco
+          }
+        });
+        await nuevaTransaccion.save();
+        console.log(`[LOGISTICA-FINANZAS] Gasto registrado: ${pedidoFinal.costoEnvio} de ${cuenta.nombreBanco}`);
+      }
+    }
 
     // 3. Devolver datos poblados para el frontend
     const pedidoGuardado = await Logistica.findById(pedido._id)

@@ -59,6 +59,7 @@ const LogisticaPage = ({ userRole }) => {
   const [clientes, setClientes] = useState([]);
   const [productos, setProductos] = useState([]);
   const [envios, setEnvios] = useState([]);
+  const [bankAccounts, setBankAccounts] = useState([]);
   const [loadingEnvios, setLoadingEnvios] = useState(false);
 
   // Búsqueda Pedidos
@@ -292,7 +293,7 @@ const LogisticaPage = ({ userRole }) => {
         tiempoEstimado: envio.tiempoEstimado,
         metodoEntrega: envio.metodoEntrega || 'Envio Domicilio',
         costoEnvio: envio.costoEnvio || envio.costoAdicional || 0,
-        tracking: `TRK${envio.pedidoNumero}`,
+        tracking: `ENV-${envio.pedidoNumero}`,
         ubicacionActual: envio.estado === 'entregado' ? 'Entregado' : 'En proceso',
         empresaEnvio: envio.empresaEnvio || ''
       }));
@@ -325,12 +326,13 @@ const LogisticaPage = ({ userRole }) => {
     try {
       const token = getAuthToken();
       if (!token) return navigate('/login');
-      const [pedidosData, clientesData, productosData] = await Promise.all([
-        apiFetch('/pedidos'), apiFetch('/clientes'), apiFetch('/productos')
+      const [pedidosData, clientesData, productosData, bankAccountsData] = await Promise.all([
+        apiFetch('/pedidos'), apiFetch('/clientes'), apiFetch('/productos'), apiFetch('/finanzas/cuentas')
       ]);
       setPedidos(pedidosData);
       setClientes(clientesData);
       setProductos(productosData);
+      setBankAccounts(bankAccountsData);
       cargarEstadisticas();
       cargarTransportistas();
       cargarEstadisticasTransportistas();
@@ -355,6 +357,9 @@ const LogisticaPage = ({ userRole }) => {
     if (action === 'create' && pedidoNumero) {
       const autoCargarPedido = async () => {
         try {
+
+
+          // 3. Devolver datos poblados para el frontend cargados
           // Asegurar que los datos base estén cargados
           if (pedidos.length === 0 && envios.length === 0) {
             await cargarDatos();
@@ -398,6 +403,12 @@ const LogisticaPage = ({ userRole }) => {
 
   const agregarEnvio = () => {
     if (!nuevoEnvio.pedidoId || !nuevoEnvio.cliente) return;
+    // Validación de Cuenta para Costos
+    if (nuevoEnvio.costoEnvio > 0 && !nuevoEnvio.cuentaId) {
+      alert('⚠️ Para registrar un costo de envío, DEBES seleccionar una Caja o Cuenta de donde saldrá el dinero.');
+      return;
+    }
+
     try {
       const datosEnvio = {
         pedidoNumero: parseInt(nuevoEnvio.pedidoId.replace('PED-', '') || Date.now().toString().slice(-6)),
@@ -636,8 +647,8 @@ const LogisticaPage = ({ userRole }) => {
                                 <button
                                   onClick={() => procesarVentaPendiente(venta)}
                                   className={`px-3 py-1 rounded text-sm text-white shadow-sm flex items-center ${venta.metodoEntrega?.toLowerCase().includes('recojo')
-                                      ? 'bg-purple-600 hover:bg-purple-700'
-                                      : 'bg-indigo-600 hover:bg-indigo-700'
+                                    ? 'bg-purple-600 hover:bg-purple-700'
+                                    : 'bg-indigo-600 hover:bg-indigo-700'
                                     }`}
                                 >
                                   {venta.metodoEntrega?.toLowerCase().includes('recojo') ? '🏢 Procesar Recojo' : '📦 Procesar Envío'}
@@ -758,25 +769,41 @@ const LogisticaPage = ({ userRole }) => {
                     )}
                     <select value={nuevoEnvio.metodoEntrega} onChange={(e) => setNuevoEnvio({ ...nuevoEnvio, metodoEntrega: e.target.value })} className="px-4 py-2 border border-gray-300 rounded-lg">
                       <option value="Envio Domicilio">Envio Domicilio</option>
-                      <option value="Recojo en Tienda">Recojo en Tienda</option>
-                      <option value="Recojo en Almacen">Recojo en Almacen</option>
                       <option value="Envio Nacional">Envio Nacional</option>
+                      <option value="Recojo en Almacen">Recojo en Almacen</option>
                     </select>
-                    <div className="relative">
-                      <span className="absolute left-3 top-2 text-gray-500">Bs</span>
-                      <input
-                        type="number"
-                        placeholder="Costo Envío"
-                        value={nuevoEnvio.costoEnvio}
-                        onChange={(e) => setNuevoEnvio({ ...nuevoEnvio, costoEnvio: e.target.value })}
-                        className="w-full pl-10 px-4 py-2 border border-gray-300 rounded-lg"
-                        disabled={nuevoEnvio.metodoEntrega?.toLowerCase().includes('recojo')}
-                      />
-                    </div>
 
-                    <div className="md:col-span-2 flex space-x-4">
-                      <button onClick={agregarEnvio} className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">Programar Envío</button>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="relative">
+                        <span className="absolute left-3 top-2 text-gray-500">Bs</span>
+                        <input
+                          type="number"
+                          placeholder="Costo Envío"
+                          value={nuevoEnvio.costoEnvio}
+                          onChange={(e) => setNuevoEnvio({ ...nuevoEnvio, costoEnvio: parseFloat(e.target.value) || 0 })}
+                          className="w-full pl-10 px-4 py-2 border border-gray-300 rounded-lg"
+                        />
+                      </div>
+                      <select
+                        value={nuevoEnvio.cuentaId}
+                        onChange={(e) => setNuevoEnvio({ ...nuevoEnvio, cuentaId: e.target.value })}
+                        className="px-4 py-2 border border-gray-300 rounded-lg text-sm"
+                      >
+                        <option value="">Seleccionar Caja/Cuenta (Requerido para Egresos)</option>
+                        {bankAccounts.map(acc => (
+                          <option key={acc._id} value={acc._id}>
+                            {acc.nombreBanco} - Bs. {acc.saldo.toFixed(2)} ({acc.tipo})
+                          </option>
+                        ))}
+                      </select>
                     </div>
+                    {/* Account Selector populated */}
+                    <div className="md:col-span-2 hidden"> {/* Hidden because moved above, just checking context */} </div>
+
+                    {/* Replacing the Account Select Options */}
+                    {/* We target the specific select via context. We know it has className "px-4 py-2 border border-gray-300 rounded-lg text-sm" */}
+
+                    <button onClick={agregarEnvio} className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">Programar Envío</button>
                   </div>
                 )}
 
@@ -908,8 +935,8 @@ const LogisticaPage = ({ userRole }) => {
             </div>
           )}
         </div>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 };
 

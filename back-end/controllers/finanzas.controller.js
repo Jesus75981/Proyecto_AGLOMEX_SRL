@@ -619,7 +619,7 @@ export const getFinancialStatistics = async (req, res) => {
           utilidadTotal: { $multiply: ["$cantidad", { $subtract: ["$precioVenta", "$costoCompra"] }] }
         }
       },
-      { $sort: { fecha: -1 } },
+      { $sort: { fecha: -1, numVenta: -1 } },
       { $limit: 100 }
     ]);
 
@@ -631,9 +631,50 @@ export const getFinancialStatistics = async (req, res) => {
       console.log("----------------------");
     }
 
+    // --- INTEGRACIÓN: HISTORIAL DE UTILIDAD (Gráfico) ---
+    // Clonar lógica de agrupación pero usando 'fecha' en lugar de 'date'
+    const groupByVenta = JSON.parse(JSON.stringify(groupBy).replace(/\$date/g, '$fecha'));
+
+    const profitHistory = await Venta.aggregate([
+      {
+        $match: {
+          fecha: { $gte: startDate, $lte: endDate },
+          estado: { $ne: 'Anulado' }
+        }
+      },
+      { $unwind: '$productos' },
+      {
+        $group: {
+          _id: groupByVenta,
+          utilidad: {
+            $sum: {
+              $multiply: [
+                '$productos.cantidad',
+                { $subtract: ['$productos.precioUnitario', { $ifNull: ['$productos.costoUnitario', 0] }] }
+              ]
+            }
+          },
+          ventas: {
+            $sum: { $multiply: ['$productos.cantidad', '$productos.precioUnitario'] }
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          period: '$_id',
+          utilidad: 1,
+          ventas: 1
+        }
+      },
+      { $sort: sort } // 'sort' variable relies on 'period.month' or 'period.day', which matches our projection
+    ]);
+
     res.json({
       metrics,
       cashflow,
+      profitHistory, // New field
+      salesDetail,
       salesDetail, // New field
       periodInfo: {
         startDate,

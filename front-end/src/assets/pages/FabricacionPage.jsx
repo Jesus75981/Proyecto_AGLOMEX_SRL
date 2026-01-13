@@ -409,7 +409,7 @@ const FabricacionPage = ({ userRole }) => {
     setSelectedOrdenId(orden._id);
     setDatosCompletados({
       descripcion: `Producto fabricado: ${orden.nombre}`,
-      categoria: 'Muebles', // Default or fetch existing
+      categoria: orden.categoria || 'Muebles',
       precioVenta: orden.precioVenta || 0,
       imagen: orden.imagen || ''
     });
@@ -1697,15 +1697,7 @@ const FabricacionPage = ({ userRole }) => {
                       onChange={(e) => setDatosCompletados({ ...datosCompletados, descripcion: e.target.value })}
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Categoría</label>
-                    <input
-                      type="text"
-                      className="w-full border rounded px-3 py-2 mt-1"
-                      value={datosCompletados.categoria}
-                      onChange={(e) => setDatosCompletados({ ...datosCompletados, categoria: e.target.value })}
-                    />
-                  </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Precio de Venta Final (Bs)</label>
                     <input

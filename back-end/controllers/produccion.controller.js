@@ -220,7 +220,7 @@ const completarProduccionAutomatica = async (produccion, datosExtra = {}) => {
         precioVenta: datosExtra.precioVenta || produccion.precioVenta,
         imagen: produccion.imagen || datosExtra.imagen || "",
         tipo: 'Producto Terminado',
-        categoria: datosExtra.categoria || 'Muebles',
+        categoria: datosExtra.categoria || produccion.categoria || 'Muebles',
         color: datosExtra.color || 'Estándar',
         codigo: idProductoTienda
       });

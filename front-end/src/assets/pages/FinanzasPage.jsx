@@ -545,6 +545,7 @@ const FinanzasPage = ({ userRole }) => {
     if (d === 'gastos_variables') return '📉';
     if (d === 'salida_caja_deposito') return '🏦';
     if (d === 'gasto_operativo') return '⚙️';
+    if (d === 'costo_envio') return '🚚';
     if (d === 'pago_deuda_compra') return '🤝';
     if (d === 'cobro_venta') return '💳';
 
@@ -761,6 +762,7 @@ const FinanzasPage = ({ userRole }) => {
                             <option value="gastos_fijos">Gastos Fijos (Luz, Agua, Alquiler)</option>
                             <option value="gastos_variables">Gastos Variables</option>
                             <option value="gasto_operativo">Gasto Operativo</option>
+
                             <option value="salida_caja_deposito">Salida a Depósito Bancario</option>
                             <option value="pago_deuda_compra">Pago Proveedor</option>
                           </>
@@ -1518,13 +1520,13 @@ const FinanzasPage = ({ userRole }) => {
                           <tr key={tx._id}>
                             <td className="px-4 py-2 text-sm text-gray-900">{new Date(tx.fecha).toLocaleDateString()}</td>
                             <td className="px-4 py-2 text-sm">
-                              <span className={`px-2 py-1 rounded-full text-xs ${tx.tipo === 'Depósito' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                              <span className={`px-2 py-1 rounded-full text-xs ${['Depósito', 'Deposito', 'Ingreso'].includes(tx.tipo) ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                                 {tx.tipo}
                               </span>
                             </td>
                             <td className="px-4 py-2 text-sm text-gray-500">{tx.descripcion}</td>
-                            <td className={`px-4 py-2 text-sm text-right font-medium ${tx.tipo === 'Depósito' ? 'text-green-600' : 'text-red-600'}`}>
-                              {tx.tipo === 'Depósito' ? '+' : '-'}{formatCurrency(tx.monto)}
+                            <td className={`px-4 py-2 text-sm text-right font-medium ${['Depósito', 'Deposito', 'Ingreso'].includes(tx.tipo) ? 'text-green-600' : 'text-red-600'}`}>
+                              {['Depósito', 'Deposito', 'Ingreso'].includes(tx.tipo) ? '+' : '-'}{formatCurrency(tx.monto)}
                             </td>
                           </tr>
                         ))}

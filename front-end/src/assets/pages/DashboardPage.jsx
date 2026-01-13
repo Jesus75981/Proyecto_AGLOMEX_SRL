@@ -410,6 +410,12 @@ const DashboardPage = ({ userRole }) => {
     pendiente: item.totalPendiente
   }));
 
+  const profitChartData = (finanzasData.profitHistory || []).map(item => ({
+    label: periodeLabel(item),
+    utilidad: item.utilidad,
+    ventas: item.ventas
+  }));
+
   const logisticaChartData = (logisticaData.estadisticas?.pedidosGrafica || []).map(item => ({
     label: periodeLabel(item),
     envios: item.count,
@@ -437,7 +443,6 @@ const DashboardPage = ({ userRole }) => {
           </button>
         </div>
 
-        {/* Navigation Tabs */}
         {/* Navigation Tabs */}
         <div className="flex flex-wrap justify-center gap-4 mb-8 bg-white p-2 rounded-2xl shadow-sm border border-gray-100 max-w-fit mx-auto">
           {['ventas', 'finanzas', 'produccion', 'inventario', 'compras', 'logistica'].map(tab => (
@@ -529,18 +534,11 @@ const DashboardPage = ({ userRole }) => {
                   <ModuleLink to="/ventas" label="Ventas" icon="💰" color="green" />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <KPICard title="Total Ventas" value={ventasData.resumenTotal?.totalVentas || 0} icon="🛒" color="blue" />
                   <KPICard title="Ingresos Totales" value={`Bs. ${(ventasData.resumenTotal?.totalIngresos || 0).toLocaleString()}`} icon="💵" color="green" />
                   <KPICard title="Productos Vendidos" value={ventasData.resumenTotal?.totalProductosVendidos || 0} icon="📦" color="purple" />
-                  <KPICard
-                    title="Promedio por Venta"
-                    value={`Bs. ${(ventasData.resumenTotal?.totalVentas
-                      ? (ventasData.resumenTotal.totalIngresos / ventasData.resumenTotal.totalVentas)
-                      : 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                    icon="📊"
-                    color="orange"
-                  />
+
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -730,23 +728,23 @@ const DashboardPage = ({ userRole }) => {
                     </div>
                   </div>
 
-                  {/* Flujo de Caja */}
+                  {/* Utilidad Bruta (Reemplaza Flujo de Caja) */}
                   <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 flex flex-col">
                     <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
                       <span className="p-2 bg-blue-100 rounded-lg text-blue-600 font-bold">💸</span>
-                      Flujo de Caja Neto
+                      Utilidad Bruta (Ventas - Costos)
                     </h3>
                     <div className="flex-grow">
                       <ResponsiveContainer width="100%" height="100%" minHeight={300}>
-                        <BarChart data={cashflowChartData}>
+                        <BarChart data={profitChartData}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                           <XAxis dataKey="label" stroke="#9CA3AF" tick={{ fontSize: 10 }} />
                           <YAxis stroke="#9CA3AF" tick={{ fontSize: 10 }} />
                           <Tooltip content={<CustomTooltip prefix="Bs. " />} />
                           <ReferenceLine y={0} stroke="#9CA3AF" />
-                          <Bar dataKey="neto" name="Flujo Neto" radius={[4, 4, 0, 0]}>
-                            {cashflowChartData.map((entry, index) => (
-                              <Cell key={`cell-${index} `} fill={entry.neto >= 0 ? '#10B981' : '#EF4444'} />
+                          <Bar dataKey="utilidad" name="Utilidad" radius={[4, 4, 0, 0]}>
+                            {profitChartData.map((entry, index) => (
+                              <Cell key={`cell-${index} `} fill={entry.utilidad >= 0 ? '#10B981' : '#EF4444'} />
                             ))}
                           </Bar>
                         </BarChart>
@@ -991,10 +989,10 @@ const DashboardPage = ({ userRole }) => {
                   <ModuleLink to="/compras" label="Compras" icon="🛍️" color="pink" />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <KPICard title="Compras Totales" value={comprasData.estadisticasGenerales.totalCompras || 0} icon="🛒" color="blue" />
                   <KPICard title="Gasto Total" value={`Bs. ${comprasData.estadisticasGenerales.totalGasto?.toLocaleString() || 0}`} icon="💸" color="red" />
-                  <KPICard title="Promedio Compra" value={`Bs. ${comprasData.estadisticasGenerales.promedioCompra ? comprasData.estadisticasGenerales.promedioCompra.toFixed(2) : 0}`} icon="📊" color="purple" />
+
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
