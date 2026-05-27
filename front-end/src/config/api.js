@@ -1,9 +1,7 @@
-
-// Detecta dinámicamente la IP del servidor backend.
-// Asume que el backend corre en el puerto 5000 de la misma máquina que sirve el frontend.
+// Detecta dinámicamente el origen para que funcione tanto en localhost como en red local (IP).
+// Vite se encarga de redirigir (proxy) las llamadas de /api, /uploads, y /models al backend en el puerto 5000.
 const getBackendUrl = () => {
-    const hostname = window.location.hostname;
-    return `http://${hostname}:5000`;
+    return window.location.origin;
 };
 
 export const API_BASE_URL = getBackendUrl();

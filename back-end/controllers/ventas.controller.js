@@ -59,7 +59,7 @@ export const registrarVenta = async (req, res) => {
       montoCredito = totalVenta; // Asumir toda la venta a crédito si no hay métodos de pago
     } else {
       for (const pago of ventaData.metodosPago) {
-        if (!pago.tipo || !["Efectivo", "Transferencia", "Cheque"].includes(pago.tipo)) {
+        if (!pago.tipo || !["Efectivo", "Transferencia", "Cheque", "Crédito"].includes(pago.tipo)) {
           return res.status(400).json({ message: "Tipo de pago no válido." });
         }
         if (pago.monto <= 0 || typeof pago.monto !== 'number') {

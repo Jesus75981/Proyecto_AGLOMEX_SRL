@@ -4,7 +4,7 @@ import mongoose from 'mongoose';
 const finanzasSchema = new mongoose.Schema({
   type: {
     type: String,
-    enum: ['ingreso', 'egreso'], // El tipo de transacción debe ser 'ingreso' o 'egreso'
+    enum: ['ingreso', 'egreso', 'transferencia'], // El tipo de transacción debe ser 'ingreso', 'egreso' o 'transferencia'
     required: true
   },
   category: {
@@ -14,20 +14,22 @@ const finanzasSchema = new mongoose.Schema({
       'venta_productos',
       'anticipo_cobrado',
       'ingreso_manual',
-      'cobro_venta', // Added
-
-      'otros_ingresos', // Added
+      'cobro_venta',
+      'otros_ingresos',
 
       // Egresos
       'compra_materias',
       'compra_productos',
       'anticipo_pagado',
       'gasto_operativo',
-      'gastos_fijos', // Added
-      'gastos_variables', // Added
-      'salida_caja_deposito', // Added
+      'gastos_fijos',
+      'gastos_variables',
+      'salida_caja_deposito',
       'egreso_manual',
-      'pago_deuda_compra' // Added
+      'pago_deuda_compra',
+
+      // Transferencias
+      'transferencia_interna'
     ],
     required: true
   },
@@ -42,18 +44,18 @@ const finanzasSchema = new mongoose.Schema({
   },
   currency: {
     type: String,
-    enum: ['BOB', 'USD'], // Moneda: Bolivianos o Dólares
+    enum: ['BOB'], 
     default: 'BOB'
   },
   exchangeRate: {
     type: Number,
     min: 0,
-    default: 1 // Tipo de cambio (1 por defecto para BOB)
+    default: 1 
   },
   amountBOB: {
     type: Number,
     required: true,
-    min: 0 // Monto convertido a bolivianos
+    min: 0 
   },
   date: {
     type: Date,
@@ -70,11 +72,8 @@ const finanzasSchema = new mongoose.Schema({
   },
   // Metadata adicional
   metadata: {
-    metodoPago: String,
-    banco: String,
-    numFactura: String,
-    numCompra: String,
-    numVenta: String
+    type: mongoose.Schema.Types.Mixed,
+    default: {}
   }
 });
 

@@ -1,6 +1,8 @@
 // front-end/src/assets/pages/ComprasPage.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // --- API Helper ---
 import { API_URL } from '../../config/api';
@@ -162,6 +164,135 @@ const ComprasPage = ({ userRole }) => {
 
   const volverAlHome = () => navigate('/home');
 
+  const verDetallesCompra = (compra) => {
+    setSelectedCompra(compra);
+    setShowDetailModal(true);
+  };
+
+  // --- Exportar Compra Detallada a PDF ---
+  const exportarCompraPDF = (compra) => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const fecha = new Date(compra.fecha).toLocaleDateString('es-ES');
+
+    // Título y Encabezado
+    doc.setFontSize(20);
+    doc.setTextColor(126, 34, 206); // Purple-700
+    doc.text("DETALLES DE COMPRA", 14, 22);
+    doc.setFontSize(12);
+    doc.setTextColor(100);
+    doc.text(`Compra #${compra.numCompra || compra._id}`, 14, 30);
+    doc.text(`Fecha: ${fecha}`, 14, 36);
+
+    // Línea divisoria
+    doc.setDrawColor(229, 231, 235);
+    doc.line(14, 42, pageWidth - 14, 42);
+
+    // Información del Proveedor
+    doc.setFontSize(14);
+    doc.setTextColor(0);
+    doc.text("Información del Proveedor", 14, 52);
+    doc.setFontSize(10);
+    doc.setTextColor(70);
+
+    if (compra.proveedor) {
+      doc.text(`Nombre: ${compra.proveedor.nombre}`, 14, 60);
+      if (compra.proveedor.nombreComercial) doc.text(`Nombre Comercial: ${compra.proveedor.nombreComercial}`, 14, 66);
+      if (compra.proveedor.nit) doc.text(`NIT: ${compra.proveedor.nit}`, 14, 72);
+      if (compra.proveedor.contacto?.telefono) doc.text(`Teléfono: ${compra.proveedor.contacto.telefono}`, 14, 78);
+    } else {
+      doc.text("Proveedor no especificado", 14, 60);
+    }
+
+    // Resumen de Compra
+    doc.text("Resumen de Compra", 120, 52);
+    doc.text(`Estado: ${compra.estado}`, 120, 60);
+    doc.text(`Tipo: ${compra.tipoCompra}`, 120, 66);
+    doc.text(`Factura Nº: ${compra.numeroFactura || '-'}`, 120, 72);
+
+    // Tabla de Productos
+    const columns = ["Producto", "Código", "Color", "Cant.", "Costo Unit.", "Subtotal"];
+    const rows = compra.productos.map(item => [
+      item.nombreProducto || 'N/A',
+      item.codigo || '-',
+      item.colorProducto || '-',
+      item.cantidad,
+      `Bs. ${item.precioUnitario.toFixed(2)}`,
+      `Bs. ${(item.cantidad * item.precioUnitario).toFixed(2)}`
+    ]);
+
+    autoTable(doc, {
+      head: [columns],
+      body: rows,
+      startY: 85,
+      theme: 'striped',
+      headStyles: { fillColor: [126, 34, 206], textColor: 255 }, // Purple-700
+      columnStyles: {
+        3: { halign: 'center' },
+        4: { halign: 'right' },
+        5: { halign: 'right' }
+      }
+    });
+
+    const finalY = doc.lastAutoTable.finalY + 10;
+
+    // Métodos de Pago
+    doc.setFontSize(14);
+    doc.setTextColor(0);
+    doc.text("Desglose de Pagos", 14, finalY);
+
+    let paymentY = finalY + 8;
+    doc.setFontSize(10);
+    doc.setTextColor(70);
+
+    if (compra.metodosPago && compra.metodosPago.length > 0) {
+      compra.metodosPago.forEach(pago => {
+        let cuentaInfo = "";
+        if (pago.cuentaId) {
+          const cuenta = bankAccounts.find(acc => acc._id === pago.cuentaId);
+          if (cuenta) {
+            cuentaInfo = ` - Desde: ${cuenta.nombreBanco} (${cuenta.numeroCuenta})`;
+          }
+        } else if (pago.cuenta) {
+          cuentaInfo = ` (${pago.cuenta})`;
+        }
+        doc.text(`• ${pago.tipo}: Bs. ${pago.monto.toFixed(2)}${cuentaInfo}`, 14, paymentY);
+        paymentY += 6;
+      });
+    } else {
+      doc.text("No hay pagos registrados", 14, paymentY);
+      paymentY += 6;
+    }
+
+    // Totales
+    doc.setFontSize(14);
+    doc.setTextColor(126, 34, 206);
+    doc.setFont(undefined, 'bold');
+    doc.text(`TOTAL COMPRA:`, 140, paymentY + 10);
+    doc.text(`Bs. ${compra.totalCompra.toFixed(2)}`, 190, paymentY + 10, { align: 'right' });
+
+    doc.setFont(undefined, 'normal');
+    const totalPagado = compra.metodosPago?.filter(p => p.tipo !== 'Crédito').reduce((acc, curr) => acc + curr.monto, 0) || 0;
+    doc.setTextColor(22, 163, 74); // Green
+    doc.text(`TOTAL PAGADO:`, 140, paymentY + 17);
+    doc.text(`Bs. ${totalPagado.toFixed(2)}`, 190, paymentY + 17, { align: 'right' });
+
+    doc.setTextColor(200, 0, 0); // Red
+    doc.text(`SALDO PENDIENTE:`, 140, paymentY + 24);
+    doc.text(`Bs. ${(compra.saldoPendiente || 0).toFixed(2)}`, 190, paymentY + 24, { align: 'right' });
+
+    // Observaciones
+    if (compra.observaciones) {
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text("Observaciones:", 14, paymentY + 35);
+      doc.setFontSize(9);
+      doc.text(doc.splitTextToSize(compra.observaciones, pageWidth - 28), 14, paymentY + 41);
+    }
+
+    doc.save(`Compra_${compra.numCompra || compra._id}_${fecha.replace(/\//g, '-')}.pdf`);
+  };
+
   // --- Estados ---
   const [activeSection, setActiveSection] = useState('realizarCompra');
   const [searchTerm, setSearchTerm] = useState('');
@@ -173,6 +304,8 @@ const ComprasPage = ({ userRole }) => {
   const [categorias, setCategorias] = useState([]);
   const [bankAccounts, setBankAccounts] = useState([]); // New state for bank accounts
   const [historialCompras, setHistorialCompras] = useState([]); // Historial state
+  const [selectedCompra, setSelectedCompra] = useState(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
   // Search & Filtering
   const [busquedaProveedor, setBusquedaProveedor] = useState('');
@@ -664,6 +797,13 @@ const ComprasPage = ({ userRole }) => {
       // En un futuro, integrar OCR para leer el monto del cheque
     }
 
+    // Validar que se haya seleccionado una cuenta/caja de origen
+    const pagoSinCuenta = listaPagos.find(p => p.tipo !== 'Crédito' && !p.cuentaId);
+    if (pagoSinCuenta) {
+      alert(`Debe seleccionar una Caja o Cuenta Bancaria de origen para el pago con ${pagoSinCuenta.tipo}.`);
+      return;
+    }
+
     const compraData = {
       numCompra: compra.numeroCompra,
       fecha: compra.fecha,
@@ -685,7 +825,7 @@ const ComprasPage = ({ userRole }) => {
         monto: parseFloat(p.monto) || 0,
         referencia: p.tipo === 'Cheque' ? 'REF-CHQ-' + Date.now() : '',
         cuenta: p.cuenta || '',
-        cuentaId: (p.tipo === 'Transferencia' || p.tipo === 'Efectivo') ? p.cuentaId : null // Send account ID for transfers and cash
+        cuentaId: p.cuentaId || null // Send account ID for all payments
       })),
       totalCompra: totalCompra,
       observaciones: compra.observaciones,
@@ -1276,19 +1416,19 @@ const ComprasPage = ({ userRole }) => {
                             </div>
 
                             {/* Bank Account / Cash Box Selector */}
-                            {(pago.tipo === 'Transferencia' || pago.tipo === 'Efectivo') && (
+                            {pago.tipo !== 'Crédito' && (
                               <div className="mt-3">
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                  {pago.tipo === 'Transferencia' ? 'Cuenta Bancaria de Origen' : 'Caja de Origen'}
+                                  {pago.tipo === 'Efectivo' ? 'Caja de Origen' : 'Cuenta Bancaria de Origen'}
                                 </label>
                                 <select
                                   value={pago.cuentaId || ''}
                                   onChange={(e) => actualizarPago(pago.id, 'cuentaId', e.target.value)}
-                                  className={`w-full px-3 py-2 border rounded-lg ${pago.tipo === 'Transferencia' ? 'border-blue-300 bg-blue-50' : 'border-green-300 bg-green-50'}`}
+                                  className={`w-full px-3 py-2 border rounded-lg ${pago.tipo === 'Efectivo' ? 'border-green-300 bg-green-50' : 'border-blue-300 bg-blue-50'}`}
                                 >
-                                  <option value="">-- Seleccionar {pago.tipo === 'Transferencia' ? 'Cuenta' : 'Caja'} --</option>
+                                  <option value="">-- Seleccionar {pago.tipo === 'Efectivo' ? 'Caja' : 'Cuenta'} --</option>
                                   {bankAccounts
-                                    .filter(acc => acc.isActive && (pago.tipo === 'Transferencia' ? acc.tipo === 'banco' : acc.tipo === 'efectivo'))
+                                    .filter(acc => acc.isActive && (pago.tipo === 'Efectivo' ? acc.tipo === 'efectivo' : acc.tipo === 'banco'))
                                     .map(acc => (
                                       <option key={acc._id} value={acc._id}>
                                         {acc.nombreBanco} - {acc.numeroCuenta} (Saldo: Bs. {acc.saldo.toFixed(2)})
@@ -1665,29 +1805,185 @@ const ComprasPage = ({ userRole }) => {
                         Bs. {compra.totalCompra ? compra.totalCompra.toFixed(2) : '0.00'}
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <button
-                          onClick={() => handleEliminarCompra(compra._id)}
-                          className="text-red-600 hover:text-red-900 hover:bg-red-50 p-2 rounded-lg transition-colors group relative"
-                          title="Eliminar Compra (Revierte Inventario y Finanzas)"
-                        >
-                          <span className="sr-only">Eliminar</span>
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
+                        <div className="flex justify-center space-x-2">
+                          {/* Botón Ver Detalles */}
+                          <button
+                            onClick={() => verDetallesCompra(compra)}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Ver Detalles"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                          </button>
+                          {/* Botón Exportar PDF */}
+                          <button
+                            onClick={() => exportarCompraPDF(compra)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Exportar PDF"
+                          >
+                            <span>📄</span>
+                          </button>
+                          {/* Botón Eliminar */}
+                          <button
+                            onClick={() => handleEliminarCompra(compra._id)}
+                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Eliminar Compra (Revierte Inventario y Finanzas)"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
-                  {historialCompras.length === 0 && (
-                    <tr>
-                      <td colSpan="5" className="px-6 py-8 text-center text-gray-400">
-                        No hay compras registradas
-                      </td>
-                    </tr>
-                  )}
                 </tbody>
               </table>
             </div>
+
+            {/* --- MODAL DE DETALLES DE COMPRA --- */}
+            {showDetailModal && selectedCompra && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+                  <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50 rounded-t-xl">
+                    <div>
+                      <h3 className="text-2xl font-bold text-gray-800">Detalles de Compra #{selectedCompra.numCompra || selectedCompra._id}</h3>
+                      <p className="text-sm text-gray-500">Fecha: {new Date(selectedCompra.fecha).toLocaleDateString('es-ES')}</p>
+                    </div>
+                    <button
+                      onClick={() => setShowDetailModal(false)}
+                      className="text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-full p-2 transition-colors"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <div className="p-6 space-y-6">
+                    {/* Info Proveedor y Estado */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-purple-50 p-4 rounded-lg border border-purple-100">
+                      <div>
+                        <h4 className="font-semibold text-purple-800 mb-2">Información del Proveedor</h4>
+                        {selectedCompra.proveedor ? (
+                          <ul className="text-sm text-gray-700 space-y-1">
+                            <li><span className="font-medium">Nombre:</span> {selectedCompra.proveedor.nombre}</li>
+                            {selectedCompra.proveedor.nit && <li><span className="font-medium">NIT:</span> {selectedCompra.proveedor.nit}</li>}
+                            {selectedCompra.proveedor.contacto?.telefono && <li><span className="font-medium">Teléfono:</span> {selectedCompra.proveedor.contacto.telefono}</li>}
+                          </ul>
+                        ) : (
+                          <p className="text-sm text-gray-500 italic">Proveedor no especificado</p>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <h4 className="font-semibold text-gray-800 mb-2">Estado de Compra</h4>
+                        <span className={`inline-block px-3 py-1 text-sm font-semibold rounded-full ${selectedCompra.estado === 'Pagada'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-yellow-100 text-yellow-800'
+                          }`}>
+                          {selectedCompra.estado}
+                        </span>
+                        <div className="mt-2 text-sm text-gray-600">
+                          <p>Tipo: <span className="font-bold">{selectedCompra.tipoCompra}</span></p>
+                          <p>Factura: <span className="font-mono font-medium">{selectedCompra.numeroFactura || '-'}</span></p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Tabla de Productos */}
+                    <div>
+                      <h4 className="font-bold text-gray-800 mb-3 text-lg border-b pb-2">Productos Comprados</h4>
+                      <div className="overflow-x-auto border rounded-lg">
+                        <table className="w-full text-sm">
+                          <thead className="bg-gray-100 text-gray-700">
+                            <tr>
+                              <th className="px-4 py-2 text-left">Producto</th>
+                              <th className="px-4 py-2 text-left">Código</th>
+                              <th className="px-4 py-2 text-center">Color</th>
+                              <th className="px-4 py-2 text-center">Cant.</th>
+                              <th className="px-4 py-2 text-right">Costo Unit.</th>
+                              <th className="px-4 py-2 text-right">Subtotal</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {selectedCompra.productos.map((item, idx) => (
+                              <tr key={idx} className="hover:bg-gray-50">
+                                <td className="px-4 py-2 font-medium text-gray-900">{item.nombreProducto}</td>
+                                <td className="px-4 py-2 font-mono text-gray-500">{item.codigo || '-'}</td>
+                                <td className="px-4 py-2 text-center text-gray-600">{item.colorProducto || '-'}</td>
+                                <td className="px-4 py-2 text-center font-semibold">{item.cantidad}</td>
+                                <td className="px-4 py-2 text-right">Bs. {item.precioUnitario.toFixed(2)}</td>
+                                <td className="px-4 py-2 text-right font-medium text-purple-600">Bs. {(item.cantidad * item.precioUnitario).toFixed(2)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot className="bg-gray-50 font-semibold">
+                            <tr>
+                              <td colSpan="5" className="px-4 py-3 text-right text-gray-900 font-bold text-lg">Total Compra:</td>
+                              <td className="px-4 py-3 text-right text-lg text-purple-700 font-bold">
+                                Bs. {selectedCompra.totalCompra.toFixed(2)}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Pagos y Observaciones */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div>
+                        <h4 className="font-bold text-gray-800 mb-2 border-b pb-1">Observaciones</h4>
+                        <p className="text-gray-600 text-sm bg-gray-50 p-3 rounded-lg border min-h-[80px]">
+                          {selectedCompra.observaciones || "Sin observaciones adicionales."}
+                        </p>
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-gray-800 mb-2 border-b pb-1">Desglose de Pagos</h4>
+                        <div className="space-y-2">
+                          {selectedCompra.metodosPago?.map((pago, idx) => {
+                            let cuentaInfo = "";
+                            if (pago.cuentaId) {
+                              const cuenta = bankAccounts.find(acc => acc._id === pago.cuentaId);
+                              if (cuenta) {
+                                cuentaInfo = ` (Desde ${cuenta.nombreBanco})`;
+                              }
+                            } else if (pago.cuenta) {
+                              cuentaInfo = ` (${pago.cuenta})`;
+                            }
+                            return (
+                              <div key={idx} className="flex justify-between text-sm bg-gray-50 p-2 rounded border border-gray-100">
+                                <span className="font-medium">{pago.tipo}{cuentaInfo}:</span>
+                                <span className="font-bold text-gray-900">Bs. {pago.monto.toFixed(2)}</span>
+                              </div>
+                            );
+                          })}
+                          <div className="border-t pt-2 flex justify-between font-bold text-gray-900 mt-2">
+                            <span>Total Pagado:</span>
+                            <span>Bs. {(selectedCompra.metodosPago?.filter(p => p.tipo !== 'Crédito').reduce((acc, curr) => acc + curr.monto, 0) || 0).toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-red-600 font-bold">
+                            <span>Saldo Pendiente:</span>
+                            <span>Bs. {(selectedCompra.saldoPendiente || 0).toFixed(2)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 rounded-b-xl">
+                    <button
+                      onClick={() => exportarCompraPDF(selectedCompra)}
+                      className="px-6 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 shadow transition-colors flex items-center gap-2"
+                    >
+                      <span>📄</span> Exportar PDF
+                    </button>
+                    <button
+                      onClick={() => setShowDetailModal(false)}
+                      className="px-6 py-2 bg-gray-600 text-white font-medium rounded-lg hover:bg-gray-700 shadow transition-colors"
+                    >
+                      Cerrar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

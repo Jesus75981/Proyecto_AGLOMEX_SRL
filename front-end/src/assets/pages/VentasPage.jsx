@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 import { API_URL, API_BASE_URL } from '../../config/api';
 
@@ -186,6 +188,139 @@ const VentasPage = ({ userRole }) => {
     setShowDetailModal(true);
   };
 
+  // --- Exportar Venta Detallada a PDF ---
+  const exportarVentaPDF = (venta) => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const fecha = new Date(venta.fecha).toLocaleDateString('es-ES');
+    const hora = new Date(venta.fecha).toLocaleTimeString('es-ES');
+
+    // Título y Encabezado
+    doc.setFontSize(20);
+    doc.setTextColor(22, 163, 74); // Green-600
+    doc.text("DETALLES DE VENTA", 14, 22);
+    doc.setFontSize(12);
+    doc.setTextColor(100);
+    doc.text(`Venta #${venta.numVenta}`, 14, 30);
+    doc.text(`Fecha: ${fecha} - ${hora}`, 14, 36);
+
+    // Línea divisoria
+    doc.setDrawColor(229, 231, 235);
+    doc.line(14, 42, pageWidth - 14, 42);
+
+    // Información del Cliente
+    doc.setFontSize(14);
+    doc.setTextColor(0);
+    doc.text("Información del Cliente", 14, 52);
+    doc.setFontSize(10);
+    doc.setTextColor(70);
+
+    if (venta.cliente) {
+      doc.text(`Nombre: ${venta.cliente.nombre}`, 14, 60);
+      if (venta.cliente.empresa) doc.text(`Empresa: ${venta.cliente.empresa}`, 14, 66);
+      if (venta.cliente.nit || venta.cliente.ci) doc.text(`NIT/CI: ${venta.cliente.nit || venta.cliente.ci}`, 14, 72);
+      doc.text(`Teléfono: ${venta.cliente.telefono}`, 14, 78);
+    } else {
+      doc.text("Cliente Casual / No registrado", 14, 60);
+    }
+
+    // Estado y Comprobante
+    doc.text("Resumen de Venta", 120, 52);
+    doc.text(`Estado: ${venta.estado}`, 120, 60);
+    doc.text(`Comprobante: ${venta.tipoComprobante || 'Recibo'}`, 120, 66);
+    doc.text(`Nº Doc: ${venta.numFactura || '-'}`, 120, 72);
+    doc.text(`Entrega: ${venta.metodoEntrega}`, 120, 78);
+
+    // Tabla de Productos
+    const columns = ["Código", "Producto", "Color", "Cant.", "Precio Unit.", "Subtotal"];
+    const rows = venta.productos.map(item => [
+      item.producto?.codigo || item.producto?.idProductoTienda || 'N/A',
+      item.producto?.nombre || item.productoNombre || 'Producto Eliminado',
+      item.producto?.color || '-',
+      item.cantidad,
+      `Bs. ${item.precioUnitario.toFixed(2)}`,
+      `Bs. ${(item.cantidad * item.precioUnitario).toFixed(2)}`
+    ]);
+
+    autoTable(doc, {
+      head: [columns],
+      body: rows,
+      startY: 85,
+      theme: 'striped',
+      headStyles: { fillColor: [22, 163, 74], textColor: 255 }, // Green-600
+      columnStyles: {
+        3: { halign: 'center' },
+        4: { halign: 'right' },
+        5: { halign: 'right' }
+      }
+    });
+
+    const finalY = doc.lastAutoTable.finalY + 10;
+
+    // Métodos de Pago
+    doc.setFontSize(14);
+    doc.setTextColor(0);
+    doc.text("Métodos de Pago", 14, finalY);
+
+    let paymentY = finalY + 8;
+    doc.setFontSize(10);
+    doc.setTextColor(70);
+
+    if (venta.metodosPago && venta.metodosPago.length > 0) {
+      venta.metodosPago.forEach(pago => {
+        let cuentaInfo = "";
+        if (pago.cuentaId) {
+          const cuenta = activeBankAccounts.find(acc => acc._id === pago.cuentaId);
+          if (cuenta) {
+            cuentaInfo = ` - A cuenta: ${cuenta.nombreBanco} (${cuenta.numeroCuenta})`;
+          }
+        }
+        doc.text(`• ${pago.tipo}: Bs. ${pago.monto.toFixed(2)}${cuentaInfo}`, 14, paymentY);
+        paymentY += 6;
+      });
+    } else {
+      doc.text("No hay pagos registrados (Venta a Crédito)", 14, paymentY);
+      paymentY += 6;
+    }
+
+    // Totales
+    const subtotal = venta.productos.reduce((sum, p) => sum + (p.cantidad * p.precioUnitario), 0);
+    const totalFinal = Math.max(0, subtotal - (venta.descuento || 0));
+
+    doc.setFontSize(12);
+    doc.setTextColor(0);
+    doc.text(`SUBTOTAL:`, 140, paymentY + 5);
+    doc.text(`Bs. ${subtotal.toFixed(2)}`, 190, paymentY + 5, { align: 'right' });
+
+    if (venta.descuento > 0) {
+      doc.setTextColor(200, 0, 0); // Red
+      doc.text(`DESCUENTO:`, 140, paymentY + 11);
+      doc.text(`- Bs. ${venta.descuento.toFixed(2)}`, 190, paymentY + 11, { align: 'right' });
+    }
+
+    doc.setFontSize(14);
+    doc.setTextColor(22, 163, 74);
+    doc.setFont(undefined, 'bold');
+    doc.text(`TOTAL FINAL:`, 140, paymentY + 18);
+    doc.text(`Bs. ${totalFinal.toFixed(2)}`, 190, paymentY + 18, { align: 'right' });
+
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(200, 0, 0);
+    doc.text(`SALDO PENDIENTE:`, 140, paymentY + 25);
+    doc.text(`Bs. ${(venta.saldoPendiente || 0).toFixed(2)}`, 190, paymentY + 25, { align: 'right' });
+
+    // Observaciones
+    if (venta.observaciones) {
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text("Observaciones:", 14, paymentY + 35);
+      doc.setFontSize(9);
+      doc.text(doc.splitTextToSize(venta.observaciones, pageWidth - 28), 14, paymentY + 41);
+    }
+
+    doc.save(`Venta_${venta.numVenta}_${fecha.replace(/\//g, '-')}.pdf`);
+  };
+
   // Función para manejar la edición de cliente
   const handleEditCliente = (cliente) => {
     setNuevoCliente({
@@ -360,9 +495,9 @@ const VentasPage = ({ userRole }) => {
       return;
     }
 
-    // Validar que se haya seleccionado una cuenta bancaria para transferencias
-    if (pagoTemporal.metodo === 'Transferencia' && !pagoTemporal.cuentaId) {
-      alert('Debe seleccionar una cuenta bancaria para transferencias');
+    // Validar que se haya seleccionado una cuenta bancaria o caja para cualquier método de pago
+    if (!pagoTemporal.cuentaId) {
+      alert('Debe seleccionar una Caja o Cuenta Bancaria de destino');
       return;
     }
 
@@ -391,10 +526,9 @@ const VentasPage = ({ userRole }) => {
     setNuevaVenta({ ...nuevaVenta, productos: productosActualizados });
   };
 
-  // Calcular total de la venta
+  // Calcular total de la venta (Subtotal sin descuento)
   const calcularTotal = () => {
-    const subtotal = nuevaVenta.productos.reduce((total, producto) => total + producto.precioTotal, 0);
-    return Math.max(0, subtotal - (parseFloat(nuevaVenta.descuento) || 0));
+    return nuevaVenta.productos.reduce((total, producto) => total + producto.precioTotal, 0);
   };
 
   // ✅ VALIDACIONES PARA FORMULARIO DE CLIENTE
@@ -540,20 +674,42 @@ const VentasPage = ({ userRole }) => {
         }
       }
 
-      const totalVenta = nuevaVenta.productos.reduce((sum, p) => sum + p.precioTotal, 0);
+      const totalVentaItems = nuevaVenta.productos.reduce((sum, p) => sum + p.precioTotal, 0);
+      const totalVenta = Math.max(0, totalVentaItems - (parseFloat(nuevaVenta.descuento) || 0));
+
+      let metodosPagoAEnviar = [...nuevaVenta.metodosPago];
+      
+      // Auto-añadir pago pendiente en el input si el usuario olvidó presionar "+"
+      if (pagoTemporal.monto && parseFloat(pagoTemporal.monto) > 0 && pagoTemporal.cuentaId) {
+        metodosPagoAEnviar.push({
+          tipo: pagoTemporal.metodo,
+          monto: parseFloat(pagoTemporal.monto),
+          cuentaId: pagoTemporal.cuentaId
+        });
+      }
+
+      if (metodosPagoAEnviar.length === 0) {
+        metodosPagoAEnviar = [{ tipo: 'Efectivo', monto: totalVenta }];
+      }
+
+      const totalPagado = metodosPagoAEnviar.reduce((acc, p) => acc + p.monto, 0);
+      const saldoPendiente = totalVenta - totalPagado;
+      if (saldoPendiente > 0.01) {
+        metodosPagoAEnviar.push({ tipo: 'Crédito', monto: saldoPendiente });
+      }
 
       const ventaData = {
         numVenta: Date.now(), // Generar número único de venta
         cliente: clienteSeleccionado ? clienteSeleccionado._id : null, // ID del cliente o null si no hay cliente
         productos: nuevaVenta.productos, // Usar el array de productos
         fecha: nuevaVenta.fecha,
-        metodosPago: nuevaVenta.metodosPago.length > 0 ? nuevaVenta.metodosPago : [{ tipo: 'Efectivo', monto: totalVenta }], // Fallback a efectivo si no hay pagos
+        metodosPago: metodosPagoAEnviar,
         metodoEntrega: nuevaVenta.metodoEntrega,
         numFactura: nuevaVenta.numFactura,
         tipoComprobante: nuevaVenta.tipoComprobante, // Send to backend
         observaciones: nuevaVenta.observaciones,
         descuento: nuevaVenta.descuento,
-        estado: (nuevaVenta.metodosPago.reduce((acc, p) => acc + p.monto, 0) >= totalVenta) ? 'Pagada' : 'Pendiente',
+        estado: saldoPendiente > 0.01 ? 'Pendiente' : 'Pagada',
         vendedor: userRole || 'usuario'
       };
 
@@ -1170,7 +1326,6 @@ const VentasPage = ({ userRole }) => {
                               >
                                 <option value="Efectivo">Efectivo</option>
                                 <option value="Transferencia">Transferencia Bancaria</option>
-                                <option value="QR">QR Simple</option>
                                 <option value="Cheque">Cheque</option>
                               </select>
                               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
@@ -1198,20 +1353,20 @@ const VentasPage = ({ userRole }) => {
                             </div>
                           </div>
 
-                          {/* Cuenta Bancaria o Caja (Condicional) */}
-                          {(pagoTemporal.metodo === 'Transferencia' || pagoTemporal.metodo === 'Efectivo') && (
+                          {/* Cuenta Bancaria o Caja (Obligatorio) */}
+                          {true && (
                             <div className="col-span-12 md:col-span-5">
                               <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                                {pagoTemporal.metodo === 'Transferencia' ? 'Cuenta Bancaria Destino' : 'Caja de Destino'}
+                                {pagoTemporal.metodo === 'Efectivo' ? 'Caja de Destino' : 'Cuenta Bancaria Destino'}
                               </label>
                               <select
                                 value={pagoTemporal.cuentaId || ''}
                                 onChange={(e) => setPagoTemporal({ ...pagoTemporal, cuentaId: e.target.value })}
-                                className={`w-full px-4 py-2.5 border text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block transition-colors ${pagoTemporal.metodo === 'Transferencia' ? 'bg-blue-50 border-blue-200 text-blue-900' : 'bg-green-50 border-green-200 text-green-900'}`}
+                                className={`w-full px-4 py-2.5 border text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block transition-colors ${pagoTemporal.metodo === 'Efectivo' ? 'bg-green-50 border-green-200 text-green-900' : 'bg-blue-50 border-blue-200 text-blue-900'}`}
                               >
                                 <option value="">Seleccione {pagoTemporal.metodo === 'Transferencia' ? 'Cuenta' : 'Caja'}...</option>
                                 {activeBankAccounts
-                                  .filter(c => pagoTemporal.metodo === 'Transferencia' ? c.tipo === 'banco' : c.tipo === 'efectivo')
+                                  .filter(c => pagoTemporal.metodo === 'Efectivo' ? c.tipo === 'efectivo' : c.tipo === 'banco')
                                   .map(cuenta => (
                                     <option key={cuenta._id} value={cuenta._id}>
                                       {cuenta.nombreBanco} - {cuenta.numeroCuenta} (Bs. {cuenta.saldo ? cuenta.saldo.toFixed(2) : '0.00'})
@@ -1265,8 +1420,8 @@ const VentasPage = ({ userRole }) => {
                         {/* Resumen de Pagos */}
                         <div className="flex justify-between items-center text-sm pt-2 border-t border-gray-300">
                           <div>
-                            <span className="text-gray-600">Total Venta: </span>
-                            <span className="font-bold">Bs. {calcularTotal().toFixed(2)}</span>
+                            <span className="text-gray-600">Total a Pagar: </span>
+                            <span className="font-bold">Bs. {Math.max(0, calcularTotal() - (parseFloat(nuevaVenta.descuento) || 0)).toFixed(2)}</span>
                           </div>
                           <div>
                             <span className="text-gray-600">Pagado: </span>
@@ -1278,7 +1433,7 @@ const VentasPage = ({ userRole }) => {
                         <div>
                           {(() => {
                             const totalPagado = nuevaVenta.metodosPago.reduce((s, p) => s + p.monto, 0);
-                            const totalVenta = calcularTotal();
+                            const totalVenta = Math.max(0, calcularTotal() - (parseFloat(nuevaVenta.descuento) || 0));
                             const diferencia = totalPagado - totalVenta;
 
                             if (diferencia > 0) {
@@ -1403,11 +1558,11 @@ const VentasPage = ({ userRole }) => {
                           {venta.fecha ? new Date(venta.fecha).toLocaleDateString('es-ES') : '-'}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${venta.estado === 'Completada' || venta.estado === 'Pagada'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-yellow-100 text-yellow-800'
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${venta.saldoPendiente > 0.01 
+                            ? 'bg-yellow-100 text-yellow-800' 
+                            : (venta.estado === 'Completada' || venta.estado === 'Pagada' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800')
                             }`}>
-                            {venta.estado}
+                            {venta.saldoPendiente > 0.01 ? 'Pendiente (Por Pagar)' : venta.estado}
                           </span>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
@@ -1472,7 +1627,7 @@ const VentasPage = ({ userRole }) => {
                     <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50 rounded-t-xl">
                       <div>
                         <h3 className="text-2xl font-bold text-gray-800">Detalles de Venta #{selectedVenta.numVenta}</h3>
-                        <p className="text-sm text-gray-500">Fecha: {new Date(selectedVenta.fecha).toLocaleDateString('es-ES')} - {new Date(selectedVenta.fecha).toLocaleTimeString('es-ES')}</p>
+                        <p className="text-sm text-gray-500">Fecha: {new Date(selectedVenta.fecha).toLocaleDateString()} - {new Date(selectedVenta.fecha).toLocaleTimeString()}</p>
                       </div>
                       <button
                         onClick={() => setShowDetailModal(false)}
@@ -1501,11 +1656,11 @@ const VentasPage = ({ userRole }) => {
                         </div>
                         <div className="text-right">
                           <h4 className="font-semibold text-gray-800 mb-2">Estado de Venta</h4>
-                          <span className={`inline-block px-3 py-1 text-sm font-semibold rounded-full ${selectedVenta.estado === 'Completada' || selectedVenta.estado === 'Pagada'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-yellow-100 text-yellow-800'
+                          <span className={`inline-block px-3 py-1 text-sm font-semibold rounded-full ${selectedVenta.saldoPendiente > 0.01 
+                            ? 'bg-yellow-100 text-yellow-800' 
+                            : (selectedVenta.estado === 'Completada' || selectedVenta.estado === 'Pagada' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800')
                             }`}>
-                            {selectedVenta.estado}
+                            {selectedVenta.saldoPendiente > 0.01 ? 'Pendiente (Por Pagar)' : selectedVenta.estado}
                           </span>
                           <div className="mt-2 text-sm text-gray-600">
                             <p>Tipo: <span className="font-bold">{selectedVenta.tipoComprobante || 'Recibo'}</span></p>
@@ -1592,12 +1747,21 @@ const VentasPage = ({ userRole }) => {
                           <h4 className="font-bold text-gray-800 mb-2 border-b pb-1">Desglose de Pagos</h4>
                           <div className="space-y-2">
                             {selectedVenta.metodosPago && selectedVenta.metodosPago.length > 0 ? (
-                              selectedVenta.metodosPago.map((pago, idx) => (
-                                <div key={idx} className="flex justify-between text-sm">
-                                  <span>{pago.tipo}:</span>
-                                  <span className="font-medium">Bs. {pago.monto.toFixed(2)}</span>
-                                </div>
-                              ))
+                              selectedVenta.metodosPago.map((pago, idx) => {
+                                let cuentaInfo = "";
+                                if (pago.cuentaId) {
+                                  const cuenta = activeBankAccounts.find(acc => acc._id === pago.cuentaId);
+                                  if (cuenta) {
+                                    cuentaInfo = ` (${cuenta.nombreBanco})`;
+                                  }
+                                }
+                                return (
+                                  <div key={idx} className="flex justify-between text-sm">
+                                    <span>{pago.tipo}{cuentaInfo}:</span>
+                                    <span className="font-medium">Bs. {pago.monto.toFixed(2)}</span>
+                                  </div>
+                                );
+                              })
                             ) : (
                               <p className="text-sm text-gray-500">No hay pagos registrados (Posiblemente crédito total)</p>
                             )}
@@ -1615,14 +1779,19 @@ const VentasPage = ({ userRole }) => {
 
                     </div>
 
-                    <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end rounded-b-xl">
+                    <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 rounded-b-xl">
+                      <button
+                        onClick={() => exportarVentaPDF(selectedVenta)}
+                        className="px-6 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 shadow transition-colors flex items-center gap-2"
+                      >
+                        <span>📄</span> Exportar PDF
+                      </button>
                       <button
                         onClick={() => setShowDetailModal(false)}
                         className="px-6 py-2 bg-gray-600 text-white font-medium rounded-lg hover:bg-gray-700 shadow transition-colors"
                       >
                         Cerrar
                       </button>
-                      {/* Opcional: Agregar botón Imprimir aquí */}
                     </div>
                   </div>
                 </div>

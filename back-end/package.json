@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node scripts/start-dev.js",
-    "db:init": "node scripts/init-db.js"
+    "db:init": "node scripts/init-db.js",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
   },
   "keywords": [],
   "author": "",
@@ -32,6 +33,7 @@
   "devDependencies": {
     "@babel/core": "^7.28.5",
     "@babel/preset-env": "^7.28.5",
+    "@babel/preset-typescript": "^7.28.5",
     "babel-jest": "^30.2.0",
     "jest": "^30.2.0",
     "mongodb-memory-server": "^10.3.0",

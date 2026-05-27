@@ -277,6 +277,7 @@ import whatsappService from './services/whatsapp.service.js';
 
 // Init WhatsApp Service
 // Start slightly delayed to prevent blocking main server startup
+/*
 setTimeout(() => {
     console.log('⏳ Iniciando servicio de WhatsApp en segundo plano...');
     try {
@@ -285,6 +286,8 @@ setTimeout(() => {
         console.error('❌ Error al iniciar WhatsApp service:', error);
     }
 }, 10000); // 10 seconds delay
+*/
+console.log('⚠️ Servicio de WhatsApp automático deshabilitado temporalmente para evitar cuelgues del servidor.');
 
 // WhatsApp Routes
 app.use('/api/whatsapp', whatsappRoutes);

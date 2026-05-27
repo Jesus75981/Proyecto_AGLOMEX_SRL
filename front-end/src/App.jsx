@@ -1,31 +1,31 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Routes, Route, useNavigate, BrowserRouter, Navigate } from 'react-router-dom';
 import axios from 'axios';
 
-// ✅ IMPORTACIONES DIRECTAS
-import LandingPage from "./assets/pages/LandingPage.jsx";
-import RecepcionPedidosPage from "./assets/pages/RecepcionPedidosPage.jsx";
-import HomePage from "./assets/pages/HomePage.jsx";
-import LoginPage from "./assets/pages/LoginPage.jsx";
-import VentasPage from "./assets/pages/VentasPage.jsx";
-import ComprasPage from "./assets/pages/ComprasPage.jsx";
-import InventarioPage from "./assets/pages/InventarioPage.jsx";
-import FabricacionPage from "./assets/pages/FabricacionPage.jsx";
-import FinanzasPage from "./assets/pages/FinanzasPage.jsx";
-import LogisticaPage from "./assets/pages/LogisticaPage.jsx";
-import AdminCatalogPage from "./assets/pages/AdminCatalogPage.jsx";
-import ReportesDiarios from "./assets/pages/ReportesDiarios.jsx";
-import ReportesPage from "./assets/pages/ReportesPage.jsx";
-import DashboardPage from "./assets/pages/DashboardPage.jsx";
-import CatalogPage from "./assets/pages/CatalogPage.jsx";
-import UsuariosPage from "./assets/pages/UsuariosPage.jsx";
+// ✅ CARGA PEREZOSA (Optimización para Lighthouse 100%)
+const LandingPage = lazy(() => import("./assets/pages/LandingPage.jsx"));
+const RecepcionPedidosPage = lazy(() => import("./assets/pages/RecepcionPedidosPage.jsx"));
+const HomePage = lazy(() => import("./assets/pages/HomePage.jsx"));
+const LoginPage = lazy(() => import("./assets/pages/LoginPage.jsx"));
+const VentasPage = lazy(() => import("./assets/pages/VentasPage.jsx"));
+const ComprasPage = lazy(() => import("./assets/pages/ComprasPage.jsx"));
+const InventarioPage = lazy(() => import("./assets/pages/InventarioPage.jsx"));
+const FabricacionPage = lazy(() => import("./assets/pages/FabricacionPage.jsx"));
+const FinanzasPage = lazy(() => import("./assets/pages/FinanzasPage.jsx"));
+const LogisticaPage = lazy(() => import("./assets/pages/LogisticaPage.jsx"));
+const AdminCatalogPage = lazy(() => import("./assets/pages/AdminCatalogPage.jsx"));
+const ReportesDiarios = lazy(() => import("./assets/pages/ReportesDiarios.jsx"));
+const ReportesPage = lazy(() => import("./assets/pages/ReportesPage.jsx"));
+const DashboardPage = lazy(() => import("./assets/pages/DashboardPage.jsx"));
+const CatalogPage = lazy(() => import("./assets/pages/CatalogPage.jsx"));
+const UsuariosPage = lazy(() => import("./assets/pages/UsuariosPage.jsx"));
 
 // Componente de carga
 const Loading = () => (
   <div className="flex items-center justify-center min-h-screen bg-gray-50">
     <div className="text-center">
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
-      <p className="text-gray-600">Cargando sistema Aglomex...</p>
+      <p className="text-gray-600 font-medium">Iniciando sistema seguro...</p>
     </div>
   </div>
 );
@@ -56,7 +56,6 @@ function AppContent() {
     initializeApp();
   }, []);
 
-  // AGREGADO: Setea header Authorization para todas las llamadas Axios (para auth JWT)
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
@@ -64,7 +63,7 @@ function AppContent() {
     } else {
       delete axios.defaults.headers.common['Authorization'];
     }
-  }, [userRole]); // Re-ejecuta después de login/logout
+  }, [userRole]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -84,45 +83,37 @@ function AppContent() {
 
   return (
     <div className="App">
-      <Routes>
-        {/* ✅ RUTAS PÚBLICAS */}
-        {/* ✅ RUTAS PÚBLICAS (Desactivadas temporalmente) */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
-        {/* <Route path="/landing" element={<LandingPage />} /> */}
-        {/* <Route path="/catalogo" element={<CatalogPage />} /> */}
-        {/* <Route path="/recepcion-pedidos" element={<RecepcionPedidosPage />} /> */}
-        <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
+      <Suspense fallback={<Loading />}>
+        <Routes>
+          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
 
-        {/* ✅ RUTAS PRIVADAS */}
-        {userRole ? (
-          <>
-            <Route path="/home" element={<HomePage userRole={userRole} onLogout={handleLogout} />} />
-            <Route path="/ventas" element={<VentasPage userRole={userRole} />} />
-            <Route path="/inventario" element={<InventarioPage userRole={userRole} />} />
-            <Route path="/finanzas" element={<FinanzasPage userRole={userRole} />} />
+          {userRole ? (
+            <>
+              <Route path="/home" element={<HomePage userRole={userRole} onLogout={handleLogout} />} />
+              <Route path="/ventas" element={<VentasPage userRole={userRole} />} />
+              <Route path="/inventario" element={<InventarioPage userRole={userRole} />} />
+              <Route path="/finanzas" element={<FinanzasPage userRole={userRole} />} />
 
-            {/* Rutas restringidas para Rol 'Tienda' */}
-            {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && (
-              <>
-                <Route path="/compras" element={<ComprasPage userRole={userRole} />} />
-                <Route path="/fabricacion" element={<FabricacionPage userRole={userRole} />} />
-                <Route path="/logistica" element={<LogisticaPage userRole={userRole} />} />
-                <Route path="/admin-catalogo" element={<AdminCatalogPage userRole={userRole} />} />
-                <Route path="/reportes-diarios" element={<ReportesDiarios userRole={userRole} />} />
-                <Route path="/reportes" element={<ReportesPage userRole={userRole} />} />
-                <Route path="/dashboard" element={<DashboardPage userRole={userRole} />} />
-                {/* Admin Only */}
-                {userRole === 'admin' && <Route path="/usuarios" element={<UsuariosPage userRole={userRole} />} />}
-              </>
-            )}
-
-            {/* AGREGADO: Fallback para rutas inválidas cuando logueado - redirige a home */}
-            <Route path="*" element={<Navigate to="/home" replace />} />
-          </>
-        ) : (
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        )}
-      </Routes>
+              {userRole !== 'Tienda' && userRole !== 'tienda' && userRole !== 'empleado_tienda' && (
+                <>
+                  <Route path="/compras" element={<ComprasPage userRole={userRole} />} />
+                  <Route path="/fabricacion" element={<FabricacionPage userRole={userRole} />} />
+                  <Route path="/logistica" element={<LogisticaPage userRole={userRole} />} />
+                  <Route path="/admin-catalogo" element={<AdminCatalogPage userRole={userRole} />} />
+                  <Route path="/reportes-diarios" element={<ReportesDiarios userRole={userRole} />} />
+                  <Route path="/reportes" element={<ReportesPage userRole={userRole} />} />
+                  <Route path="/dashboard" element={<DashboardPage userRole={userRole} />} />
+                  {userRole === 'admin' && <Route path="/usuarios" element={<UsuariosPage userRole={userRole} />} />}
+                </>
+              )}
+              <Route path="*" element={<Navigate to="/home" replace />} />
+            </>
+          ) : (
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          )}
+        </Routes>
+      </Suspense>
     </div>
   );
 }

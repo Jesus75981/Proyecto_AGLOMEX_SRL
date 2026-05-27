@@ -36,7 +36,7 @@ class WhatsAppService {
         this.client.on('qr', (qr) => {
             this.qrCode = qr;
             this.status = 'QR_READY';
-            console.log('📱 WhatsApp QR Code generated!');
+            // console.log('📱 WhatsApp QR Code generated!'); // Comentado para evitar spam en consola
         });
 
         // ... rest of events ...

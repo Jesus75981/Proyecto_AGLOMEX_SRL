@@ -1,4 +1,5 @@
 @echo off
+cd /d "%~dp0"
 TITLE Iniciando Sistema de Muebles
 echo ====================================================
 echo      INICIANDO SISTEMA DE GESTION DE MUEBLES
@@ -6,13 +7,13 @@ echo ====================================================
 echo.
 
 echo 1. Iniciando Servidor Backend (Base de Datos y API)...
-start "Backend Muebles" cmd /k "cd back-end && npm run dev"
+start "Backend Muebles" cmd /k "cd back-end && npm run dev || pause"
 
 echo 2. Esperando 5 segundos para que arranque el servidor...
 timeout /t 5 /nobreak >nul
 
 echo 3. Iniciando Interfaz de Usuario (Frontend)...
-start "Frontend Muebles" cmd /k "cd front-end && npm run dev -- --host"
+start "Frontend Muebles" cmd /k "cd front-end && npm run dev -- --host || pause"
 
 echo 4. Abriendo el navegador...
 timeout /t 3 /nobreak >nul

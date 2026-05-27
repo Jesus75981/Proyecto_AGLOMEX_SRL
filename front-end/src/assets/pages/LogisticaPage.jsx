@@ -887,7 +887,7 @@ const LogisticaPage = ({ userRole }) => {
                     <p className="text-sm text-gray-600 mb-1">Contacto: {t.contacto}</p>
                     <p className="text-sm text-gray-600 mb-1">Tel: {t.telefono}</p>
                     <p className="text-sm text-gray-500 italic mb-2">{t.tipo}</p>
-                    <p className="text-sm text-gray-600 mb-2">Costo Est.: ${t.costoBase}</p>
+                    <p className="text-sm text-gray-600 mb-2">Costo Est.: Bs. {t.costoBase}</p>
 
                     <div className="flex space-x-2 mt-2">
                       <button onClick={() => editarTransportista(t)} className="bg-blue-100 text-blue-600 px-3 py-1 rounded text-sm hover:bg-blue-200">Editar</button>

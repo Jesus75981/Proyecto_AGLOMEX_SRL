@@ -1,15 +1,15 @@
 module.exports = {
   preset: null,
   transform: {
-    '^.+\\.js$': 'babel-jest',
+    '^.+\\.(js|ts)$': 'babel-jest',
   },
   testEnvironment: 'node',
   testMatch: [
-    '**/__tests__/**/*.test.js',
-    '**/?(*.)+(spec|test).js'
+    '**/__tests__/**/*.test.(js|ts)',
+    '**/?(*.)+(spec|test).(js|ts)'
   ],
   collectCoverageFrom: [
-    '**/*.{js,jsx}',
+    '**/*.{js,jsx,ts,tsx}',
     '!**/node_modules/**',
     '!**/vendor/**'
   ],

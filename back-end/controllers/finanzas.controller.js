@@ -5,6 +5,10 @@ import Venta from '../models/venta.model.js';
 import Compra from '../models/compra.model.js';
 
 import DeudaCompra from '../models/deudaCompra.model.js';
+import DeudaVenta from '../models/deudaVenta.model.js';
+import Maquina from '../models/maquina.model.js';
+import MateriaPrima from '../models/materiaPrima.model.js';
+import ProductoTienda from '../models/productoTienda.model.js';
 import Proveedor from '../models/proveedores.model.js';
 import BankAccount from '../models/bankAccount.model.js';
 import BankTransaction from '../models/bankTransaction.model.js';
@@ -365,66 +369,38 @@ export const getFinancialStatistics = async (req, res) => {
     let sort = {};
 
     if (period === 'month') {
-      const selectedMonth = (parseInt(month) || 1) - 1; // Frontend sends 1-12, JS Date needs 0-11
+      const selectedMonth = (parseInt(month) || 1) - 1;
       startDate = new Date(selectedYear, selectedMonth, 1);
       endDate = new Date(selectedYear, selectedMonth + 1, 0, 23, 59, 59);
-
-      // Group by day for monthly view
-      groupBy = {
-        day: { $dayOfMonth: '$date' }
-      };
+      groupBy = { day: { $dayOfMonth: '$date' } };
       sort = { 'period.day': 1 };
     } else if (period === 'week') {
-      // Logic for 'week': if a specific date is provided, find the start/end of that week
-      // If 'week' number is provided... it's complex. Let's use a reference date for the week.
-      // Simplify: User picks a date (or we default to current week).
       const refDate = date ? new Date(date) : new Date();
-      const day = refDate.getDay(); // 0 (Sun) to 6 (Sat)
-      const diff = refDate.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+      const day = refDate.getDay();
+      const diff = refDate.getDate() - day + (day === 0 ? -6 : 1);
       startDate = new Date(refDate.setDate(diff));
       startDate.setHours(0, 0, 0, 0);
       endDate = new Date(startDate);
       endDate.setDate(startDate.getDate() + 6);
       endDate.setHours(23, 59, 59, 999);
-
-      groupBy = {
-        day: { $dayOfMonth: '$date' }, // Also group by day, but labels will be week days
-        dayOfWeek: { $dayOfWeek: '$date' }
-      };
+      groupBy = { day: { $dayOfMonth: '$date' }, dayOfWeek: { $dayOfWeek: '$date' } };
       sort = { 'period.day': 1 };
     } else {
-      // Default: Year
       startDate = new Date(selectedYear, 0, 1);
       endDate = new Date(selectedYear, 11, 31, 23, 59, 59);
-      groupBy = {
-        year: { $year: '$date' },
-        month: { $month: '$date' }
-      };
+      groupBy = { year: { $year: '$date' }, month: { $month: '$date' } };
       sort = { 'period.month': 1 };
     }
 
-    // Métricas generales (Totales en el rango seleccionado)
     const metricsAggregation = await Finanzas.aggregate([
-      {
-        $match: {
-          date: { $gte: startDate, $lte: endDate }
-        }
-      },
+      { $match: { date: { $gte: startDate, $lte: endDate } } },
       {
         $group: {
           _id: null,
-          totalIngresos: {
-            $sum: { $cond: [{ $eq: ['$type', 'ingreso'] }, '$amountBOB', 0] }
-          },
-          totalEgresos: {
-            $sum: { $cond: [{ $eq: ['$type', 'egreso'] }, '$amountBOB', 0] }
-          },
-          countIngresos: {
-            $sum: { $cond: [{ $eq: ['$type', 'ingreso'] }, 1, 0] }
-          },
-          countEgresos: {
-            $sum: { $cond: [{ $eq: ['$type', 'egreso'] }, 1, 0] }
-          }
+          totalIngresos: { $sum: { $cond: [{ $eq: ['$type', 'ingreso'] }, '$amountBOB', 0] } },
+          totalEgresos: { $sum: { $cond: [{ $eq: ['$type', 'egreso'] }, '$amountBOB', 0] } },
+          countIngresos: { $sum: { $cond: [{ $eq: ['$type', 'ingreso'] }, 1, 0] } },
+          countEgresos: { $sum: { $cond: [{ $eq: ['$type', 'egreso'] }, 1, 0] } }
         }
       },
       {
@@ -439,76 +415,38 @@ export const getFinancialStatistics = async (req, res) => {
       }
     ]);
 
-    let metrics = metricsAggregation[0] || {
-      totalIngresos: 0,
-      totalEgresos: 0,
-      countIngresos: 0,
-      countEgresos: 0,
-      utilidadNeta: 0
-    };
+    let metrics = metricsAggregation[0] || { totalIngresos: 0, totalEgresos: 0, countIngresos: 0, countEgresos: 0, utilidadNeta: 0 };
 
-    // --- INTEGRACIÓN CON LOGÍSTICA ---
-    // Agregamos los costos de envío como INGRESOS (pagados por cliente)
     const logisticaMetrics = await Logistica.aggregate([
-      {
-        $match: {
-          fechaPedido: { $gte: startDate, $lte: endDate },
-          estado: { $ne: 'cancelado' } // Solo envíos válidos
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          totalCostoEnvio: { $sum: "$costoEnvio" },
-          countEnvios: { $sum: 1 }
-        }
-      }
+      { $match: { fechaPedido: { $gte: startDate, $lte: endDate }, estado: { $ne: 'cancelado' } } },
+      { $group: { _id: null, totalCostoEnvio: { $sum: "$costoEnvio" }, countEnvios: { $sum: 1 } } }
     ]);
-
-    // Inicializar campo específico para ingresos por envío
     metrics.ingresosPorEnvio = 0;
-
     if (logisticaMetrics.length > 0) {
-      const logisticaData = logisticaMetrics[0];
-
-      // Sumar a ingresos totales
-      metrics.totalIngresos += logisticaData.totalCostoEnvio;
-      metrics.countIngresos += logisticaData.countEnvios;
-
-      // Guardar dato específico para desglose
-      metrics.ingresosPorEnvio = logisticaData.totalCostoEnvio;
+      metrics.totalIngresos += logisticaMetrics[0].totalCostoEnvio;
+      metrics.countIngresos += logisticaMetrics[0].countEnvios;
+      metrics.ingresosPorEnvio = logisticaMetrics[0].totalCostoEnvio;
     }
-    // -------------------------------
-    // --- INTEGRACIÓN: VENTAS FACTURADAS VS RECIEBOS ---
+
     const ventasBreakdown = await Venta.aggregate([
-      {
-        $match: {
-          fecha: { $gte: startDate, $lte: endDate },
-          estado: { $ne: 'Anulado' }
-        }
-      },
-      // Descomponemos productos para calcular costo individualmente
+      { $match: { fecha: { $gte: startDate, $lte: endDate }, estado: { $ne: 'Anulado' } } },
       { $unwind: "$productos" },
       {
         $project: {
-          _id: 1, // Mantener ID de venta
+          _id: 1,
           tipoComprobante: 1,
           cantidad: "$productos.cantidad",
-          precioTotal: "$productos.precioTotal", // O calcular precioUnitario * cantidad
+          precioTotal: "$productos.precioTotal",
           precioUnitario: "$productos.precioUnitario",
-          // Lógica de costo con fallback
-          costoUnitarioReal: {
-            $ifNull: ["$productos.costoUnitario", 0]
-          }
+          costoUnitarioReal: { $ifNull: ["$productos.costoUnitario", 0] }
         }
       },
       {
         $addFields: {
           costoTotalProducto: { $multiply: ["$cantidad", "$costoUnitarioReal"] },
-          ventaTotalProducto: { $multiply: ["$cantidad", "$precioUnitario"] } // Recalcular para asegurar consistencia
+          ventaTotalProducto: { $multiply: ["$cantidad", "$precioUnitario"] }
         }
       },
-      // Re-agrupar por Venta
       {
         $group: {
           _id: "$_id",
@@ -517,7 +455,6 @@ export const getFinancialStatistics = async (req, res) => {
           costoVenta: { $sum: "$costoTotalProducto" }
         }
       },
-      // Agrupar por Tipo de Comprobante (como estaba originalmente)
       {
         $group: {
           _id: "$tipoComprobante",
@@ -527,56 +464,29 @@ export const getFinancialStatistics = async (req, res) => {
         }
       }
     ]);
-
-    // Assign breakdown results
     metrics.ventasBreakdown = ventasBreakdown[0] || { total: 0, count: 0, costoTotal: 0 };
 
-    // --- INTEGRACIÓN: UTILIDAD BRUTA REAL (VENTAS - COSTOS) ---
-    // User requested "Utilidad por Venta" to be purely Sales - COGS, excluding other expenses.
     const grossProfitAggregation = await Venta.aggregate([
-      {
-        $match: {
-          fecha: { $gte: startDate, $lte: endDate },
-          estado: { $ne: 'Anulado' }
-        }
-      },
+      { $match: { fecha: { $gte: startDate, $lte: endDate }, estado: { $ne: 'Anulado' } } },
       { $unwind: '$productos' },
       {
         $group: {
           _id: null,
           totalVentas: { $sum: { $multiply: ['$productos.cantidad', '$productos.precioUnitario'] } },
-          totalCosto: {
-            $sum: { $multiply: ['$productos.cantidad', { $ifNull: ['$productos.costoUnitario', 0] }] }
-          }
+          totalCosto: { $sum: { $multiply: ['$productos.cantidad', { $ifNull: ['$productos.costoUnitario', 0] }] } }
         }
       },
-      {
-        $project: {
-          utilidadBrutaVentas: { $subtract: ['$totalVentas', '$totalCosto'] }
-        }
-      }
+      { $project: { utilidadBrutaVentas: { $subtract: ['$totalVentas', '$totalCosto'] } } }
     ]);
-
     metrics.utilidadBrutaVentas = grossProfitAggregation[0] ? grossProfitAggregation[0].utilidadBrutaVentas : 0;
-    // -------------------------------------------------------------
 
-    // --- INTEGRACIÓN: FLUJO DE CAJA (Gráfico) ---
-    // Agrupar por unidad de tiempo seleccionada (día, mes)
     const cashflow = await Finanzas.aggregate([
-      {
-        $match: {
-          date: { $gte: startDate, $lte: endDate }
-        }
-      },
+      { $match: { date: { $gte: startDate, $lte: endDate } } },
       {
         $group: {
           _id: groupBy,
-          ingresos: {
-            $sum: { $cond: [{ $eq: ['$type', 'ingreso'] }, '$amountBOB', 0] }
-          },
-          egresos: {
-            $sum: { $cond: [{ $eq: ['$type', 'egreso'] }, '$amountBOB', 0] }
-          }
+          ingresos: { $sum: { $cond: [{ $eq: ['$type', 'ingreso'] }, '$amountBOB', 0] } },
+          egresos: { $sum: { $cond: [{ $eq: ['$type', 'egreso'] }, '$amountBOB', 0] } }
         }
       },
       {
@@ -586,21 +496,14 @@ export const getFinancialStatistics = async (req, res) => {
           ingresos: 1,
           egresos: 1,
           flujoNeto: { $subtract: ['$ingresos', '$egresos'] },
-          // Include date info for sorting/labeling
           dateInfo: '$_id'
         }
       },
       { $sort: sort }
     ]);
 
-    // Detalle Granular de Ventas para Tabla de Rentabilidad
     const salesDetail = await Venta.aggregate([
-      {
-        $match: {
-          fecha: { $gte: startDate, $lte: endDate },
-          estado: { $ne: 'Anulado' }
-        }
-      },
+      { $match: { fecha: { $gte: startDate, $lte: endDate }, estado: { $ne: 'Anulado' } } },
       { $unwind: "$productos" },
       {
         $project: {
@@ -623,70 +526,89 @@ export const getFinancialStatistics = async (req, res) => {
       { $limit: 100 }
     ]);
 
-    // DEBUG: Inspect Venta #1
-    const v1 = salesDetail.find(s => s.numVenta === 1);
-    if (v1) {
-      console.log("--- DEBUG VENTA #1 ---");
-      console.log(JSON.stringify(v1, null, 2));
-      console.log("----------------------");
-    }
-
-    // --- INTEGRACIÓN: HISTORIAL DE UTILIDAD (Gráfico) ---
-    // Clonar lógica de agrupación pero usando 'fecha' en lugar de 'date'
     const groupByVenta = JSON.parse(JSON.stringify(groupBy).replace(/\$date/g, '$fecha'));
-
     const profitHistory = await Venta.aggregate([
-      {
-        $match: {
-          fecha: { $gte: startDate, $lte: endDate },
-          estado: { $ne: 'Anulado' }
-        }
-      },
+      { $match: { fecha: { $gte: startDate, $lte: endDate }, estado: { $ne: 'Anulado' } } },
       { $unwind: '$productos' },
       {
         $group: {
           _id: groupByVenta,
-          utilidad: {
-            $sum: {
-              $multiply: [
-                '$productos.cantidad',
-                { $subtract: ['$productos.precioUnitario', { $ifNull: ['$productos.costoUnitario', 0] }] }
-              ]
-            }
-          },
-          ventas: {
-            $sum: { $multiply: ['$productos.cantidad', '$productos.precioUnitario'] }
-          }
+          utilidad: { $sum: { $multiply: ['$productos.cantidad', { $subtract: ['$productos.precioUnitario', { $ifNull: ['$productos.costoUnitario', 0] }] }] } },
+          ventas: { $sum: { $multiply: ['$productos.cantidad', '$productos.precioUnitario'] } }
         }
       },
-      {
-        $project: {
-          _id: 0,
-          period: '$_id',
-          utilidad: 1,
-          ventas: 1
-        }
-      },
-      { $sort: sort } // 'sort' variable relies on 'period.month' or 'period.day', which matches our projection
+      { $project: { _id: 0, period: '$_id', utilidad: 1, ventas: 1 } },
+      { $sort: sort }
     ]);
+
+    // NEW: Balance Sheet metrics
+    const balanceStats = await getBalanceSheetStats(startDate, endDate);
+    metrics = { ...metrics, ...balanceStats };
 
     res.json({
       metrics,
       cashflow,
-      profitHistory, // New field
+      profitHistory,
       salesDetail,
-      salesDetail, // New field
-      periodInfo: {
-        startDate,
-        endDate,
-        type: period
-      }
+      periodInfo: { startDate, endDate, type: period }
     });
-
   } catch (error) {
     console.error('Error al obtener estadísticas financieras:', error);
     res.status(500).json({ message: 'Error al obtener estadísticas financieras' });
   }
+};
+
+// Nueva función interna para métricas integrales que puede ser llamada desde getFinancialStatistics
+const getBalanceSheetStats = async (startDate, endDate) => {
+  // 1. Inversión en Maquinaria (Valor Total de Activos Fijos)
+  const maquinas = await Maquina.find();
+  const inversionMaquinaria = maquinas.reduce((acc, m) => acc + ((m.costo || 0) * (m.cantidad || 1)), 0);
+
+  // 2. Costo Materiales e Inventario
+  const materiasPrimas = await MateriaPrima.find({ activo: true });
+  const costoMateriales = materiasPrimas.reduce((acc, mp) => acc + ((mp.precioCompra || 0) * (mp.cantidad || 0)), 0);
+
+  const productosTerminados = await ProductoTienda.find({ activo: true, tipo: 'Producto Terminado' });
+  const costoProductosTerminados = productosTerminados.reduce((acc, pt) => acc + ((pt.precioCompra || 0) * (pt.cantidad || 0)), 0);
+
+  // 3. Cuentas por Cobrar (Saldos pendientes de clientes)
+  const deudasVenta = await DeudaVenta.find({ estado: { $ne: 'Pagada' } });
+  const cuentasPorCobrar = deudasVenta.reduce((acc, d) => acc + (d.saldoActual || 0), 0);
+
+  // 4. Cuentas por Pagar (Saldos pendientes a proveedores)
+  const deudasCompra = await DeudaCompra.find({ estado: { $ne: 'Pagada' } });
+  const cuentasPorPagar = deudasCompra.reduce((acc, d) => acc + (d.saldoActual || 0), 0);
+
+  // 5. Capital en Cuentas y Cajas
+  const bankAccounts = await BankAccount.find({ isActive: true });
+  const capitalCuentas = bankAccounts.reduce((acc, a) => acc + (a.saldo || 0), 0);
+
+  // 6. Transferencias Internas en el Periodo
+  const transferenciasPeriodo = await Finanzas.aggregate([
+    {
+      $match: {
+        date: { $gte: startDate, $lte: endDate },
+        category: 'transferencia_interna'
+      }
+    },
+    { $group: { _id: null, total: { $sum: "$amountBOB" } } }
+  ]);
+  const totalTransferencias = transferenciasPeriodo[0]?.total || 0;
+
+  const totalActivos = capitalCuentas + inversionMaquinaria + costoMateriales + costoProductosTerminados + cuentasPorCobrar;
+
+  return {
+    inversionMaquinaria,
+    costoMateriales,
+    costoProductosTerminados,
+    valorInventarioTotal: costoMateriales + costoProductosTerminados,
+    cuentasPorCobrar,
+    cuentasPorPagar,
+    capitalCuentas,
+    totalActivos,
+    capitalTotal: totalActivos - cuentasPorPagar,
+    totalTransferencias
+  };
 };
 
 // Función para obtener rentabilidad por producto
@@ -1089,5 +1011,83 @@ export const getAccountTransactions = async (req, res) => {
   } catch (error) {
     console.error("Error al obtener historial bancario:", error);
     res.status(500).json({ message: "Error al obtener el historial." });
+  }
+};
+
+// Transferir fondos entre cuentas
+export const transferFunds = async (req, res) => {
+  const { sourceAccountId, targetAccountId, amount, description, date } = req.body;
+
+  if (!sourceAccountId || !targetAccountId || !amount || amount <= 0) {
+    return res.status(400).json({ message: 'Datos incompletos o inválidos.' });
+  }
+
+  if (sourceAccountId === targetAccountId) {
+    return res.status(400).json({ message: 'La cuenta de origen y destino no pueden ser la misma.' });
+  }
+
+  try {
+    const sourceAccount = await BankAccount.findById(sourceAccountId);
+    const targetAccount = await BankAccount.findById(targetAccountId);
+
+    if (!sourceAccount || !targetAccount) {
+      throw new Error('Cuenta de origen o destino no encontrada.');
+    }
+
+    if (sourceAccount.saldo < amount) {
+      throw new Error('Saldo insuficiente en la cuenta de origen.');
+    }
+
+    // 1. Descontar de Origen
+    sourceAccount.saldo -= parseFloat(amount);
+    await sourceAccount.save();
+
+    // 2. Aumentar a Destino
+    targetAccount.saldo += parseFloat(amount);
+    await targetAccount.save();
+
+    // 3. Registrar Movimientos Bancarios
+    const txDate = date || new Date();
+
+    // Retiro
+    await new BankTransaction({
+      cuentaId: sourceAccountId,
+      tipo: 'Retiro',
+      monto: amount,
+      fecha: txDate,
+      descripcion: `Transferencia a ${targetAccount.nombreBanco} - ${description || ''}`,
+    }).save();
+
+    // Deposito
+    await new BankTransaction({
+      cuentaId: targetAccountId,
+      tipo: 'Deposito',
+      monto: amount,
+      fecha: txDate,
+      descripcion: `Transferencia desde ${sourceAccount.nombreBanco} - ${description || ''}`,
+    }).save();
+
+    // 4. Registrar en Finanzas (solo informativo, no P&L si se filtra por type)
+    // Opcional: Si queremos que aparezca en el historial global "neutro".
+    await new Finanzas({
+      type: 'transferencia',
+      category: 'transferencia_interna',
+      description: `Transferencia: ${sourceAccount.nombreBanco} -> ${targetAccount.nombreBanco} | ${description}`,
+      amount: amount,
+      currency: 'BOB',
+      amountBOB: amount,
+      date: txDate,
+      metadata: {
+        sourceAccount: sourceAccount.nombreBanco,
+        targetAccount: targetAccount.nombreBanco,
+        transfer: true
+      }
+    }).save();
+
+    res.json({ message: 'Transferencia realizada con éxito.' });
+
+  } catch (error) {
+    console.error('Error en transferencia:', error);
+    res.status(400).json({ message: error.message || 'Error al procesar la transferencia.' });
   }
 };

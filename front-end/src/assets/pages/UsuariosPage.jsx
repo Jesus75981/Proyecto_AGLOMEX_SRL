@@ -16,7 +16,7 @@ const UsuariosPage = ({ userRole }) => {
     username: '',
     nombre: '',
     password: '',
-    rol: 'empleado_stock'
+    rol: 'empleado_tienda'
   });
 
   const getAuthToken = () => localStorage.getItem('token');
@@ -88,7 +88,7 @@ const UsuariosPage = ({ userRole }) => {
       username: '',
       nombre: '',
       password: '',
-      rol: 'empleado_stock'
+      rol: 'empleado_tienda'
     });
     setShowModal(true);
   };
@@ -239,7 +239,6 @@ const UsuariosPage = ({ userRole }) => {
                   >
                     <option value="admin">Administrador</option>
                     <option value="empleado_tienda">Vendedor (Tienda)</option>
-                    <option value="empleado_stock">Almacenista (Stock)</option>
                   </select>
                 </div>
               </div>

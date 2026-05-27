@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 // --- Helper para API (Igual que DashboardPage) ---
 import { API_URL, API_BASE_URL } from '../../config/api';
 
@@ -120,6 +122,7 @@ const FinanzasPage = ({ userRole }) => {
     nombre: '',
     tipo: '',
     estado: 'Operativa',
+    cantidad: 1,
     costo: ''
   });
   const [expandedMaquina, setExpandedMaquina] = useState(null);
@@ -141,7 +144,6 @@ const FinanzasPage = ({ userRole }) => {
   useEffect(() => {
     loadTransactions();
     loadDeudas();
-    loadBankAccounts();
     loadBankAccounts();
     loadMaquinas();
   }, [userRole]);
@@ -216,7 +218,6 @@ const FinanzasPage = ({ userRole }) => {
 
       setShowAccountForm(false);
       setEditingAccountId(null);
-      setEditingAccountId(null);
       setAccountFormData({ nombreBanco: '', numeroCuenta: '', saldoInicial: '', tipo: 'banco' });
       loadBankAccounts();
     } catch (err) {
@@ -240,6 +241,41 @@ const FinanzasPage = ({ userRole }) => {
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [accountToClose, setAccountToClose] = useState(null);
   const [targetAccountId, setTargetAccountId] = useState('');
+
+  // Estado para Transferencia Interna de Fondos (Nueva Funcionalidad)
+  const [showInternalTransferModal, setShowInternalTransferModal] = useState(false);
+  const [transferFormData, setTransferFormData] = useState({
+    sourceAccountId: '',
+    targetAccountId: '',
+    amount: '',
+    description: ''
+  });
+
+  const handleInternalTransfer = async (e) => {
+    e.preventDefault();
+    try {
+      if (transferFormData.sourceAccountId === transferFormData.targetAccountId) {
+        alert("La cuenta de origen y destino no pueden ser la misma.");
+        return;
+      }
+      await apiFetch('/cuentas/transferir', {
+        method: 'POST',
+        body: JSON.stringify(transferFormData)
+      });
+
+      setShowInternalTransferModal(false);
+      setTransferFormData({ sourceAccountId: '', targetAccountId: '', amount: '', description: '' });
+      loadBankAccounts();
+      loadTransactions();
+      // Si es admin, actualizar resumen global también
+      if (userRole === 'admin') loadSummary();
+
+      alert('Transferencia realizada con éxito.');
+    } catch (err) {
+      console.error(err);
+      alert('Error en transferencia: ' + err.message);
+    }
+  };
 
   const handleUpdateAccountStatus = async (account) => {
     const newStatus = !account.isActive;
@@ -295,7 +331,8 @@ const FinanzasPage = ({ userRole }) => {
         method: 'POST',
         body: JSON.stringify({
           cuentaId: selectedAccount._id,
-          ...depositFormData
+          ...depositFormData,
+          descripcion: depositFormData.descripcion || 'Depósito manual'
         })
       });
       setShowDepositForm(false);
@@ -389,6 +426,10 @@ const FinanzasPage = ({ userRole }) => {
       if (fechaSeleccionada > hoy) {
         nuevosErrores.date = 'La fecha no puede ser futura';
       }
+    }
+
+    if (!formData.cuentaId) {
+      nuevosErrores.cuentaId = 'Debe seleccionar una cuenta o caja de destino/origen';
     }
 
     setErrors(nuevosErrores);
@@ -536,6 +577,183 @@ const FinanzasPage = ({ userRole }) => {
     }
   };
 
+  const exportarMaquinasPDF = () => {
+    const doc = new jsPDF();
+    const fecha = new Date().toLocaleDateString();
+
+    // Encabezado
+    doc.setFontSize(18);
+    doc.setTextColor(128, 0, 128); // Morado
+    doc.text('Inventario de Maquinaria y Equipos', 14, 20);
+
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Fecha de Reporte: ${fecha}`, 14, 28);
+    doc.text('AGLOMEX SRL - Sistema de Gestión', 14, 33);
+
+    const tableColumn = ["Nombre", "Tipo", "Cant.", "Estado", "Costo Unit.", "Subtotal"];
+    const tableRows = [];
+
+    maquinarias.forEach(m => {
+      const maquinaData = [
+        m.nombre,
+        m.tipo,
+        m.cantidad || 1,
+        m.estado,
+        `Bs. ${(m.costo || 0).toFixed(2)}`,
+        `Bs. ${((m.costo || 0) * (m.cantidad || 1)).toFixed(2)}`
+      ];
+      tableRows.push(maquinaData);
+    });
+
+    const totalValor = maquinarias.reduce((acc, m) => acc + ((m.costo || 0) * (m.cantidad || 1)), 0);
+
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 40,
+      theme: 'striped',
+      headStyles: { fillColor: [128, 0, 128] },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+      margin: { top: 40 },
+      didDrawPage: (data) => {
+        if (data.pageNumber === doc.getNumberOfPages()) {
+          const finalY = data.cursor.y + 10;
+          doc.setFontSize(12);
+          doc.setFont('helvetica', 'bold');
+          doc.text(`VALOR TOTAL: Bs. ${totalValor.toFixed(2)}`, 140, finalY);
+        }
+      }
+    });
+
+    doc.save(`Inventario_Maquinaria_${fecha.replace(/\//g, '-')}.pdf`);
+  };
+
+  const exportarCuentasPDF = () => {
+    const doc = new jsPDF();
+    const fecha = new Date().toLocaleDateString();
+
+    doc.setFontSize(18);
+    doc.setTextColor(0, 100, 0); // Verde oscuro
+    doc.text('Reporte de Cuentas y Cajas', 14, 20);
+
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Fecha: ${fecha}`, 14, 28);
+    doc.text('AGLOMEX SRL - Gestión Financiera', 14, 33);
+
+    const tableColumn = ["Entidad / Banco", "Nº Cuenta", "Tipo", "Estado", "Saldo"];
+    const tableRows = [];
+
+    bankAccounts.forEach(a => {
+      tableRows.push([
+        a.nombreBanco,
+        a.numeroCuenta || 'N/A',
+        a.tipo === 'efectivo' ? 'Caja/Efectivo' : 'Cuenta Bancaria',
+        a.isActive ? 'Activa' : 'Inactiva',
+        `Bs. ${(a.saldo || 0).toFixed(2)}`
+      ]);
+    });
+
+    const totalSaldo = bankAccounts.filter(a => a.isActive).reduce((sum, a) => sum + a.saldo, 0);
+
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 40,
+      theme: 'grid',
+      headStyles: { fillColor: [0, 128, 0] },
+      margin: { top: 40 },
+      didDrawPage: (data) => {
+        if (data.pageNumber === doc.getNumberOfPages()) {
+          const finalY = data.cursor.y + 10;
+          doc.setFontSize(12);
+          doc.setFont('helvetica', 'bold');
+          doc.text(`CAPITAL TOTAL: Bs. ${totalSaldo.toFixed(2)}`, 140, finalY);
+        }
+      }
+    });
+
+    doc.save(`Reporte_Cuentas_${fecha.replace(/\//g, '-')}.pdf`);
+  };
+
+  const exportarTransaccionesPDF = () => {
+    const doc = new jsPDF('l', 'mm', 'a4'); // Horizontal
+    const fecha = new Date().toLocaleDateString();
+
+    const filtered = transactions.filter(t => {
+      // Logic for new 'inversion' tab and modified 'egreso' tab
+      if (activeSubTab === 'ingreso' && t.type !== 'ingreso') return false;
+      
+      if (activeSubTab === 'egreso') {
+        if (t.type !== 'egreso') return false;
+        // Exclude investments from expenses
+        if (t.category === 'compra_materias' || t.category === 'compra_productos') return false;
+      }
+      
+      if (activeSubTab === 'inversion') {
+        if (t.type !== 'egreso') return false;
+        // Include only investments
+        if (t.category !== 'compra_materias' && t.category !== 'compra_productos') return false;
+      }
+
+      const tDate = new Date(t.date);
+      if (filterStartDate && tDate < new Date(filterStartDate)) return false;
+      if (filterEndDate && tDate > new Date(filterEndDate)) return false;
+      if (filterMinAmount && t.amount < parseFloat(filterMinAmount)) return false;
+      if (filterMaxAmount && t.amount > parseFloat(filterMaxAmount)) return false;
+      if (userRole === 'Tienda' || userRole === 'tienda' || userRole === 'empleado_tienda') {
+        if (t.type === 'egreso' && t.category !== 'gasto_operativo') return false;
+      }
+      return true;
+    });
+
+    doc.setFontSize(18);
+    doc.setTextColor(0, 51, 102); // Azul oscuro
+    doc.text('Historial de Transacciones Financieras', 14, 20);
+
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Filtrado por: ${activeSubTab.toUpperCase()} | Fecha: ${fecha}`, 14, 28);
+    doc.text('AGLOMEX SRL - Movimientos de Caja', 14, 33);
+
+    const tableColumn = ["Fecha", "Tipo", "Categoría / Descripción", "Monto", "Cuenta Destino"];
+    const tableRows = [];
+
+    filtered.forEach(t => {
+      let tipoLabel = t.type === 'ingreso' ? 'Ingreso' : 'Egreso';
+      if (t.type === 'egreso' && (t.category === 'compra_materias' || t.category === 'compra_productos')) {
+        tipoLabel = 'Inversión';
+      }
+
+      tableRows.push([
+        new Date(t.date).toLocaleDateString(),
+        tipoLabel,
+        `${t.category ? t.category.replace(/_/g, ' ') : ''} - ${t.description}`,
+        `${t.type === 'ingreso' ? '+' : '-'}${t.amount.toFixed(2)}`,
+        t.metadata?.banco || t.metadata?.cuenta || 
+        (t.metadata?.metodosPago && t.metadata.metodosPago.length > 0
+          ? t.metadata.metodosPago.map(p => {
+              const acc = bankAccounts.find(a => a._id === p.cuentaId);
+              return acc ? `${acc.nombreBanco} (${acc.tipo === 'efectivo' ? 'Caja' : acc.numeroCuenta})` : p.tipo;
+            }).join(' / ')
+          : '-')
+      ]);
+    });
+
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 40,
+      theme: 'striped',
+      headStyles: { fillColor: [0, 51, 102] },
+      margin: { top: 40 },
+      styles: { fontSize: 9 }
+    });
+
+    doc.save(`Transacciones_${fecha.replace(/\//g, '-')}.pdf`);
+  };
+
   const getCategoryIcon = (categoryOrDesc) => {
     const d = categoryOrDesc.toLowerCase();
 
@@ -666,7 +884,13 @@ const FinanzasPage = ({ userRole }) => {
                 onClick={() => setActiveSubTab('egreso')}
                 className={`px-3 py-1 rounded-full text-sm ${activeSubTab === 'egreso' ? 'bg-red-600 text-white' : 'bg-gray-200 text-gray-700'}`}
               >
-                Egresos (Compras)
+                Egresos (Gastos)
+              </button>
+              <button
+                onClick={() => setActiveSubTab('inversion')}
+                className={`px-3 py-1 rounded-full text-sm ${activeSubTab === 'inversion' ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+              >
+                Inversiones (Compras)
               </button>
             </div>
 
@@ -716,7 +940,10 @@ const FinanzasPage = ({ userRole }) => {
                 <label className="block text-xs text-gray-500 mb-1">Monto Max</label>
                 <input type="number" value={filterMaxAmount} onChange={e => setFilterMaxAmount(e.target.value)} className="p-2 border rounded-md text-sm w-24" placeholder="Max" />
               </div>
-              <button onClick={() => { setFilterStartDate(''); setFilterEndDate(''); setFilterMinAmount(''); setFilterMaxAmount(''); }} className="text-sm text-gray-500 hover:text-orange-500 underline">
+
+
+
+              <button onClick={() => { setFilterStartDate(''); setFilterEndDate(''); setFilterMinAmount(''); setFilterMaxAmount(''); setFilterNoReceipt(false); }} className="text-sm text-gray-500 hover:text-orange-500 underline">
                 Limpiar
               </button>
             </div>
@@ -788,23 +1015,25 @@ const FinanzasPage = ({ userRole }) => {
                       </select>
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Cuenta / Caja (Opcional)</label>
-                      <select
-                        value={formData.cuentaId || ''}
-                        onChange={(e) => setFormData({ ...formData, cuentaId: e.target.value })}
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
-                      >
-                        <option value="">-- Ninguna (Solo Registro) --</option>
-                        {bankAccounts.filter(acc => acc.isActive).map(acc => (
-                          <option key={acc._id} value={acc._id}>
-                            {acc.nombreBanco} ({acc.tipo === 'efectivo' ? 'Caja' : acc.numeroCuenta})
-                            {(userRole === 'admin' || userRole === 'dueno') ? ` - ${formatCurrency(acc.saldo)}` : ''}
-                          </option>
-                        ))}
-                      </select>
-                      <p className="text-xs text-gray-500 mt-1">Si selecciona una cuenta, el saldo se actualizará.</p>
-                    </div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Cuenta / Caja <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={formData.cuentaId || ''}
+                      onChange={(e) => setFormData({ ...formData, cuentaId: e.target.value })}
+                      className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-orange-500 ${errors.cuentaId ? 'border-red-500 focus:ring-red-500' : 'border-gray-300'}`}
+                      required
+                    >
+                      <option value="">-- Seleccione una Cuenta / Caja --</option>
+                      {bankAccounts.filter(acc => acc.isActive).map(acc => (
+                        <option key={acc._id} value={acc._id}>
+                          {acc.nombreBanco} ({acc.tipo === 'efectivo' ? 'Caja' : acc.numeroCuenta})
+                          {(userRole === 'admin' || userRole === 'dueno') ? ` - ${formatCurrency(acc.saldo)}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.cuentaId && <p className="text-xs text-red-500 mt-1">{errors.cuentaId}</p>}
+                    {!errors.cuentaId && <p className="text-xs text-gray-500 mt-1">El monto se sumará o restará del saldo de esta cuenta.</p>}
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Monto</label>
@@ -878,8 +1107,14 @@ const FinanzasPage = ({ userRole }) => {
 
             {/* Lista de transacciones */}
             <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-              <div className="p-6 border-b border-gray-200">
+              <div className="p-6 border-b border-gray-200 flex justify-between items-center">
                 <h2 className="text-xl font-bold text-gray-800">Transacciones</h2>
+                <button
+                  onClick={exportarTransaccionesPDF}
+                  className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors shadow-md flex items-center gap-2"
+                >
+                  <span>📄</span> Exportar PDF
+                </button>
               </div>
 
               {error && (
@@ -909,7 +1144,17 @@ const FinanzasPage = ({ userRole }) => {
                     <tbody className="bg-white divide-y divide-gray-200">
                       {transactions
                         .filter(t => {
-                          if (activeSubTab !== 'todos' && t.type !== activeSubTab) return false;
+                          if (activeSubTab === 'ingreso' && t.type !== 'ingreso') return false;
+                          
+                          if (activeSubTab === 'egreso') {
+                            if (t.type !== 'egreso') return false;
+                            if (t.category === 'compra_materias' || t.category === 'compra_productos') return false;
+                          }
+                          
+                          if (activeSubTab === 'inversion') {
+                            if (t.type !== 'egreso') return false;
+                            if (t.category !== 'compra_materias' && t.category !== 'compra_productos') return false;
+                          }
 
                           const tDate = new Date(t.date);
                           if (filterStartDate && tDate < new Date(filterStartDate)) return false;
@@ -931,12 +1176,24 @@ const FinanzasPage = ({ userRole }) => {
                               {formatDate(transaction.date)}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${transaction.type === 'ingreso'
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-red-100 text-red-800'
-                                }`}>
-                                {transaction.type === 'ingreso' ? 'Ingreso' : 'Egreso'}
-                              </span>
+                              {(() => {
+                                let badgeClass = 'bg-red-100 text-red-800';
+                                let labelText = 'Egreso';
+                                
+                                if (transaction.type === 'ingreso') {
+                                  badgeClass = 'bg-green-100 text-green-800';
+                                  labelText = 'Ingreso';
+                                } else if (transaction.category === 'compra_materias' || transaction.category === 'compra_productos') {
+                                  badgeClass = 'bg-purple-100 text-purple-800';
+                                  labelText = 'Inversión';
+                                }
+
+                                return (
+                                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${badgeClass}`}>
+                                    {labelText}
+                                  </span>
+                                );
+                              })()}
                             </td>
                             <td className="px-6 py-4 text-sm text-gray-900">
                               <div className="flex items-center">
@@ -957,7 +1214,13 @@ const FinanzasPage = ({ userRole }) => {
                               </span>
                             </td>
                             <td className="px-6 py-4 text-sm text-gray-500">
-                              {transaction.metadata?.banco || transaction.metadata?.cuenta || '-'}
+                              {transaction.metadata?.banco || transaction.metadata?.cuenta || 
+                                (transaction.metadata?.metodosPago && transaction.metadata.metodosPago.length > 0
+                                  ? transaction.metadata.metodosPago.map(p => {
+                                      const acc = bankAccounts.find(a => a._id === p.cuentaId);
+                                      return acc ? `${acc.nombreBanco} (${acc.tipo === 'efectivo' ? 'Caja' : acc.numeroCuenta})` : p.tipo;
+                                    }).join(' / ')
+                                  : '-')}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                               <div className="flex space-x-2">
@@ -985,11 +1248,13 @@ const FinanzasPage = ({ userRole }) => {
               )}
             </div>
           </>
-        ) : (
-          <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-            <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-              <h2 className="text-xl font-bold text-gray-800">Cuentas Pendientes</h2>
+        ) : null}
 
+        {/* --- DEUDAS TAB --- */}
+        {activeTab === 'deudas' && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-bold text-gray-800">Cuentas por Pagar y Cobrar</h2>
               <div className="flex space-x-2">
                 <button
                   onClick={() => setActiveDebtTab('pagar')}
@@ -1007,231 +1272,246 @@ const FinanzasPage = ({ userRole }) => {
             </div>
 
             {(activeDebtTab === 'pagar' ? deudasCompra : deudasVenta).length === 0 ? (
-              <div className="p-8 text-center">
+              <div className="p-8 text-center bg-white rounded-xl shadow-md border border-gray-100">
                 <p className="text-gray-500 italic">No hay cuentas pendientes</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proveedor</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Compra</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Monto Original</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Pagado</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Saldo Pendiente</th>
-                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {(activeDebtTab === 'pagar' ? deudasCompra : deudasVenta).map((deuda) => (
-                      <tr key={deuda._id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                          {activeDebtTab === 'pagar' ? (deuda.proveedor?.nombre || 'N/A') : (deuda.cliente?.nombre || 'N/A')}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-500">
-                          {activeDebtTab === 'pagar' ? (deuda.compraId?.numCompra || 'N/A') : (deuda.ventaId?.numVenta || 'N/A')}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-500">{formatDate(deuda.fechaCreacion)}</td>
-                        <td className="px-6 py-4 text-sm text-right">{formatCurrency(deuda.montoOriginal || deuda.ventaId?.saldoPendiente + (deuda.montoPagado || 0))}</td>
-                        {/* Note: montoOriginal might not exist in DeudaVenta depending on model, falling back logic might be needed or field standardized */}
-                        <td className="px-6 py-4 text-sm text-right text-green-600">{formatCurrency(deuda.montoPagado)}</td>
-                        <td className="px-6 py-4 text-sm text-right font-bold text-red-600">{formatCurrency(deuda.saldoActual)}</td>
-                        <td className="px-6 py-4 text-center">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${deuda.estado === 'Pendiente' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
-                            }`}>
-                            {deuda.estado}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <button
-                            onClick={() => handlePagarDeudaClick(deuda)}
-                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                            title="Pagar"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                          </button>
-                        </td>
+              <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proveedor/Cliente</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ref.</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Monto Original</th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Pagado</th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Saldo Pendiente</th>
+                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {(activeDebtTab === 'pagar' ? deudasCompra : deudasVenta).map((deuda) => (
+                        <tr key={deuda._id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                            {activeDebtTab === 'pagar' ? (deuda.proveedor?.nombre || 'N/A') : (deuda.cliente?.nombre || 'N/A')}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500">
+                            {activeDebtTab === 'pagar' ? (deuda.compraId?.numCompra || 'N/A') : (deuda.ventaId?.numVenta || 'N/A')}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500">{formatDate(deuda.fechaCreacion)}</td>
+                          <td className="px-6 py-4 text-sm text-right">{formatCurrency(deuda.montoOriginal || (deuda.ventaId?.saldoPendiente + (deuda.montoPagado || 0) || 0))}</td>
+                          <td className="px-6 py-4 text-sm text-right text-green-600">{formatCurrency(deuda.montoPagado)}</td>
+                          <td className="px-6 py-4 text-sm text-right font-bold text-red-600">{formatCurrency(deuda.saldoActual)}</td>
+                          <td className="px-6 py-4 text-center">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${deuda.estado === 'Pendiente' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                              }`}>
+                              {deuda.estado}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <button
+                              onClick={() => handlePagarDeudaClick(deuda)}
+                              className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                              title="Pagar"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>
-        )
-        }
+        )}
 
-        {
-          activeTab === 'cuentas' && (
-            <div className="space-y-6">
-              <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold text-gray-800">Cuentas Bancarias</h2>
+        {/* --- CUENTAS TAB --- */}
+        {activeTab === 'cuentas' && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-bold text-gray-800">Cuentas y Cajas</h2>
+              <div className="flex gap-2">
                 <button
-                  onClick={() => setShowAccountForm(true)}
+                  onClick={exportarCuentasPDF}
+                  className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors shadow-md flex items-center gap-2"
+                >
+                  <span>📄</span> Exportar PDF
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingAccountId(null);
+                    setAccountFormData({ nombreBanco: '', numeroCuenta: '', saldoInicial: '', tipo: 'banco' });
+                    setShowAccountForm(true);
+                  }}
                   className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
                 >
                   + Nueva Cuenta
                 </button>
+                <button
+                  onClick={() => {
+                    setTransferFormData({ sourceAccountId: '', targetAccountId: '', amount: '', description: '' });
+                    setShowInternalTransferModal(true);
+                  }}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  ↔ Transferir Fondos
+                </button>
               </div>
+            </div>
 
-              {/* Resumen de Capital - Nuevo Componente */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-green-500">
-                  <p className="text-sm text-gray-500 mb-1">Total en Banco</p>
-                  <h3 className="text-2xl font-bold text-gray-800">
-                    {formatCurrency(bankAccounts.filter(a => a.tipo === 'banco' && a.isActive).reduce((sum, a) => sum + a.saldo, 0))}
-                  </h3>
-                </div>
-                <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-emerald-600">
-                  <p className="text-sm text-gray-500 mb-1">Total en Efectivo (Caja)</p>
-                  <h3 className="text-2xl font-bold text-gray-800">
-                    {formatCurrency(bankAccounts.filter(a => a.tipo === 'efectivo' && a.isActive).reduce((sum, a) => sum + a.saldo, 0))}
-                  </h3>
-                </div>
-                <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-blue-600">
-                  <p className="text-sm text-gray-500 mb-1">Capital Liquido Total</p>
-                  <h3 className="text-2xl font-bold text-gray-800">
-                    {formatCurrency(bankAccounts.filter(a => a.isActive).reduce((sum, a) => sum + a.saldo, 0))}
-                  </h3>
-                  <p className="text-xs text-gray-400 mt-1">Caja + Bancos</p>
-                </div>
+            {/* Resumen Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-blue-500">
+                <p className="text-sm text-gray-500 mb-1">Total en Bancos</p>
+                <h3 className="text-2xl font-bold text-gray-800">
+                  {formatCurrency(bankAccounts.filter(a => a.tipo === 'banco' && a.isActive).reduce((sum, a) => sum + a.saldo, 0))}
+                </h3>
               </div>
+              <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-emerald-500">
+                <p className="text-sm text-gray-500 mb-1">Total en Efectivo</p>
+                <h3 className="text-2xl font-bold text-gray-800">
+                  {formatCurrency(bankAccounts.filter(a => a.tipo === 'efectivo' && a.isActive).reduce((sum, a) => sum + a.saldo, 0))}
+                </h3>
+              </div>
+              <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-purple-500">
+                <p className="text-sm text-gray-500 mb-1">Capital Total Disponible</p>
+                <h3 className="text-2xl font-bold text-gray-800">
+                  {formatCurrency(bankAccounts.filter(a => a.isActive).reduce((sum, a) => sum + a.saldo, 0))}
+                </h3>
+              </div>
+            </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {bankAccounts.map(account => (
-                  <div key={account._id} className={`bg-white rounded-xl shadow-lg p-6 border-l-4 ${account.isActive ? 'border-green-500' : 'border-red-500'}`}>
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-2xl">{account.tipo === 'efectivo' ? '💵' : '🏦'}</span>
-                          <h3 className="text-lg font-bold text-gray-800">{account.nombreBanco}</h3>
-                        </div>
-                        <p className="text-gray-500 text-sm">{account.tipo === 'efectivo' ? 'Caja / Efectivo' : account.numeroCuenta}</p>
-                      </div>
-                      <span className={`px-2 py-1 text-xs rounded-full ${account.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                        {account.isActive ? 'Activa' : 'Inactiva'}
-                      </span>
-                    </div>
 
-                    <div className="mb-6">
-                      <p className="text-sm text-gray-500">Saldo Disponible</p>
-                      <p className="text-3xl font-bold text-gray-800">{formatCurrency(account.saldo)}</p>
-                    </div>
 
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => {
-                          setSelectedAccount(account);
-                          setShowDepositForm(true);
-                        }}
-                        disabled={!account.isActive}
-                        className="flex-1 bg-blue-50 text-blue-600 py-2 rounded-lg hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Depositar
-                      </button>
-                      <button
-                        onClick={() => handleUpdateAccountStatus(account)}
-                        className={`px-3 py-2 rounded-lg ${account.isActive ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}
-                      >
-                        {account.isActive ? 'Baja' : 'Alta'}
-                      </button>
-                      <button
-                        onClick={() => handleEditAccount(account)}
-                        className="px-3 py-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200"
-                      >
-                        Editar
-                      </button>
-                    </div>
-                    <button
-                      onClick={() => handleViewHistory(account)}
-                      className="w-full mt-2 text-sm text-gray-500 hover:text-gray-700 underline"
-                    >
-                      Ver Historial de Movimientos
+            {/* Grilla de Cuentas */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {bankAccounts.map(account => (
+                <div key={account._id} className={`bg-white rounded-xl shadow-md p-6 border-l-4 ${account.isActive ? (account.tipo === 'efectivo' ? 'border-green-500' : 'border-blue-500') : 'border-gray-400 opacity-75'} relative`}>
+                  <div className="absolute top-4 right-4 flex gap-2">
+                    <button onClick={() => handleEditAccount(account)} className="text-gray-400 hover:text-blue-500" title="Editar">✏️</button>
+                    <button onClick={() => handleUpdateAccountStatus(account)} className="text-gray-400 hover:text-red-500" title={account.isActive ? "Dar de baja" : "Activar"}>
+                      {account.isActive ? '❌' : '✅'}
                     </button>
                   </div>
-                ))}
-              </div>
 
-              {/* Modal Nueva Cuenta */}
-              {showAccountForm && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                  <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
-                    <h3 className="text-xl font-bold text-gray-800 mb-4">{editingAccountId ? 'Editar Cuenta' : 'Nueva Cuenta Bancaria'}</h3>
-                    <form onSubmit={handleCreateAccount} className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Cuenta</label>
-                        <select
-                          value={accountFormData.tipo}
-                          onChange={(e) => setAccountFormData({ ...accountFormData, tipo: e.target.value })}
-                          className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                        >
-                          <option value="banco">Cuenta Bancaria</option>
-                          <option value="efectivo">Caja / Efectivo</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del Banco</label>
-                        <input
-                          type="text"
-                          value={accountFormData.nombreBanco}
-                          onChange={(e) => setAccountFormData({ ...accountFormData, nombreBanco: e.target.value })}
-                          className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                          placeholder="Ej: Banco Mercantil"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Número de Cuenta</label>
-                        <input
-                          type="text"
-                          value={accountFormData.numeroCuenta}
-                          onChange={(e) => setAccountFormData({ ...accountFormData, numeroCuenta: e.target.value })}
-                          className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                          placeholder="Ej: 12345678"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Saldo Inicial</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={accountFormData.saldoInicial}
-                          onChange={(e) => setAccountFormData({ ...accountFormData, saldoInicial: e.target.value })}
-                          className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                          placeholder="0.00"
-                          required={!editingAccountId}
-                          disabled={!!editingAccountId}
-                        />
-                      </div>
-                      <div className="flex space-x-3 mt-4">
-                        <button
-                          type="submit"
-                          className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition-colors"
-                        >
-                          Guardar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowAccountForm(false);
-                            setEditingAccountId(null);
-                            setAccountFormData({ nombreBanco: '', numeroCuenta: '', saldoInicial: '' });
-                          }}
-                          className="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600 transition-colors"
-                        >
-                          Cancelar
-                        </button>
-                      </div>
-                    </form>
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="text-3xl">{account.tipo === 'efectivo' ? '💵' : '🏦'}</span>
+                    <div>
+                      <h4 className="font-bold text-lg text-gray-800">{account.nombreBanco}</h4>
+                      <p className="text-xs text-gray-500">{account.tipo === 'efectivo' ? 'Caja Chica' : `Cuenta: ${account.numeroCuenta}`}</p>
+                    </div>
                   </div>
+
+                  <div className="mb-4">
+                    <p className="text-sm text-gray-500 mb-1">Saldo Disponible</p>
+                    <p className="text-3xl font-bold text-green-600">{formatCurrency(account.saldo)}</p>
+
+                  </div>
+
+                  <div className="flex gap-2 mt-4">
+                    <button
+                      onClick={() => {
+                        setSelectedAccount(account);
+                        setShowDepositForm(true);
+                      }}
+                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${account.isActive ? 'bg-blue-50 text-blue-600 hover:bg-blue-100' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+                      disabled={!account.isActive}
+                    >
+                      📥 Depositar
+                    </button>
+                    <button
+                      onClick={() => handleViewHistory(account)}
+                      className="flex-1 bg-gray-50 text-gray-600 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors"
+                    >
+                      📜 Historial
+                    </button>
+                  </div>
+                  {!account.isActive && <div className="absolute inset-0 bg-white/50 flex items-center justify-center rounded-xl pointer-events-none"><span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-xs font-bold transform -rotate-12 border border-red-200 shadow-sm">INACTIVA</span></div>}
                 </div>
-              )}
+              ))}
             </div>
-          )}
+
+            {/* Modal Nueva/Editar Cuenta */}
+            {showAccountForm && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
+                  <h3 className="text-xl font-bold text-gray-800 mb-4">{editingAccountId ? 'Editar Cuenta' : 'Nueva Cuenta Bancaria'}</h3>
+                  <form onSubmit={handleCreateAccount} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Cuenta</label>
+                      <select
+                        value={accountFormData.tipo}
+                        onChange={(e) => setAccountFormData({ ...accountFormData, tipo: e.target.value })}
+                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                      >
+                        <option value="banco">Cuenta Bancaria</option>
+                        <option value="efectivo">Caja / Efectivo</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del Banco</label>
+                      <input
+                        type="text"
+                        value={accountFormData.nombreBanco}
+                        onChange={(e) => setAccountFormData({ ...accountFormData, nombreBanco: e.target.value })}
+                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                        placeholder="Ej: Banco Mercantil"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Número de Cuenta</label>
+                      <input
+                        type="text"
+                        value={accountFormData.numeroCuenta}
+                        onChange={(e) => setAccountFormData({ ...accountFormData, numeroCuenta: e.target.value })}
+                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                        placeholder="Ej: 12345678"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Saldo Inicial</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={accountFormData.saldoInicial}
+                        onChange={(e) => setAccountFormData({ ...accountFormData, saldoInicial: e.target.value })}
+                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                        placeholder="0.00"
+                        required={!editingAccountId}
+                        disabled={!!editingAccountId}
+                      />
+                    </div>
+                    <div className="flex space-x-3 mt-4">
+                      <button
+                        type="submit"
+                        className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition-colors"
+                      >
+                        Guardar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAccountForm(false);
+                          setEditingAccountId(null);
+                          setAccountFormData({ nombreBanco: '', numeroCuenta: '', saldoInicial: '' });
+                        }}
+                        className="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600 transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* --- MAQUINARIA TAB --- */}
         {activeTab === 'maquinaria' && (
@@ -1241,18 +1521,26 @@ const FinanzasPage = ({ userRole }) => {
                 <h2 className="text-xl font-bold text-gray-800">Activos y Maquinaria</h2>
                 <p className="text-gray-500 text-sm">Registro de valor de maquinaria y equipos</p>
               </div>
-              <button
-                onClick={() => setShowMaquinaForm(true)}
-                className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors shadow-md"
-              >
-                + Nueva Maquinaria
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={exportarMaquinasPDF}
+                  className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors shadow-md flex items-center gap-2"
+                >
+                  <span>📄</span> Exportar PDF
+                </button>
+                <button
+                  onClick={() => setShowMaquinaForm(true)}
+                  className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors shadow-md"
+                >
+                  + Nueva Maquinaria
+                </button>
+              </div>
             </div>
 
             {/* Resumen de Valor */}
             <div className="bg-white p-6 rounded-xl shadow-lg border-l-4 border-purple-500">
               <h3 className="text-gray-500 text-sm font-medium uppercase">Valor Total en Maquinaria</h3>
-              <p className="text-3xl font-bold text-gray-800">{formatCurrency(maquinarias.reduce((acc, m) => acc + (m.costo || 0), 0))}</p>
+              <p className="text-3xl font-bold text-gray-800">{formatCurrency(maquinarias.reduce((acc, m) => acc + ((m.costo || 0) * (m.cantidad || 1)), 0))}</p>
             </div>
 
             {/* Lista de Maquinarias */}
@@ -1262,6 +1550,7 @@ const FinanzasPage = ({ userRole }) => {
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Cant.</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Costo (Valor)</th>
                     <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
@@ -1278,6 +1567,7 @@ const FinanzasPage = ({ userRole }) => {
                         <tr className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{maquina.nombre}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{maquina.tipo}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-center font-medium text-gray-900">{maquina.cantidad || 1}</td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`px-2 py-1 text-xs rounded-full ${maquina.estado === 'Operativa' ? 'bg-green-100 text-green-800' :
                               maquina.estado === 'En mantenimiento' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
@@ -1285,7 +1575,7 @@ const FinanzasPage = ({ userRole }) => {
                               {maquina.estado}
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-gray-700">{formatCurrency(maquina.costo || 0)}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-gray-700">{formatCurrency((maquina.costo || 0) * (maquina.cantidad || 1))}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
                             <button onClick={() => setExpandedMaquina(expandedMaquina === maquina._id ? null : maquina._id)} className="text-blue-600 hover:text-blue-900 mr-3">
                               {expandedMaquina === maquina._id ? 'Ocultar' : 'Historial'}
@@ -1353,7 +1643,12 @@ const FinanzasPage = ({ userRole }) => {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Costo / Valor (Bs.)</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Cantidad</label>
+                      <input type="number" required min="1" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                        value={maquinaFormData.cantidad} onChange={e => setMaquinaFormData({ ...maquinaFormData, cantidad: parseInt(e.target.value) })} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Costo Unitario (Bs.)</label>
                       <input type="number" required min="0" step="0.01" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
                         value={maquinaFormData.costo} onChange={e => setMaquinaFormData({ ...maquinaFormData, costo: e.target.value })} placeholder="0.00" />
                     </div>
@@ -1428,27 +1723,6 @@ const FinanzasPage = ({ userRole }) => {
                       onChange={(e) => setDepositFormData({ ...depositFormData, monto: e.target.value })}
                       className="w-full p-2 border border-gray-300 rounded-lg"
                       required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
-                    <input
-                      type="text"
-                      value={depositFormData.descripcion}
-                      onChange={(e) => setDepositFormData({ ...depositFormData, descripcion: e.target.value })}
-                      className="w-full p-2 border border-gray-300 rounded-lg"
-                      placeholder="Ej: Depósito de ventas del día"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Comprobante (URL/Imagen)</label>
-                    {/* En un futuro, cambiar a input file y subir a servidor */}
-                    <input
-                      type="text"
-                      value={depositFormData.comprobanteUrl}
-                      onChange={(e) => setDepositFormData({ ...depositFormData, comprobanteUrl: e.target.value })}
-                      className="w-full p-2 border border-gray-300 rounded-lg"
-                      placeholder="URL del comprobante (opcional)"
                     />
                   </div>
                   <div className="flex space-x-3 mt-6">
@@ -1687,8 +1961,96 @@ const FinanzasPage = ({ userRole }) => {
             </div>
           )
         }
-      </div >
-    </div >
+        {/* Modal Transferencia Interna */}
+        {showInternalTransferModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">Transferencia Interna de Fondos</h3>
+              <form onSubmit={handleInternalTransfer} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Cuenta Origen</label>
+                  <select
+                    value={transferFormData.sourceAccountId}
+                    onChange={(e) => setTransferFormData({ ...transferFormData, sourceAccountId: e.target.value })}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    <option value="">-- Seleccionar Origen --</option>
+                    {bankAccounts
+                      .filter(acc => acc.isActive && acc.saldo > 0)
+                      .map(acc => (
+                        <option key={acc._id} value={acc._id}>
+                          {acc.nombreBanco} ({acc.numeroCuenta}) - {formatCurrency(acc.saldo)}
+                        </option>
+                      ))
+                    }
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Cuenta Destino</label>
+                  <select
+                    value={transferFormData.targetAccountId}
+                    onChange={(e) => setTransferFormData({ ...transferFormData, targetAccountId: e.target.value })}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    <option value="">-- Seleccionar Destino --</option>
+                    {bankAccounts
+                      .filter(acc => acc.isActive && acc._id !== transferFormData.sourceAccountId)
+                      .map(acc => (
+                        <option key={acc._id} value={acc._id}>
+                          {acc.nombreBanco} ({acc.numeroCuenta || 'Efectivo'}) - {formatCurrency(acc.saldo)}
+                        </option>
+                      ))
+                    }
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Monto a Transferir</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={transferFormData.amount}
+                    onChange={(e) => setTransferFormData({ ...transferFormData, amount: e.target.value })}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="0.00"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Descripción / Motivo</label>
+                  <input
+                    type="text"
+                    value={transferFormData.description}
+                    onChange={(e) => setTransferFormData({ ...transferFormData, description: e.target.value })}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="Ej: Reposición de caja chica"
+                    required
+                  />
+                </div>
+
+                <div className="flex space-x-3 mt-6">
+                  <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                    Transferir
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowInternalTransferModal(false)}
+                    className="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 

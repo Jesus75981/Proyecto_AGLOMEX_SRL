@@ -14,6 +14,11 @@ const maquinaSchema = new mongoose.Schema({
         enum: ['Operativa', 'En mantenimiento', 'Fuera de servicio', 'En revisión', 'Necesita reparación'],
         default: 'Operativa'
     },
+    cantidad: {
+        type: Number,
+        default: 1,
+        min: 1
+    },
     costo: {
         type: Number,
         default: 0

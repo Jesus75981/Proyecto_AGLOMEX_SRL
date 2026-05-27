@@ -76,6 +76,7 @@ const FabricacionPage = ({ userRole }) => {
     marca: '',
     cajas: '',
     dimensiones: { alto: '', ancho: '', profundidad: '' },
+    codigo: '',
     imagen: null
   });
 
@@ -168,7 +169,7 @@ const FabricacionPage = ({ userRole }) => {
     ];
 
     const rows = materiales.map(item => ({
-      codigo: item.idMateriaPrima || 'S/C',
+      codigo: item.codigo || item.idMateriaPrima || 'S/C',
       nombre: item.nombre,
       categoria: item.categoria,
       marca: item.marca || '-',
@@ -180,13 +181,17 @@ const FabricacionPage = ({ userRole }) => {
       proveedor: item.proveedor ? (item.proveedor.nombre || item.proveedor.nombreEmpresa || item.proveedor) : '-'
     }));
 
+    const valorTotalInventario = materiales.reduce((acc, item) => acc + (item.cantidad * item.precioCompra), 0);
+
     autoTable(doc, {
       head: [columns.map(col => col.header)],
       body: rows.map(row => columns.map(col => row[col.dataKey])),
+      foot: [[{ content: 'VALOR TOTAL DEL INVENTARIO', colSpan: 8, styles: { halign: 'right', fontStyle: 'bold' } }, { content: `Bs. ${valorTotalInventario.toFixed(2)}`, styles: { fontStyle: 'bold', fillColor: [255, 247, 237] } }, '']],
       startY: 30,
       theme: 'grid',
       styles: { fontSize: 8 },
-      headStyles: { fillColor: [249, 115, 22] } // Orange theme to match Fabrication
+      headStyles: { fillColor: [249, 115, 22] }, // Orange theme
+      footStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0] }
     });
 
     doc.save(`Inventario_Materiales_${fecha.replace(/\//g, '-')}.pdf`);
@@ -454,6 +459,7 @@ const FabricacionPage = ({ userRole }) => {
 
       const formData = new FormData();
       formData.append('nombre', nuevoMaterial.nombre);
+      formData.append('codigo', nuevoMaterial.codigo);
       formData.append('categoria', nuevoMaterial.categoria);
       formData.append('cantidad', nuevoMaterial.cantidad);
       formData.append('precioVenta', nuevoMaterial.precioVenta);
@@ -517,6 +523,7 @@ const FabricacionPage = ({ userRole }) => {
           cajas: '',
           dimensiones: { alto: '', ancho: '', profundidad: '' },
           proveedor: '',
+          codigo: '',
           imagen: null
         });
       } else {
@@ -533,6 +540,7 @@ const FabricacionPage = ({ userRole }) => {
     setEditingMaterial(material);
     setNuevoMaterial({
       nombre: material.nombre,
+      codigo: material.codigo || '',
       categoria: material.categoria,
       cantidad: material.cantidad,
       cantidadMinima: material.cantidadMinima || 10,
@@ -1251,6 +1259,16 @@ const FabricacionPage = ({ userRole }) => {
                       />
                     </div>
                     <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Código de Material (Manual)</label>
+                      <input
+                        type="text"
+                        value={nuevoMaterial.codigo}
+                        onChange={(e) => setNuevoMaterial({ ...nuevoMaterial, codigo: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        placeholder="Ej: MAD-001"
+                      />
+                    </div>
+                    <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Categoría *</label>
                       <input
                         type="text"
@@ -1451,7 +1469,14 @@ const FabricacionPage = ({ userRole }) => {
               {/* Tabla de Materiales (Estilo Inventario Productos Terminados) */}
               <div className="bg-white rounded-xl shadow-md p-6 overflow-hidden">
                 <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-semibold text-gray-800">Inventario de Materiales</h2>
+                  <div>
+                    <h2 className="text-2xl font-semibold text-gray-800">Inventario de Materiales</h2>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Valor Total: <span className="font-bold text-orange-600">
+                        Bs. {materiales.reduce((acc, item) => acc + (item.cantidad * item.precioCompra), 0).toFixed(2)}
+                      </span>
+                    </p>
+                  </div>
                   <div className="flex space-x-3">
                     <button
                       onClick={exportarMaterialesPDF}
@@ -1477,6 +1502,7 @@ const FabricacionPage = ({ userRole }) => {
                           marca: '',
                           cajas: '',
                           dimensiones: { alto: '', ancho: '', profundidad: '' },
+                          codigo: '',
                           imagen: null
                         });
                       }}
@@ -1492,7 +1518,7 @@ const FabricacionPage = ({ userRole }) => {
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Material</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código (Auto)</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Marca</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Color</th>
@@ -1529,7 +1555,10 @@ const FabricacionPage = ({ userRole }) => {
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono bg-gray-50 rounded">
-                              {item.idMateriaPrima || <span className="text-xs text-gray-400">Sin ID</span>}
+                              <div className="flex flex-col">
+                                <span className="font-bold text-gray-900">{item.codigo || '-'}</span>
+                                <span className="text-[10px] text-gray-400">ID: {item.idMateriaPrima}</span>
+                              </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.categoria}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.marca || '-'}</td>

@@ -16,9 +16,10 @@ import {
     createAccount,
     getAccounts,
     updateAccount,
+    getRentabilidadProductos,
+    transferFunds,
     addDeposit,
-    getAccountTransactions,
-    getRentabilidadProductos // <-- Importar función
+    getAccountTransactions
 } from '../controllers/finanzas.controller.js';
 
 import { verifyToken, isAdmin } from '../middleware/auth.middleware.js';
@@ -76,6 +77,7 @@ router.post('/cuentas', createAccount);
 router.get('/cuentas', getAccounts);
 router.put('/cuentas/:id', updateAccount);
 router.post('/cuentas/deposito', addDeposit);
+router.post('/cuentas/transferir', transferFunds); // Nueva ruta de transferencia
 router.get('/cuentas/:id/transacciones', getAccountTransactions);
 
 // Rutas para transacciones financieras

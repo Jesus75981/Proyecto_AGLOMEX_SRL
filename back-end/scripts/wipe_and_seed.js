@@ -23,6 +23,7 @@ const seed = async () => {
         const users = [
             { username: 'admin', password: 'admin123', nombre: 'Admin', rol: 'admin' },
             { username: 'dueno', password: 'admin123', nombre: 'Dueño', rol: 'admin' },
+            { username: 'jesus', password: 'jesus123', nombre: 'Jesus', rol: 'admin' },
             { username: 'tienda', password: 'tienda123', nombre: 'Tienda', rol: 'empleado_tienda' }
         ];
 

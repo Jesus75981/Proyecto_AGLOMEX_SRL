@@ -21,19 +21,20 @@ export const registrarUsuario = async (req, res) => {
 export const loginUsuario = async (req, res) => {
   try {
     const { username, password } = req.body;
+    const trimmedUsername = username.trim().toLowerCase();
 
-    console.log(`🔑 Intento de login: Usuario="${username}"`);
+    console.log(`🔑 Intento de login: Usuario="${trimmedUsername}"`);
 
-    const user = await User.findOne({ username });
+    const user = await User.findOne({ username: trimmedUsername });
 
     if (!user) {
-      return res.status(401).json({ error: "Credenciales inválidas" });
+      return res.status(401).json({ error: "Credenciales inválidas (Usuario no encontrado)" });
     }
 
-    const isMatch = await user.comparePassword(password);
+    const isMatch = await user.comparePassword(password.trim());
 
     if (!isMatch) {
-      return res.status(401).json({ error: "Credenciales inválidas" });
+      return res.status(401).json({ error: "Credenciales inválidas (Contraseña incorrecta)" });
     }
 
     const token = jwt.sign({ id: user._id, rol: user.rol, nombre: user.nombre }, process.env.JWT_SECRET, { expiresIn: "1d" });
