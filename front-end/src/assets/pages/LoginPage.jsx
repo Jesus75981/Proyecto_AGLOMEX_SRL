@@ -60,10 +60,6 @@ const LoginPage = ({ onLogin }) => {
 
 
 
-  // Función para ir al catálogo público
-  const goToCatalog = () => {
-    navigate('/');
-  };
 
   return (
     <div className="flex items-center justify-center min-h-screen w-full bg-gradient-to-br from-gray-50 to-gray-100 font-sans">
@@ -156,16 +152,7 @@ const LoginPage = ({ onLogin }) => {
           </div>
         </form>
 
-        {/* Botón para ver catálogo público */}
-        <div className="flex items-center justify-center mb-4">
-          <button
-            onClick={goToCatalog}
-            className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-50 transition-colors duration-200 shadow-sm"
-            type="button"
-          >
-            Ver la página inicial
-          </button>
-        </div>
+
 
 
 
